@@ -260,10 +260,11 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   <aside class="sidebar" id="sidebar">
 
     <div class="sidebar-section section-work">
-      <div class="sidebar-title"><span class="dot"></span>근무안 체크</div>
+      <div class="sidebar-title"><span class="dot"></span>근무안</div>
       <button class="nav-item" data-tool="work1"><span class="icon">1</span><span class="label">1과 근무안</span></button>
       <button class="nav-item" data-tool="work2"><span class="icon">2</span><span class="label">2과 근무안</span></button>
       <button class="nav-item" data-tool="work3"><span class="icon">3</span><span class="label">3과 근무안</span></button>
+      <button class="nav-item" data-tool="leave"><span class="icon">🗓</span><span class="label">연차달력</span></button>
     </div>
 
     <div class="sidebar-section section-schedule">
@@ -322,6 +323,10 @@ const TOOLS = {
   work3: {
     title: '3과 근무안',
     url: 'https://script.google.com/macros/s/AKfycbxGe-JbxQJqTgvkpbv7bIgzzryJFxNqCcfuuAvoXRApqHmsV2FdPdAQ0zS5UW0hjbNO/exec'
+  },
+  leave: {
+    title: '연차달력',
+    url: 'https://script.google.com/macros/s/AKfycbxsQ2Zs8Qab0MTNmZUdDcDW-OoaaEnKdpqEVlX9t2uC9lOEM_jo0oKeUnqS5Suoh2zX/exec'
   },
   gen: {
     title: '주말·공휴일 시간표 생성기',

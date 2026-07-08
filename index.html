@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>광주365재활병원 치료실 통합 도구</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/[email protected]/dist/web/static/pretendard.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#f6f3eb;
+  --surface:#fff;
+  --sidebar-bg:#fdfbf5;
+  --ink:#181818;
+  --ink-soft:#555;
+  --ink-mute:#9a9a9a;
+  --line:#d8d4c5;
+  --line-soft:#ece8d9;
+
+  --cat-work:#5b9cd6;      --cat-work-soft:#e8f1fb;
+  --cat-schedule:#e67e22;  --cat-schedule-soft:#fdf1e6;
+  --cat-check:#16a085;     --cat-check-soft:#d5efea;
+  --cat-mgmt:#8e44ad;      --cat-mgmt-soft:#f0e6f7;
+
+  --sidebar-w:270px;
+  --header-h:56px;
+}
+
+html, body{height:100%; overflow:hidden}
+html{
+  font-family:'Pretendard','Malgun Gothic',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column}
+
+.top-header{
+  height:var(--header-h);
+  background:var(--surface);
+  border-bottom:1px solid var(--line);
+  display:flex;
+  align-items:center;
+  padding:0 20px;
+  gap:12px;
+  flex-shrink:0;
+  z-index:20;
+}
+.menu-btn{
+  display:none;
+  background:none;
+  border:none;
+  font-size:22px;
+  cursor:pointer;
+  padding:6px;
+  color:var(--ink);
+}
+.top-header .title{
+  font-weight:700;
+  font-size:15px;
+  letter-spacing:-0.3px;
+}
+.top-header .badge{
+  font-size:11px;
+  padding:3px 10px;
+  background:var(--line-soft);
+  border-radius:999px;
+  color:var(--ink-soft);
+  letter-spacing:0.3px;
+}
+.top-header .actions{
+  margin-left:auto;
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+.open-new{
+  font-size:12px;
+  color:var(--ink-soft);
+  text-decoration:none;
+  padding:6px 12px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--surface);
+  cursor:pointer;
+  font-family:inherit;
+}
+.open-new:hover{border-color:var(--ink); color:var(--ink)}
+
+.layout{
+  flex:1;
+  display:flex;
+  overflow:hidden;
+  position:relative;
+}
+
+.sidebar{
+  width:var(--sidebar-w);
+  background:var(--sidebar-bg);
+  border-right:1px solid var(--line);
+  overflow-y:auto;
+  padding:20px 0;
+  flex-shrink:0;
+}
+.sidebar-section{margin-bottom:22px}
+.sidebar-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 20px 10px;
+  font-size:11px;
+  font-weight:700;
+  color:var(--ink-mute);
+  text-transform:uppercase;
+  letter-spacing:0.8px;
+}
+.sidebar-title .dot{
+  width:6px; height:6px; border-radius:50%;
+}
+.section-work .dot{background:var(--cat-work)}
+.section-schedule .dot{background:var(--cat-schedule)}
+.section-check .dot{background:var(--cat-check)}
+.section-mgmt .dot{background:var(--cat-mgmt)}
+
+.mgmt-badge{
+  margin-left:auto;
+  margin-right:0;
+  padding:2px 7px;
+  font-size:9px;
+  background:var(--cat-mgmt);
+  color:white;
+  border-radius:4px;
+  letter-spacing:0.5px;
+  font-weight:600;
+}
+
+.sidebar-divider{
+  margin:4px 20px 20px;
+  border:0;
+  border-top:1px dashed var(--line);
+}
+
+.nav-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 20px;
+  cursor:pointer;
+  border:none;
+  background:none;
+  width:100%;
+  text-align:left;
+  font-size:14px;
+  color:var(--ink);
+  border-left:3px solid transparent;
+  font-family:inherit;
+  transition:background 0.12s ease;
+}
+.nav-item:hover{background:var(--line-soft)}
+.nav-item.active{
+  background:var(--surface);
+  font-weight:600;
+}
+.section-work .nav-item.active{border-left-color:var(--cat-work)}
+.section-schedule .nav-item.active{border-left-color:var(--cat-schedule)}
+.section-check .nav-item.active{border-left-color:var(--cat-check)}
+.section-mgmt .nav-item.active{border-left-color:var(--cat-mgmt)}
+
+.nav-item .icon{
+  width:28px; height:28px;
+  border-radius:6px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700;
+  flex-shrink:0;
+}
+.section-work .nav-item .icon{background:var(--cat-work-soft); color:var(--cat-work)}
+.section-schedule .nav-item .icon{background:var(--cat-schedule-soft); color:var(--cat-schedule)}
+.section-check .nav-item .icon{background:var(--cat-check-soft); color:var(--cat-check)}
+.section-mgmt .nav-item .icon{background:var(--cat-mgmt-soft); color:var(--cat-mgmt)}
+.nav-item .label{flex:1}
+
+.main{
+  flex:1;
+  position:relative;
+  background:var(--bg);
+  overflow:hidden;
+}
+.frame{
+  width:100%;
+  height:100%;
+  border:none;
+  background:var(--surface);
+  display:block;
+}
+.welcome{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  text-align:center;
+  padding:20px;
+  color:var(--ink-soft);
+}
+.welcome .emoji{font-size:44px; margin-bottom:16px}
+.welcome h2{font-size:22px; margin-bottom:8px; color:var(--ink); font-weight:600; letter-spacing:-0.3px}
+.welcome p{font-size:14px; margin-bottom:6px}
+.welcome .hint{
+  font-size:12px;
+  color:var(--ink-mute);
+  margin-top:22px;
+  max-width:420px;
+  line-height:1.7;
+  padding:14px 18px;
+  background:var(--surface);
+  border:1px solid var(--line-soft);
+  border-radius:10px;
+}
+
+.overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.4);
+  z-index:15;
+}
+
+@media (max-width:768px){
+  .menu-btn{display:block}
+  .sidebar{
+    position:fixed;
+    left:0;
+    top:var(--header-h);
+    bottom:0;
+    z-index:18;
+    transform:translateX(-100%);
+    transition:transform 0.22s ease;
+    box-shadow:2px 0 12px rgba(0,0,0,0.15);
+  }
+  .sidebar.open{transform:translateX(0)}
+  .overlay.show{display:block}
+  .top-header .badge{display:none}
+  .top-header .title{font-size:13px}
+}
+</style>
+</head>
+<body>
+
+<header class="top-header">
+  <button class="menu-btn" onclick="toggleSidebar()" aria-label="메뉴">☰</button>
+  <div class="title" id="pageTitle">치료실 통합 도구</div>
+  <span class="badge">광주365재활병원</span>
+  <div class="actions">
+    <a class="open-new" id="openNewBtn" href="#" target="_blank" rel="noopener" style="display:none">↗ 새 탭</a>
+  </div>
+</header>
+
+<div class="layout">
+
+  <aside class="sidebar" id="sidebar">
+
+    <div class="sidebar-section section-work">
+      <div class="sidebar-title"><span class="dot"></span>근무안 체크</div>
+      <button class="nav-item" data-tool="work1"><span class="icon">1</span><span class="label">1과 근무안</span></button>
+      <button class="nav-item" data-tool="work2"><span class="icon">2</span><span class="label">2과 근무안</span></button>
+      <button class="nav-item" data-tool="work3"><span class="icon">3</span><span class="label">3과 근무안</span></button>
+    </div>
+
+    <div class="sidebar-section section-schedule">
+      <div class="sidebar-title"><span class="dot"></span>시간표</div>
+      <button class="nav-item" data-tool="gen"><span class="icon">📅</span><span class="label">주말·공휴일 생성기</span></button>
+    </div>
+
+    <div class="sidebar-section section-check">
+      <div class="sidebar-title"><span class="dot"></span>확인 · 점검</div>
+      <button class="nav-item" data-tool="opd"><span class="icon">🩺</span><span class="label">외래치료 확인</span></button>
+      <button class="nav-item" data-tool="equip"><span class="icon">🔧</span><span class="label">기구점검</span></button>
+    </div>
+
+    <hr class="sidebar-divider">
+
+    <div class="sidebar-section section-mgmt">
+      <div class="sidebar-title">
+        <span class="dot"></span>
+        관리 도구
+        <span class="mgmt-badge">간부용</span>
+      </div>
+      <button class="nav-item" data-tool="mwd"><span class="icon">☀</span><span class="label">이동반 · 평일</span></button>
+      <button class="nav-item" data-tool="mwe"><span class="icon">🌙</span><span class="label">이동반 · 주말</span></button>
+      <button class="nav-item" data-tool="stat"><span class="icon">📊</span><span class="label">EMR-시간표 교차 마감</span></button>
+    </div>
+
+  </aside>
+
+  <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+  <main class="main">
+    <div class="welcome" id="welcome">
+      <div class="emoji">👋</div>
+      <h2>안녕하세요</h2>
+      <p>왼쪽 메뉴에서 사용할 도구를 선택하세요.</p>
+      <div class="hint">
+        모바일에서는 왼쪽 위 <b>☰</b> 버튼으로 메뉴를 열 수 있어요.<br>
+        도구가 화면에 뜨지 않으면 상단 우측 <b>↗ 새 탭</b> 버튼으로 열어보세요.
+      </div>
+    </div>
+    <iframe class="frame" id="frame" style="display:none" title="선택한 도구" allow="clipboard-read; clipboard-write"></iframe>
+  </main>
+
+</div>
+
+<script>
+const TOOLS = {
+  work1: {
+    title: '1과 근무안',
+    url: 'https://script.google.com/macros/s/AKfycbxj56hAduN2hofV3JLYZd3WQrlDPf1WjEq3nfNiAsZSxP8zaEabbCLR2_1XC_qapJhFPQ/exec'
+  },
+  work2: {
+    title: '2과 근무안',
+    url: 'https://script.google.com/macros/s/AKfycbzBpBQCbROR7jwqilQRR2QXljsFZncqwqIwBCbRzmjeboAjVy9VkvEtOtw77Wq-e0shSQ/exec'
+  },
+  work3: {
+    title: '3과 근무안',
+    url: 'https://script.google.com/macros/s/AKfycbxGe-JbxQJqTgvkpbv7bIgzzryJFxNqCcfuuAvoXRApqHmsV2FdPdAQ0zS5UW0hjbNO/exec'
+  },
+  gen: {
+    title: '주말·공휴일 시간표 생성기',
+    url: '광주365재활병원_시간표생성기.html'
+  },
+  opd: {
+    title: '외래치료 확인',
+    url: 'https://script.google.com/macros/s/AKfycbyTHcYeheArs7nSSseSQGUAwQbO4GCAGnN__vZngvi4grjy9VZw6ozJd_ylGZEzWHg-/exec'
+  },
+  equip: {
+    title: '기구점검',
+    url: 'https://script.google.com/macros/s/AKfycbywpy4d71ZV7YVlFDaEvWfI2W8c-7dYwnrUNECMVxxIcGGym-wE3VdiwS32m1ORqlKN/exec'
+  },
+  mwd: {
+    title: '이동반 시간표 · 평일',
+    url: '이동반_시간표_평일.html'
+  },
+  mwe: {
+    title: '이동반 시간표 · 주말',
+    url: '이동반_시간표_주말.html'
+  },
+  stat: {
+    title: 'EMR-시간표 교차 마감',
+    url: '재활센터_통계.html'
+  }
+};
+
+const frame = document.getElementById('frame');
+const welcome = document.getElementById('welcome');
+const pageTitle = document.getElementById('pageTitle');
+const openNewBtn = document.getElementById('openNewBtn');
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('overlay');
+
+function loadTool(key){
+  const tool = TOOLS[key];
+  if(!tool) return;
+
+  document.querySelectorAll('.nav-item').forEach(el=>{
+    el.classList.toggle('active', el.dataset.tool === key);
+  });
+
+  frame.src = tool.url;
+  frame.style.display = 'block';
+  welcome.style.display = 'none';
+  pageTitle.textContent = tool.title;
+  openNewBtn.href = tool.url;
+  openNewBtn.style.display = 'inline-block';
+
+  history.replaceState(null, '', '#' + key);
+
+  if(window.innerWidth <= 768){
+    sidebar.classList.remove('open');
+    overlay.classList.remove('show');
+  }
+}
+
+function toggleSidebar(){
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('show');
+}
+
+document.querySelectorAll('.nav-item').forEach(el=>{
+  el.addEventListener('click', ()=> loadTool(el.dataset.tool));
+});
+
+const initKey = window.location.hash.replace('#','');
+if(initKey && TOOLS[initKey]){
+  loadTool(initKey);
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>광주365재활병원 주말 및 공휴일 시간표 생성기</title>
+
+<style>
+body{
+  font-family:Arial,"Malgun Gothic",sans-serif;
+  margin:20px;
+  background:#f5f5f5;
+}
+
+.box{
+  background:white;
+  border:1px solid #ccc;
+  border-radius:10px;
+  padding:15px;
+  margin-bottom:15px;
+}
+
+button{
+  padding:10px 14px;
+  border-radius:8px;
+  border:1px solid #999;
+  cursor:pointer;
+  margin:4px;
+}
+
+table.result .edit-button button{
+  padding:4px 8px;
+  margin:2px;
+}
+
+input, select{
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #999;
+}
+
+#sheetWrap{
+  overflow:auto;
+  max-height:500px;
+  border:1px solid #aaa;
+  background:white;
+}
+
+.sheet-table{
+  border-collapse:collapse;
+  width:max-content;
+}
+
+.sheet-table th,
+.sheet-table td{
+  border:1px solid #ddd;
+  min-width:80px;
+  height:28px;
+  padding:0;
+  font-size:12px;
+}
+
+.sheet-table th{
+  background:#eee;
+  position:sticky;
+  top:0;
+  z-index:2;
+}
+
+.row-header{
+  background:#eee;
+  position:sticky;
+  left:0;
+  z-index:1;
+  min-width:40px!important;
+  text-align:center;
+}
+
+.cell{
+  width:100%;
+  height:100%;
+  padding:4px;
+  box-sizing:border-box;
+  outline:none;
+  overflow:hidden;
+  white-space:nowrap;
+}
+
+.cell:focus{
+  box-shadow:inset 0 0 0 2px #111;
+}
+
+table.result{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:15px;
+  background:white;
+}
+
+table.result th,
+table.result td{
+  border:1px solid #aaa;
+  padding:8px;
+  text-align:center;
+}
+
+table.result th{
+  background:#eee;
+}
+
+.notice{
+  background:#fff8dc;
+  border:1px solid #e0c97f;
+  border-radius:8px;
+  padding:10px;
+  margin-top:10px;
+  line-height:1.7;
+}
+
+@media print{
+  .edit-button{
+    display:none;
+  }
+
+  .box{
+    display:none;
+  }
+
+  h1{
+    display:none;
+  }
+
+  body{
+    background:white;
+    margin:0;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<h1>광주365재활병원 주말 및 공휴일 시간표 생성기</h1>
+
+<div class="box">
+
+<h3>사용 방법</h3>
+
+<ol style="line-height:1.8;">
+  <li>시놀로지에서 <b>신경계일일업무보고</b> 시트를 엽니다.</li>
+
+  <li><b>Ctrl + A</b> 를 눌러 시트 전체 선택 후 <b>Ctrl + C</b> 를 눌러 복사합니다.</li>
+
+  <li>
+    아래 큰 표의 아무 칸이나 클릭한 뒤
+    <b>Ctrl + V</b> 로 붙여넣습니다.
+  </li>
+
+  <li>
+    월 / 일 / 요일 입력 후
+    <b>[현재 표를 주말 시트에 추가]</b>
+    버튼을 누릅니다.
+  </li>
+
+  <li>
+    토요일 / 일요일 시트가 따로 있으면
+    각각 같은 방식으로 추가합니다.
+  </li>
+
+  <li>
+    환자 이름을 입력한 뒤
+    <b>[개인 시간표 보기]</b> 버튼을 누릅니다.
+  </li>
+</ol>
+
+<div style="margin:10px 0;">
+  <input id="monthInput" type="number" placeholder="월" style="width:70px;">
+  <input id="dayInput" type="number" placeholder="일" style="width:70px;">
+
+  <select id="weekdayInput">
+    <option value="">요일</option>
+    <option value="월">월</option>
+    <option value="화">화</option>
+    <option value="수">수</option>
+    <option value="목">목</option>
+    <option value="금">금</option>
+    <option value="토">토</option>
+    <option value="일">일</option>
+  </select>
+</div>
+
+<button onclick="addCurrentSheet()">
+현재 표를 주말 시트에 추가
+</button>
+
+<button onclick="clearGrid()">
+현재 표 지우기
+</button>
+
+<button onclick="clearSheets()">
+추가한 시트 전체 초기화
+</button>
+
+<p id="sheetStatus">
+아직 추가한 시트가 없습니다.
+</p>
+
+<div id="sheetWrap">
+  <table id="sheetGrid" class="sheet-table"></table>
+</div>
+
+</div>
+
+<div class="box">
+
+<input
+  type="text"
+  id="patientInput"
+  placeholder="환자명 입력 예: 김아무개"
+/>
+
+<button onclick="makeSchedule()">
+개인 시간표 보기
+</button>
+
+<button onclick="findPatientPositions()">
+환자명 위치 확인
+</button>
+
+<button onclick="window.print()">
+출력
+</button>
+
+</div>
+
+<div id="result"></div>
+
+<script>
+
+const ROWS = 60;
+const COLS = 93;
+
+let pastedSheets = [];
+
+const sections = [
+  {
+    label:"PT",
+    therapistRow:3,
+    startRow:4,
+    endRow:18,
+    startCol:1,
+    endCol:25
+  },
+  {
+    label:"작업치료",
+    therapistRow:22,
+    startRow:23,
+    endRow:38,
+    startCol:1,
+    endCol:25
+  },
+  {
+    label:"1층 근골격계",
+    therapistRow:42,
+    startRow:43,
+    endRow:60,
+    startCol:1,
+    endCol:7
+  }
+];
+
+const specialCodes = {
+  "V":"바이탈",
+  "S":"특수작업",
+  "A":"일상생활",
+  "D":"연하치료",
+  "N":"중추운동",
+  "8":"도수",
+  "12":"도수",
+  "14":"도수",
+  "16":"도수"
+};
+
+window.addEventListener("DOMContentLoaded", () => {
+
+  createGrid();
+
+  document
+    .getElementById("patientInput")
+    .addEventListener("keydown", e => {
+
+      if(e.key === "Enter"){
+        makeSchedule();
+      }
+    });
+});
+
+function createGrid(){
+
+  const table =
+    document.getElementById("sheetGrid");
+
+  table.innerHTML = "";
+
+  const thead =
+    document.createElement("thead");
+
+  const tr =
+    document.createElement("tr");
+
+  const corner =
+    document.createElement("th");
+
+  corner.className = "row-header";
+
+  tr.appendChild(corner);
+
+  for(let c=0;c<COLS;c++){
+
+    const th =
+      document.createElement("th");
+
+    th.innerText = columnName(c);
+
+    tr.appendChild(th);
+  }
+
+  thead.appendChild(tr);
+
+  table.appendChild(thead);
+
+  const tbody =
+    document.createElement("tbody");
+
+  for(let r=0;r<ROWS;r++){
+
+    const row =
+      document.createElement("tr");
+
+    const header =
+      document.createElement("td");
+
+    header.className = "row-header";
+    header.innerText = r + 1;
+
+    row.appendChild(header);
+
+    for(let c=0;c<COLS;c++){
+
+      const td =
+        document.createElement("td");
+
+      const div =
+        document.createElement("div");
+
+      div.className = "cell";
+      div.contentEditable = true;
+
+      div.dataset.row = r;
+      div.dataset.col = c;
+
+      div.addEventListener(
+        "paste",
+        handlePaste
+      );
+
+      td.appendChild(div);
+
+      row.appendChild(td);
+    }
+
+    tbody.appendChild(row);
+  }
+
+  table.appendChild(tbody);
+}
+
+function handlePaste(event){
+
+  event.preventDefault();
+
+  const html =
+    event.clipboardData.getData("text/html");
+
+  const text =
+    event.clipboardData.getData("text/plain");
+
+  const startRow = 0;
+  const startCol = 0;
+
+  let rows = [];
+
+  if(html && html.includes("<table")){
+
+    rows =
+      parseHtmlTableWithMergedCells(html);
+
+  }else{
+
+    rows = text
+      .replace(/\r\n/g,"\n")
+      .replace(/\r/g,"\n")
+      .split("\n")
+      .filter((line,index,array)=>
+        !(index===array.length-1 && line==="")
+      )
+      .map(line => line.split("\t"));
+  }
+
+  clearGrid();
+
+  rows.forEach((row,rOffset)=>{
+
+    row.forEach((value,cOffset)=>{
+
+      const r = startRow + rOffset;
+      const c = startCol + cOffset;
+
+      if(r >= ROWS || c >= COLS) return;
+
+      const cell =
+        document.querySelector(
+          `.cell[data-row="${r}"][data-col="${c}"]`
+        );
+
+      if(cell){
+        cell.innerText = normalize(value);
+      }
+    });
+  });
+}
+
+function parseHtmlTableWithMergedCells(html){
+
+  const parser =
+    new DOMParser();
+
+  const doc =
+    parser.parseFromString(html,"text/html");
+
+  const table =
+    doc.querySelector("table");
+
+  if(!table) return [];
+
+  const result = [];
+  const occupied = {};
+
+  const trList =
+    Array.from(table.querySelectorAll("tr"));
+
+  trList.forEach((tr,r)=>{
+
+    if(!result[r]) result[r] = [];
+
+    let c = 0;
+
+    const cells =
+      Array.from(tr.children);
+
+    cells.forEach(cell=>{
+
+      while(occupied[`${r},${c}`]){
+        c++;
+      }
+
+      const value =
+        normalize(cell.innerText);
+
+      const rowspan =
+        parseInt(
+          cell.getAttribute("rowspan") || "1",
+          10
+        );
+
+      const colspan =
+        parseInt(
+          cell.getAttribute("colspan") || "1",
+          10
+        );
+
+      for(let rr=0; rr<rowspan; rr++){
+
+        for(let cc=0; cc<colspan; cc++){
+
+          const targetR = r + rr;
+          const targetC = c + cc;
+
+          if(!result[targetR]){
+            result[targetR] = [];
+          }
+
+          result[targetR][targetC] = value;
+
+          occupied[
+            `${targetR},${targetC}`
+          ] = true;
+        }
+      }
+
+      c += colspan;
+    });
+  });
+
+  return result;
+}
+
+function addCurrentSheet(){
+
+  const rows =
+    getGridRows();
+
+  const hasContent =
+    rows.some(row =>
+      row.some(cell => normalize(cell))
+    );
+
+  if(!hasContent){
+
+    alert("표에 붙여넣은 내용이 없습니다.");
+    return;
+  }
+
+  const month =
+    normalize(
+      document.getElementById("monthInput").value
+    );
+
+  const day =
+    normalize(
+      document.getElementById("dayInput").value
+    );
+
+  const weekday =
+    normalize(
+      document.getElementById("weekdayInput").value
+    );
+
+  let sheetName = "";
+
+  if(month && day && weekday){
+
+    sheetName =
+      `${month}월 ${day}일 ${weekday}요일`;
+
+  }else if(month && day){
+
+    sheetName =
+      `${month}월 ${day}일`;
+
+  }else{
+
+    sheetName =
+      "붙여넣은 시트 " +
+      (pastedSheets.length + 1);
+  }
+
+  pastedSheets.push({
+    sheetName,
+    rows
+  });
+
+  document.getElementById(
+    "sheetStatus"
+  ).innerText =
+    "추가한 시트 수 : " +
+    pastedSheets.length +
+    " / " +
+    pastedSheets.map(sheet => sheet.sheetName).join(", ");
+
+  clearGrid();
+
+  document.getElementById("monthInput").value = "";
+  document.getElementById("dayInput").value = "";
+  document.getElementById("weekdayInput").value = "";
+
+  alert(sheetName + " 추가 완료");
+}
+
+function getGridRows(){
+
+  const rows = [];
+
+  for(let r=0;r<ROWS;r++){
+
+    const row = [];
+
+    for(let c=0;c<COLS;c++){
+
+      const cell =
+        document.querySelector(
+          `.cell[data-row="${r}"][data-col="${c}"]`
+        );
+
+      row.push(
+        cell
+          ? normalize(cell.innerText)
+          : ""
+      );
+    }
+
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function clearGrid(){
+
+  document
+    .querySelectorAll(".cell")
+    .forEach(cell => {
+
+      cell.innerText = "";
+    });
+}
+
+function clearSheets(){
+
+  pastedSheets = [];
+
+  document.getElementById(
+    "sheetStatus"
+  ).innerText =
+    "아직 추가한 시트가 없습니다.";
+
+  document.getElementById(
+    "result"
+  ).innerHTML = "";
+}
+
+function findPatientPositions(){
+
+  const patientName =
+    normalize(
+      document.getElementById(
+        "patientInput"
+      ).value
+    );
+
+  if(!patientName){
+
+    alert("환자명을 입력해주세요.");
+    return;
+  }
+
+  if(pastedSheets.length === 0){
+
+    alert("먼저 시트를 추가해주세요.");
+    return;
+  }
+
+  const targetName =
+    compact(patientName);
+
+  const found = [];
+
+  pastedSheets.forEach((sheet, sheetIndex)=>{
+
+    sheet.rows.forEach((row,r)=>{
+
+      row.forEach((cell,c)=>{
+
+        if(compact(cell).includes(targetName)){
+
+          found.push({
+            sheet: sheetIndex + 1,
+            row: r + 1,
+            col: columnName(c),
+            value: cell
+          });
+        }
+      });
+    });
+  });
+
+  if(found.length === 0){
+
+    alert(
+      "붙여넣은 표 안에서 환자명을 찾지 못했습니다."
+    );
+
+    return;
+  }
+
+  alert(
+    found.map(item =>
+      `시트${item.sheet} / ${item.col}${item.row} / ${item.value}`
+    ).join("\n")
+  );
+}
+
+function makeSchedule(){
+
+  const patientName =
+    normalize(
+      document.getElementById(
+        "patientInput"
+      ).value
+    );
+
+  if(!patientName){
+
+    alert("환자명을 입력해주세요.");
+    return;
+  }
+
+  if(pastedSheets.length === 0){
+
+    alert(
+      "먼저 시트를 붙여넣고 [현재 표를 주말 시트에 추가]를 눌러주세요."
+    );
+
+    return;
+  }
+
+  const items =
+    parseSchedule(patientName);
+
+  renderSchedule(patientName, items);
+}
+
+function parseSchedule(patientName){
+
+  const results = [];
+
+  const targetName =
+    compact(patientName);
+
+  pastedSheets.forEach((sheet, sheetIndex)=>{
+
+    const rows = sheet.rows;
+
+    parseMainTherapies(
+      rows,
+      results,
+      sheetIndex,
+      sheet.sheetName,
+      targetName
+    );
+
+    parseFirstFloorPT(
+      rows,
+      results,
+      sheetIndex,
+      sheet.sheetName,
+      targetName
+    );
+
+    parseFirstFloorMachines(
+      rows,
+      results,
+      sheetIndex,
+      sheet.sheetName,
+      targetName
+    );
+
+    parseMachines(
+      rows,
+      results,
+      sheetIndex,
+      sheet.sheetName,
+      targetName
+    );
+
+    parseElectric(
+      rows,
+      results,
+      sheetIndex,
+      sheet.sheetName,
+      targetName
+    );
+  });
+
+  const filteredResults =
+    removeTherapistScheduleDuplicates(results)
+      .filter(item => !isHiddenScheduleTime(item.time));
+
+  filteredResults.sort((a,b)=>{
+
+    if(a.sheetIndex !== b.sheetIndex){
+
+      return a.sheetIndex - b.sheetIndex;
+    }
+
+    return a.sortTime - b.sortTime;
+  });
+
+  return filteredResults;
+}
+
+function parseMainTherapies(
+  rows,
+  results,
+  sheetIndex,
+  dayTitle,
+  targetName
+){
+
+  sections.forEach(section=>{
+
+    const therapistHeader =
+      rows[section.therapistRow] || [];
+
+    for(
+      let r=section.startRow;
+      r<=Math.min(section.endRow, rows.length-1);
+      r++
+    ){
+
+      const row = rows[r] || [];
+
+      const time =
+        normalize(row[0]);
+
+      if(!time) continue;
+
+      if(time.includes("12:30"))
+        continue;
+
+      for(
+        let c=section.startCol;
+        c<=Math.min(section.endCol, row.length-1);
+        c++
+      ){
+
+        const cellText =
+          normalize(row[c]);
+
+        if(!cellText) continue;
+
+        const cellCompact =
+          compact(cellText);
+
+        if(!cellCompact.includes(targetName))
+          continue;
+
+        const therapist =
+          normalize(therapistHeader[c]) ||
+          "치료사 확인 필요";
+
+        const treatment =
+          makeTreatmentName(
+            cellCompact,
+            targetName,
+            section.label,
+            therapist
+          );
+
+        results.push({
+          sheetIndex,
+          dayTitle,
+          time,
+          sortTime: timeOrder(time),
+          treatment
+        });
+      }
+    }
+  });
+}
+
+function parseFirstFloorPT(
+  rows,
+  results,
+  sheetIndex,
+  dayTitle,
+  targetName
+){
+
+  for(let r=42; r<=57; r++){
+
+    const row = rows[r] || [];
+
+    const time =
+      normalize(row[9]);
+
+    if(!time) continue;
+
+    if(time.includes("12:30"))
+      continue;
+
+    for(let c=10; c<=17; c++){
+
+      const cellText =
+        normalize(row[c]);
+
+      if(!cellText) continue;
+
+      if(!compact(cellText).includes(targetName))
+        continue;
+
+      results.push({
+        sheetIndex,
+        dayTitle,
+        time,
+        sortTime: timeOrder(time),
+        treatment:"물리치료"
+      });
+    }
+  }
+}
+
+function parseFirstFloorMachines(
+  rows,
+  results,
+  sheetIndex,
+  dayTitle,
+  targetName
+){
+
+  const machineHeader =
+    rows[42] || [];
+
+  for(let r=42; r<=57; r++){
+
+    const row = rows[r] || [];
+
+    const time =
+      normalize(row[18]);
+
+    if(!time) continue;
+
+    if(time.includes("12:30"))
+      continue;
+
+    for(let c=19; c<=28; c++){
+
+      if(c === 22) continue;
+
+      const cellText =
+        normalize(row[c]);
+
+      if(!cellText) continue;
+
+      if(!compact(cellText).includes(targetName))
+        continue;
+
+      const machineName =
+        c >= 19 && c <= 21
+          ? "CPM"
+          : normalize(machineHeader[c]) || "기구";
+
+      results.push({
+        sheetIndex,
+        dayTitle,
+        time,
+        sortTime: timeOrder(time),
+        treatment:"기구-" + machineName
+      });
+    }
+  }
+}
+
+function parseMachines(
+  rows,
+  results,
+  sheetIndex,
+  dayTitle,
+  targetName
+){
+
+  const machineHeader =
+    rows[3] || [];
+
+  for(let r=4; r<=18; r++){
+
+    const row = rows[r] || [];
+
+    const time =
+      normalize(row[29]);
+
+    if(!time) continue;
+
+    if(time.includes("12:30"))
+      continue;
+
+    for(let c=30; c<=64; c++){
+
+      const cellText =
+        normalize(row[c]);
+
+      if(!cellText) continue;
+
+      if(!compact(cellText).includes(targetName))
+        continue;
+
+      const machineName =
+        normalize(machineHeader[c]) || "기구";
+
+      results.push({
+        sheetIndex,
+        dayTitle,
+        time,
+        sortTime: timeOrder(time),
+        treatment:"기구-" + machineName
+      });
+    }
+  }
+}
+
+function parseElectric(
+  rows,
+  results,
+  sheetIndex,
+  dayTitle,
+  targetName
+){
+
+  for(let r=22; r<=37; r++){
+
+    const row = rows[r] || [];
+
+    const time =
+      normalize(row[29]);
+
+    if(!time) continue;
+
+    if(time.includes("12:30"))
+      continue;
+
+    for(let c=30; c<=43; c++){
+
+      const cellText =
+        normalize(row[c]);
+
+      if(!cellText) continue;
+
+      if(!compact(cellText).includes(targetName))
+        continue;
+
+      results.push({
+        sheetIndex,
+        dayTitle,
+        time,
+        sortTime: timeOrder(time),
+        treatment:"전기치료"
+      });
+    }
+  }
+}
+
+function removeTherapistScheduleDuplicates(items){
+
+  return items.filter(item=>{
+
+    const isMachineOrElectric =
+      item.treatment.startsWith("기구-") ||
+      item.treatment === "전기치료";
+
+    if(isMachineOrElectric){
+      return true;
+    }
+
+    const hasMachineOrElectricSameTime =
+      items.some(other=>{
+
+        return (
+          other.sheetIndex === item.sheetIndex &&
+          other.dayTitle === item.dayTitle &&
+          other.time === item.time &&
+          (
+            other.treatment.startsWith("기구-") ||
+            other.treatment === "전기치료"
+          )
+        );
+      });
+
+    if(hasMachineOrElectricSameTime){
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function makeTreatmentName(
+  cellCompact,
+  targetName,
+  sectionLabel,
+  therapist
+){
+
+  const code =
+    getCodeBeforeName(
+      cellCompact,
+      targetName
+    );
+
+  if(specialCodes[code]){
+
+    if(specialCodes[code] === "도수")
+      return "도수-" + therapist;
+
+    return specialCodes[code];
+  }
+
+  if(code === "H" || code === "h")
+    return "회복기재활치료-" + therapist;
+
+  return sectionLabel + "-" + therapist;
+}
+
+function getCodeBeforeName(
+  cellCompact,
+  targetName
+){
+
+  const index =
+    cellCompact.indexOf(targetName);
+
+  if(index <= 0)
+    return "";
+
+  const before =
+    cellCompact.slice(0,index);
+
+  if(before.endsWith("16"))
+    return "16";
+
+  if(before.endsWith("14"))
+    return "14";
+
+  if(before.endsWith("12"))
+    return "12";
+
+  if(before.endsWith("8"))
+    return "8";
+
+  return before.slice(-1);
+}
+
+function timeOrder(timeText){
+
+  const text =
+    normalize(timeText);
+
+  const match =
+    text.match(
+      /(\d{1,2})\s*[:시]\s*(\d{2})?/
+    );
+
+  if(!match)
+    return 9999;
+
+  let hour =
+    parseInt(match[1],10);
+
+  const minute =
+    parseInt(match[2] || "0",10);
+
+  if(hour >= 1 && hour <= 5)
+    hour += 12;
+
+  return hour * 60 + minute;
+}
+
+function renderSchedule(patientName, items){
+
+  const result =
+    document.getElementById("result");
+
+  result.innerHTML = "";
+
+  const h2 =
+    document.createElement("h2");
+
+  h2.innerText =
+    patientName + "님 개인 시간표";
+
+  result.appendChild(h2);
+
+  if(items.length === 0){
+
+    result.innerHTML +=
+      "<p>검색 결과가 없습니다.</p>";
+
+    return;
+  }
+
+  const grouped = {};
+
+  items.forEach(item=>{
+
+    if(!grouped[item.dayTitle]){
+      grouped[item.dayTitle] = [];
+    }
+
+    grouped[item.dayTitle].push(item);
+  });
+
+  Object.keys(grouped).forEach(dayTitle=>{
+
+    const h3 =
+      document.createElement("h3");
+
+    h3.innerText = dayTitle;
+
+    result.appendChild(h3);
+
+    const table =
+      document.createElement("table");
+
+    table.className = "result";
+
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th style="width:25%;">시간</th>
+          <th>치료 내용</th>
+          <th class="edit-button" style="width:190px;">관리</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+
+    const tbody =
+      table.querySelector("tbody");
+
+    addRowsWithLunchBreak(
+      tbody,
+      grouped[dayTitle]
+    );
+
+    const sortBtn =
+      document.createElement("button");
+
+    sortBtn.className = "edit-button";
+    sortBtn.innerText = "시간순 정렬";
+    sortBtn.style.marginTop = "8px";
+
+    sortBtn.onclick = () => {
+
+      sortScheduleRows(tbody);
+    };
+
+    result.appendChild(table);
+    result.appendChild(sortBtn);
+  });
+
+  const note =
+    document.createElement("p");
+
+  note.style.textAlign = "center";
+  note.style.fontWeight = "bold";
+
+  note.innerText =
+    "스케줄 상황에 따라 치료시간 및 1:1 회복기재활치료 갯수(2~3개)가 변경될 수 있습니다.";
+
+  result.appendChild(note);
+}
+
+function addEditableRow(tbody, time="", treatment=""){
+
+  tbody.appendChild(
+    createEditableRow(time, treatment)
+  );
+}
+function addRowsWithLunchBreak(tbody, items){
+
+  const lunchSortTime =
+    12 * 60 + 30;
+
+  let lunchAdded = false;
+
+  items.forEach(item=>{
+
+    if(
+      !lunchAdded &&
+      timeOrder(item.time) >= (13 * 60 + 30)
+    ){
+
+      tbody.appendChild(
+        createLunchBreakRow()
+      );
+
+      lunchAdded = true;
+    }
+
+    addEditableRow(
+      tbody,
+      formatPersonalScheduleTime(item.time),
+      item.treatment
+    );
+  });
+}
+
+function createLunchBreakRow(){
+
+  const tr =
+    document.createElement("tr");
+
+  tr.dataset.rowType = "lunch";
+
+  tr.innerHTML = `
+    <td
+      colspan="3"
+      style="font-weight:bold; text-align:center; background:#f7f7f7;"
+    >점심시간</td>
+  `;
+
+  return tr;
+}
+
+function formatPersonalScheduleTime(timeText){
+
+  const text =
+    normalize(timeText);
+
+  const match =
+    text.match(/^(\d{1,2})\s*[:시]\s*(\d{2})?/);
+
+  if(!match)
+    return text;
+
+  let hour =
+    parseInt(match[1],10);
+
+  const minute =
+    parseInt(match[2] || "0",10);
+
+  if(hour >= 1 && hour <= 5){
+    hour += 12;
+  }
+
+  return String(hour).padStart(2,"0") +
+    ":" +
+    String(minute).padStart(2,"0");
+}
+
+
+function createEditableRow(time="", treatment=""){
+
+  const tr =
+    document.createElement("tr");
+
+  tr.innerHTML = `
+    <td
+      contenteditable="true"
+      style="outline:none;"
+    >${escapeHtml(time)}</td>
+    <td
+      contenteditable="true"
+      style="outline:none;"
+    >${escapeHtml(treatment)}</td>
+    <td class="edit-button" style="white-space:nowrap;">
+      <button type="button" title="위로 이동" onclick="moveScheduleRow(this, -1)">▲</button>
+      <button type="button" title="아래로 이동" onclick="moveScheduleRow(this, 1)">▼</button>
+      <button type="button" title="아래에 추가" onclick="insertScheduleRowBelow(this)">＋</button>
+      <button type="button" title="삭제" onclick="deleteScheduleRow(this)">삭제</button>
+    </td>
+  `;
+
+  return tr;
+}
+
+function moveScheduleRow(button, direction){
+
+  const tr =
+    button.closest("tr");
+
+  if(!tr) return;
+
+  const tbody =
+    tr.parentElement;
+
+  if(direction < 0){
+
+    const previous =
+      tr.previousElementSibling;
+
+    if(previous){
+      tbody.insertBefore(tr, previous);
+    }
+
+  }else{
+
+    const next =
+      tr.nextElementSibling;
+
+    if(next){
+      tbody.insertBefore(next, tr);
+    }
+  }
+}
+
+function insertScheduleRowBelow(button){
+
+  const tr =
+    button.closest("tr");
+
+  if(!tr) return;
+
+  const tbody =
+    tr.parentElement;
+
+  const newRow =
+    createEditableRow("", "");
+
+  if(tr.nextElementSibling){
+    tbody.insertBefore(newRow, tr.nextElementSibling);
+  }else{
+    tbody.appendChild(newRow);
+  }
+}
+
+function deleteScheduleRow(button){
+
+  const tr =
+    button.closest("tr");
+
+  if(tr){
+    tr.remove();
+  }
+}
+
+function sortScheduleRows(tbody){
+
+  const rows =
+    Array.from(tbody.querySelectorAll("tr"));
+
+  rows.sort((a,b)=>{
+
+    const aTime =
+      a.dataset.rowType === "lunch"
+        ? "12:30"
+        : normalize(a.children[0]?.innerText || "");
+
+    const bTime =
+      b.dataset.rowType === "lunch"
+        ? "12:30"
+        : normalize(b.children[0]?.innerText || "");
+
+    return timeOrder(aTime) - timeOrder(bTime);
+  });
+
+  rows.forEach(row => tbody.appendChild(row));
+}
+
+function isHiddenScheduleTime(time){
+
+  return timeOrder(time) >= (17 * 60 + 30);
+}
+
+function columnName(index){
+
+  let name = "";
+  let n = index + 1;
+
+  while(n > 0){
+
+    const rem =
+      (n - 1) % 26;
+
+    name =
+      String.fromCharCode(65 + rem) + name;
+
+    n =
+      Math.floor((n - 1) / 26);
+  }
+
+  return name;
+}
+
+function normalize(value){
+
+  if(value === undefined || value === null)
+    return "";
+
+  return String(value)
+    .replace(/\s+/g," ")
+    .trim();
+}
+
+function compact(value){
+
+  return normalize(value)
+    .replace(/\s+/g,"");
+}
+
+function escapeHtml(str){
+
+  return normalize(str)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+</script>
+
+</body>
+</html>

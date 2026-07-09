@@ -23,6 +23,11 @@
   --cat-check:#16a085;     --cat-check-soft:#d5efea;
   --cat-mgmt:#8e44ad;      --cat-mgmt-soft:#f0e6f7;
 
+  --accent-red:#e74c3c;    --accent-red-soft:#fdecea;
+  --accent-blue:#3498db;   --accent-blue-soft:#e8f4fc;
+  --accent-yellow:#f39c12; --accent-yellow-soft:#fef5e7;
+  --accent-green:#27ae60;
+
   --sidebar-w:270px;
   --header-h:56px;
 }
@@ -73,7 +78,7 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   gap:8px;
   align-items:center;
 }
-.open-new{
+.open-new, .gear-btn{
   font-size:12px;
   color:var(--ink-soft);
   text-decoration:none;
@@ -84,7 +89,8 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   cursor:pointer;
   font-family:inherit;
 }
-.open-new:hover{border-color:var(--ink); color:var(--ink)}
+.open-new:hover, .gear-btn:hover{border-color:var(--ink); color:var(--ink)}
+.gear-btn{padding:6px 10px; font-size:14px}
 
 .layout{
   flex:1;
@@ -113,9 +119,8 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   text-transform:uppercase;
   letter-spacing:0.8px;
 }
-.sidebar-title .dot{
-  width:6px; height:6px; border-radius:50%;
-}
+.sidebar-title .dot{width:6px; height:6px; border-radius:50%}
+.section-home .dot{background:var(--ink)}
 .section-work .dot{background:var(--cat-work)}
 .section-schedule .dot{background:var(--cat-schedule)}
 .section-check .dot{background:var(--cat-check)}
@@ -123,7 +128,6 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
 
 .mgmt-badge{
   margin-left:auto;
-  margin-right:0;
   padding:2px 7px;
   font-size:9px;
   background:var(--cat-mgmt);
@@ -156,10 +160,8 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   transition:background 0.12s ease;
 }
 .nav-item:hover{background:var(--line-soft)}
-.nav-item.active{
-  background:var(--surface);
-  font-weight:600;
-}
+.nav-item.active{background:var(--surface); font-weight:600}
+.section-home .nav-item.active{border-left-color:var(--ink)}
 .section-work .nav-item.active{border-left-color:var(--cat-work)}
 .section-schedule .nav-item.active{border-left-color:var(--cat-schedule)}
 .section-check .nav-item.active{border-left-color:var(--cat-check)}
@@ -172,6 +174,7 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   font-size:13px; font-weight:700;
   flex-shrink:0;
 }
+.section-home .nav-item .icon{background:#eee; color:var(--ink)}
 .section-work .nav-item .icon{background:var(--cat-work-soft); color:var(--cat-work)}
 .section-schedule .nav-item .icon{background:var(--cat-schedule-soft); color:var(--cat-schedule)}
 .section-check .nav-item .icon{background:var(--cat-check-soft); color:var(--cat-check)}
@@ -191,7 +194,96 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   background:var(--surface);
   display:block;
 }
-.welcome{
+
+/* Dashboard */
+.dashboard{
+  position:absolute;
+  inset:0;
+  overflow-y:auto;
+  padding:32px 40px 60px;
+}
+.dash-header{
+  display:flex;
+  align-items:flex-end;
+  gap:16px;
+  margin-bottom:28px;
+  flex-wrap:wrap;
+}
+.dash-date{
+  font-size:44px;
+  font-weight:700;
+  letter-spacing:-1.5px;
+  line-height:1;
+  color:var(--ink);
+}
+.dash-day{
+  font-size:22px;
+  font-weight:600;
+  color:var(--ink-soft);
+  padding-bottom:4px;
+}
+.dash-day.weekend{color:var(--accent-red)}
+.dash-greeting{
+  margin-left:auto;
+  font-size:14px;
+  color:var(--ink-mute);
+  padding-bottom:6px;
+}
+
+.dash-card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:20px 22px;
+  max-width:720px;
+}
+.dash-card h3{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:13px;
+  font-weight:700;
+  color:var(--ink-mute);
+  text-transform:uppercase;
+  letter-spacing:0.6px;
+  margin-bottom:14px;
+}
+.dash-card h3 .dot{width:6px; height:6px; border-radius:50%; background:var(--accent-yellow)}
+
+.notice-item{
+  display:flex;
+  gap:12px;
+  padding:12px 0;
+  border-bottom:1px solid var(--line-soft);
+  align-items:flex-start;
+}
+.notice-item:last-child{border-bottom:0}
+.notice-tag{
+  padding:3px 8px;
+  border-radius:4px;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:0.3px;
+  flex-shrink:0;
+  margin-top:1px;
+}
+.notice-tag.important{background:var(--accent-red-soft); color:var(--accent-red)}
+.notice-tag.info{background:var(--accent-blue-soft); color:var(--accent-blue)}
+.notice-tag.event{background:var(--accent-yellow-soft); color:var(--accent-yellow)}
+.notice-body{flex:1}
+.notice-title{font-size:14px; font-weight:600; color:var(--ink); line-height:1.4}
+.notice-desc{font-size:12px; color:var(--ink-soft); margin-top:3px; line-height:1.5; white-space:pre-wrap}
+.notice-date{font-size:11px; color:var(--ink-mute); margin-top:4px}
+
+.empty-msg{
+  padding:20px 0;
+  font-size:13px;
+  color:var(--ink-mute);
+  text-align:center;
+}
+
+/* New Tab Notice */
+.newtab-notice{
   position:absolute;
   inset:0;
   display:flex;
@@ -202,10 +294,10 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   padding:20px;
   color:var(--ink-soft);
 }
-.welcome .emoji{font-size:44px; margin-bottom:16px}
-.welcome h2{font-size:22px; margin-bottom:8px; color:var(--ink); font-weight:600; letter-spacing:-0.3px}
-.welcome p{font-size:14px; margin-bottom:6px}
-.welcome .hint{
+.newtab-notice .emoji{font-size:44px; margin-bottom:16px}
+.newtab-notice h2{font-size:22px; margin-bottom:8px; color:var(--ink); font-weight:600}
+.newtab-notice p{font-size:14px; margin-bottom:6px}
+.newtab-notice .hint{
   font-size:12px;
   color:var(--ink-mute);
   margin-top:22px;
@@ -225,6 +317,263 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   z-index:15;
 }
 
+/* Settings Modal */
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  z-index:100;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+.modal-card{
+  background:var(--surface);
+  border-radius:14px;
+  width:100%;
+  max-width:640px;
+  max-height:90vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,0.3);
+}
+.modal-header{
+  padding:18px 22px;
+  border-bottom:1px solid var(--line-soft);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-shrink:0;
+}
+.modal-title{font-weight:700; font-size:16px}
+.modal-close{
+  background:none;
+  border:none;
+  font-size:24px;
+  cursor:pointer;
+  color:var(--ink-soft);
+  line-height:1;
+  padding:0;
+  width:28px; height:28px;
+  display:flex; align-items:center; justify-content:center;
+}
+.modal-close:hover{color:var(--ink)}
+.modal-body{
+  padding:22px;
+  overflow-y:auto;
+  flex:1;
+}
+.settings-desc{
+  font-size:13px;
+  color:var(--ink-soft);
+  margin-bottom:16px;
+  line-height:1.5;
+}
+.settings-error{
+  font-size:12px;
+  color:var(--accent-red);
+  margin:8px 0;
+  padding:8px 12px;
+  background:var(--accent-red-soft);
+  border-radius:6px;
+}
+.pw-input, .url-input{
+  width:100%;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  font-family:inherit;
+  font-size:13px;
+  outline:none;
+  color:var(--ink);
+  background:var(--surface);
+}
+.pw-input:focus, .url-input:focus{border-color:var(--ink)}
+
+/* Tabs */
+.settings-tabs{
+  display:flex;
+  gap:4px;
+  margin-bottom:18px;
+  border-bottom:1px solid var(--line);
+}
+.tab-btn{
+  padding:10px 18px;
+  background:none;
+  border:none;
+  cursor:pointer;
+  font-family:inherit;
+  font-size:13px;
+  color:var(--ink-mute);
+  border-bottom:2px solid transparent;
+  margin-bottom:-1px;
+  font-weight:600;
+}
+.tab-btn:hover{color:var(--ink-soft)}
+.tab-btn.active{
+  color:var(--ink);
+  border-bottom-color:var(--ink);
+}
+
+/* URL edit */
+.url-edit-item{
+  padding:14px 0;
+  border-bottom:1px solid var(--line-soft);
+}
+.url-edit-item:last-child{border-bottom:0}
+.url-edit-label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:13px;
+  font-weight:600;
+  margin-bottom:8px;
+  color:var(--ink);
+}
+.url-edit-label .badge-cat{
+  padding:2px 7px;
+  border-radius:4px;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:0.3px;
+}
+.url-input{font-size:12px; font-family:'Consolas','Monaco',monospace}
+.url-input.changed{border-color:var(--accent-blue); background:var(--accent-blue-soft)}
+
+/* Notice edit */
+.notice-edit-item{
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  margin-bottom:12px;
+  position:relative;
+  background:var(--sidebar-bg);
+}
+.notice-edit-row{
+  display:flex;
+  gap:8px;
+  margin-bottom:8px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.notice-type-select, .notice-date-input{
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius:6px;
+  font-family:inherit;
+  font-size:12px;
+  background:white;
+  color:var(--ink);
+  outline:none;
+}
+.notice-type-select{flex-shrink:0}
+.notice-date-input{flex-shrink:0}
+.notice-title-input{
+  flex:1;
+  min-width:150px;
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius:6px;
+  font-family:inherit;
+  font-size:13px;
+  outline:none;
+  background:white;
+}
+.notice-desc-input{
+  width:100%;
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius:6px;
+  font-family:inherit;
+  font-size:12px;
+  min-height:50px;
+  resize:vertical;
+  outline:none;
+  background:white;
+  color:var(--ink);
+}
+.notice-title-input:focus, .notice-desc-input:focus,
+.notice-type-select:focus, .notice-date-input:focus{border-color:var(--ink)}
+
+.btn-delete-notice{
+  padding:6px 12px;
+  border:1px solid var(--accent-red-soft);
+  background:white;
+  color:var(--accent-red);
+  border-radius:6px;
+  cursor:pointer;
+  font-family:inherit;
+  font-size:11px;
+  font-weight:600;
+  flex-shrink:0;
+}
+.btn-delete-notice:hover{background:var(--accent-red-soft)}
+
+.btn-add-notice{
+  width:100%;
+  padding:14px;
+  border:1px dashed var(--line);
+  background:transparent;
+  border-radius:10px;
+  cursor:pointer;
+  font-family:inherit;
+  font-size:13px;
+  color:var(--ink-soft);
+  font-weight:600;
+  transition:all 0.12s ease;
+}
+.btn-add-notice:hover{
+  border-color:var(--ink);
+  color:var(--ink);
+  background:var(--sidebar-bg);
+}
+
+.settings-actions{
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+  margin-top:20px;
+  padding-top:20px;
+  border-top:1px solid var(--line-soft);
+}
+.btn-primary, .btn-secondary{
+  padding:10px 20px;
+  border-radius:8px;
+  font-family:inherit;
+  font-size:13px;
+  cursor:pointer;
+  font-weight:600;
+  transition:all 0.12s ease;
+}
+.btn-primary{background:var(--ink); color:white; border:1px solid var(--ink)}
+.btn-primary:hover:not(:disabled){background:#000}
+.btn-primary:disabled{opacity:0.5; cursor:not-allowed}
+.btn-secondary{background:var(--surface); color:var(--ink); border:1px solid var(--line)}
+.btn-secondary:hover{border-color:var(--ink)}
+
+.toast{
+  position:fixed;
+  bottom:24px;
+  right:24px;
+  padding:14px 20px;
+  border-radius:10px;
+  background:var(--ink);
+  color:white;
+  font-size:13px;
+  font-weight:600;
+  z-index:200;
+  box-shadow:0 8px 24px rgba(0,0,0,0.2);
+  animation:toastIn 0.25s ease;
+}
+.toast.success{background:var(--accent-green)}
+.toast.error{background:var(--accent-red)}
+@keyframes toastIn{
+  from{transform:translateY(20px); opacity:0}
+  to{transform:translateY(0); opacity:1}
+}
+
 @media (max-width:768px){
   .menu-btn{display:block}
   .sidebar{
@@ -241,6 +590,11 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   .overlay.show{display:block}
   .top-header .badge{display:none}
   .top-header .title{font-size:13px}
+  .dashboard{padding:20px 18px 40px}
+  .dash-date{font-size:32px}
+  .dash-day{font-size:18px}
+  .dash-greeting{width:100%; margin-left:0}
+  .modal-card{max-height:95vh}
 }
 </style>
 </head>
@@ -252,12 +606,18 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   <span class="badge">광주365재활병원</span>
   <div class="actions">
     <a class="open-new" id="openNewBtn" href="#" target="_blank" rel="noopener" style="display:none">↗ 새 탭</a>
+    <button class="gear-btn" onclick="openSettings()" title="관리자 설정">⚙</button>
   </div>
 </header>
 
 <div class="layout">
 
   <aside class="sidebar" id="sidebar">
+
+    <div class="sidebar-section section-home">
+      <div class="sidebar-title"><span class="dot"></span>홈</div>
+      <button class="nav-item active" data-tool="home"><span class="icon">🏠</span><span class="label">대시보드</span></button>
+    </div>
 
     <div class="sidebar-section section-work">
       <div class="sidebar-title"><span class="dot"></span>근무안</div>
@@ -296,16 +656,21 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
 
   <main class="main">
-    <div class="welcome" id="welcome">
-      <div class="emoji">👋</div>
-      <h2>안녕하세요</h2>
-      <p>왼쪽 메뉴에서 사용할 도구를 선택하세요.</p>
-      <div class="hint">
-        모바일에서는 왼쪽 위 <b>☰</b> 버튼으로 메뉴를 열 수 있어요.<br>
-        도구가 화면에 뜨지 않으면 상단 우측 <b>↗ 새 탭</b> 버튼으로 열어보세요.
+
+    <div class="dashboard" id="dashboard">
+      <div class="dash-header">
+        <div class="dash-date" id="dashDate"></div>
+        <div class="dash-day" id="dashDay"></div>
+        <div class="dash-greeting" id="dashGreeting"></div>
+      </div>
+
+      <div class="dash-card">
+        <h3><span class="dot"></span>공지사항</h3>
+        <div id="noticeList"></div>
       </div>
     </div>
-    <div class="welcome" id="newTabNotice" style="display:none">
+
+    <div class="newtab-notice" id="newTabNotice" style="display:none">
       <div class="emoji">↗</div>
       <h2 id="newTabTitle">도구</h2>
       <p>이 도구는 새 탭에서 열려요.</p>
@@ -314,62 +679,428 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
         상단 우측 <b>↗ 새 탭</b> 버튼을 눌러주세요.
       </div>
     </div>
+
     <iframe class="frame" id="frame" style="display:none" title="선택한 도구" allow="clipboard-read; clipboard-write"></iframe>
   </main>
 
 </div>
 
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal" style="display:none" onclick="handleModalClick(event)">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">⚙ 관리자 설정</div>
+      <button class="modal-close" onclick="closeSettings()">×</button>
+    </div>
+    <div class="modal-body">
+
+      <div id="pwStep">
+        <div class="settings-desc">편집하려면 관리자 비밀번호를 입력해주세요.</div>
+        <input type="password" class="pw-input" id="pwInput" placeholder="비밀번호" autocomplete="off">
+        <div class="settings-error" id="pwError" style="display:none"></div>
+        <div class="settings-actions">
+          <button class="btn-secondary" onclick="closeSettings()">취소</button>
+          <button class="btn-primary" onclick="unlockSettings()">확인</button>
+        </div>
+      </div>
+
+      <div id="editStep" style="display:none">
+        <div class="settings-tabs">
+          <button class="tab-btn active" data-tab="urls" onclick="switchTab('urls')">URL 관리</button>
+          <button class="tab-btn" data-tab="notices" onclick="switchTab('notices')">공지사항</button>
+        </div>
+
+        <div id="urlsTab">
+          <div class="settings-desc">
+            Apps Script 재배포 등으로 URL이 바뀌면 여기서 수정하세요.
+          </div>
+          <div id="urlEditList"></div>
+        </div>
+
+        <div id="noticesTab" style="display:none">
+          <div class="settings-desc">
+            대시보드에 표시될 공지사항을 관리합니다.
+          </div>
+          <div id="noticesEditList"></div>
+          <button class="btn-add-notice" onclick="addNotice()">+ 새 공지 추가</button>
+        </div>
+
+        <div class="settings-error" id="saveError" style="display:none"></div>
+        <div class="settings-actions">
+          <button class="btn-secondary" onclick="closeSettings()">취소</button>
+          <button class="btn-primary" id="saveBtn" onclick="saveSettings()">저장</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <script>
+// ==========================================
+//  URL 관리 API (Google Apps Script)
+// ==========================================
+const CONFIG_API_URL = 'https://script.google.com/macros/s/AKfycbzyifx7avafP9AlDMZ2bAzGAI8fCEhYLFX2DvhNZsGMxVaGhc8ONWpoHPmAYpQG-xRarQ/exec';
+
+// ==========================================
+//  도구 URL 기본값 (fallback)
+//  실제 사용 URL은 Google Sheet에서 관리됨
+// ==========================================
+
 const TOOLS = {
-  work1: {
-    title: '1과 근무안',
-    url: 'https://script.google.com/macros/s/AKfycbxj56hAduN2hofV3JLYZd3WQrlDPf1WjEq3nfNiAsZSxP8zaEabbCLR2_1XC_qapJhFPQ/exec'
-  },
-  work2: {
-    title: '2과 근무안',
-    url: 'https://script.google.com/macros/s/AKfycbzBpBQCbROR7jwqilQRR2QXljsFZncqwqIwBCbRzmjeboAjVy9VkvEtOtw77Wq-e0shSQ/exec'
-  },
-  work3: {
-    title: '3과 근무안',
-    url: 'https://script.google.com/macros/s/AKfycbxGe-JbxQJqTgvkpbv7bIgzzryJFxNqCcfuuAvoXRApqHmsV2FdPdAQ0zS5UW0hjbNO/exec'
-  },
-  leave: {
-    title: '연차달력',
-    url: 'https://script.google.com/macros/s/AKfycbxsQ2Zs8Qab0MTNmZUdDcDW-OoaaEnKdpqEVlX9t2uC9lOEM_jo0oKeUnqS5Suoh2zX/exec'
-  },
-  gen: {
-    title: '주말·공휴일 시간표 생성기',
-    url: '광주365재활병원_시간표생성기.html'
-  },
-  opd: {
-    title: '외래치료 확인',
-    url: 'https://script.google.com/macros/s/AKfycbyTHcYeheArs7nSSseSQGUAwQbO4GCAGnN__vZngvi4grjy9VZw6ozJd_ylGZEzWHg-/exec'
-  },
-  equip: {
-    title: '기구점검',
-    url: 'https://script.google.com/macros/s/AKfycbywpy4d71ZV7YVlFDaEvWfI2W8c-7dYwnrUNECMVxxIcGGym-wE3VdiwS32m1ORqlKN/exec',
-    openInNewTab: true
-  },
-  mwd: {
-    title: '이동반 시간표 · 평일',
-    url: '이동반_시간표_평일.html'
-  },
-  mwe: {
-    title: '이동반 시간표 · 주말',
-    url: '이동반_시간표_주말.html'
-  },
-  stat: {
-    title: 'EMR-시간표 교차 마감',
-    url: '재활센터_통계.html'
-  }
+  home: { title: '치료실 통합 도구', special: 'home' },
+  work1: { title: '1과 근무안', url: 'https://script.google.com/macros/s/AKfycbxj56hAduN2hofV3JLYZd3WQrlDPf1WjEq3nfNiAsZSxP8zaEabbCLR2_1XC_qapJhFPQ/exec' },
+  work2: { title: '2과 근무안', url: 'https://script.google.com/macros/s/AKfycbzBpBQCbROR7jwqilQRR2QXljsFZncqwqIwBCbRzmjeboAjVy9VkvEtOtw77Wq-e0shSQ/exec' },
+  work3: { title: '3과 근무안', url: 'https://script.google.com/macros/s/AKfycbxGe-JbxQJqTgvkpbv7bIgzzryJFxNqCcfuuAvoXRApqHmsV2FdPdAQ0zS5UW0hjbNO/exec' },
+  leave: { title: '연차달력', url: 'https://script.google.com/macros/s/AKfycbxsQ2Zs8Qab0MTNmZUdDcDW-OoaaEnKdpqEVlX9t2uC9lOEM_jo0oKeUnqS5Suoh2zX/exec' },
+  gen: { title: '주말·공휴일 시간표 생성기', url: '광주365재활병원_시간표생성기.html' },
+  opd: { title: '외래치료 확인', url: 'https://script.google.com/macros/s/AKfycbyTHcYeheArs7nSSseSQGUAwQbO4GCAGnN__vZngvi4grjy9VZw6ozJd_ylGZEzWHg-/exec' },
+  equip: { title: '기구점검', url: 'https://script.google.com/macros/s/AKfycbywpy4d71ZV7YVlFDaEvWfI2W8c-7dYwnrUNECMVxxIcGGym-wE3VdiwS32m1ORqlKN/exec', openInNewTab: true },
+  mwd: { title: '이동반 시간표 · 평일', url: '이동반_시간표_평일.html' },
+  mwe: { title: '이동반 시간표 · 주말', url: '이동반_시간표_주말.html' },
+  stat: { title: 'EMR-시간표 교차 마감', url: '재활센터_통계.html' }
 };
 
+// ==========================================
+//  로직
+// ==========================================
+
 const frame = document.getElementById('frame');
-const welcome = document.getElementById('welcome');
+const dashboard = document.getElementById('dashboard');
+const newTabNotice = document.getElementById('newTabNotice');
 const pageTitle = document.getElementById('pageTitle');
 const openNewBtn = document.getElementById('openNewBtn');
 const sidebar = document.getElementById('sidebar');
 const overlay = document.getElementById('overlay');
+
+const DAY_NAMES = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
+
+let currentNotices = [];        // 서버에서 로드한 공지 (대시보드 표시용)
+let editingNotices = [];        // 편집 중인 공지 (임시)
+let originalNoticesJson = '[]'; // 편집 시작 시 스냅샷 (변경 감지용)
+let currentPassword = null;
+let originalUrls = {};
+
+// --- Config Loading ---
+
+async function loadConfig() {
+  try {
+    const res = await fetch(CONFIG_API_URL);
+    const result = await res.json();
+
+    if (result.success) {
+      // 새 형식: tools + notices
+      if (result.tools) {
+        Object.keys(result.tools).forEach(key => {
+          if (TOOLS[key]) {
+            const remote = result.tools[key];
+            if (remote.url) TOOLS[key].url = remote.url;
+            if (remote.title) TOOLS[key].title = remote.title;
+            if (typeof remote.openInNewTab !== 'undefined') {
+              TOOLS[key].openInNewTab = remote.openInNewTab === true;
+            }
+          }
+        });
+      }
+      // 이전 형식 호환: data 필드
+      else if (result.data) {
+        Object.keys(result.data).forEach(key => {
+          if (TOOLS[key]) {
+            const remote = result.data[key];
+            if (remote.url) TOOLS[key].url = remote.url;
+            if (remote.title) TOOLS[key].title = remote.title;
+            if (typeof remote.openInNewTab !== 'undefined') {
+              TOOLS[key].openInNewTab = remote.openInNewTab === true;
+            }
+          }
+        });
+      }
+      if (Array.isArray(result.notices)) {
+        currentNotices = result.notices;
+      }
+      console.log('[Config] 원격 데이터 반영됨');
+    }
+  } catch (err) {
+    console.warn('[Config] 원격 로드 실패, 기본값 사용', err);
+  }
+}
+
+// --- Settings Modal ---
+
+function openSettings() {
+  document.getElementById('settingsModal').style.display = 'flex';
+  document.getElementById('pwStep').style.display = 'block';
+  document.getElementById('editStep').style.display = 'none';
+  document.getElementById('pwInput').value = '';
+  document.getElementById('pwError').style.display = 'none';
+  document.getElementById('saveError').style.display = 'none';
+  currentPassword = null;
+  setTimeout(() => document.getElementById('pwInput').focus(), 100);
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').style.display = 'none';
+}
+
+function handleModalClick(event) {
+  if (event.target.id === 'settingsModal') closeSettings();
+}
+
+function unlockSettings() {
+  const pw = document.getElementById('pwInput').value.trim();
+  if (!pw) {
+    showPwError('비밀번호를 입력해주세요');
+    return;
+  }
+  currentPassword = pw;
+  document.getElementById('pwStep').style.display = 'none';
+  document.getElementById('editStep').style.display = 'block';
+
+  // 편집용 데이터 초기화
+  editingNotices = JSON.parse(JSON.stringify(currentNotices));
+  originalNoticesJson = JSON.stringify(currentNotices);
+
+  switchTab('urls');
+  renderUrlEditList();
+  renderNoticesEditor();
+}
+
+function showPwError(msg) {
+  const el = document.getElementById('pwError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  document.getElementById('urlsTab').style.display = tab === 'urls' ? 'block' : 'none';
+  document.getElementById('noticesTab').style.display = tab === 'notices' ? 'block' : 'none';
+}
+
+function renderUrlEditList() {
+  originalUrls = {};
+  const list = document.getElementById('urlEditList');
+  const keys = Object.keys(TOOLS).filter(k => k !== 'home');
+
+  const categoryMap = {
+    work1: {label: '근무안', color: 'var(--cat-work)'},
+    work2: {label: '근무안', color: 'var(--cat-work)'},
+    work3: {label: '근무안', color: 'var(--cat-work)'},
+    leave: {label: '근무안', color: 'var(--cat-work)'},
+    gen: {label: '시간표', color: 'var(--cat-schedule)'},
+    opd: {label: '확인·점검', color: 'var(--cat-check)'},
+    equip: {label: '확인·점검', color: 'var(--cat-check)'},
+    mwd: {label: '간부용', color: 'var(--cat-mgmt)'},
+    mwe: {label: '간부용', color: 'var(--cat-mgmt)'},
+    stat: {label: '간부용', color: 'var(--cat-mgmt)'}
+  };
+
+  list.innerHTML = keys.map(key => {
+    const tool = TOOLS[key];
+    const cat = categoryMap[key] || {label: '기타', color: 'var(--ink-mute)'};
+    originalUrls[key] = tool.url;
+    return `
+      <div class="url-edit-item">
+        <div class="url-edit-label">
+          <span class="badge-cat" style="background:${cat.color}20; color:${cat.color}">${cat.label}</span>
+          ${escapeHtml(tool.title)}
+        </div>
+        <input type="text" class="url-input" data-key="${key}" value="${escapeHtml(tool.url || '')}" oninput="markChanged(this)">
+      </div>
+    `;
+  }).join('');
+}
+
+function markChanged(input) {
+  const key = input.dataset.key;
+  input.classList.toggle('changed', input.value.trim() !== originalUrls[key]);
+}
+
+// --- Notice Editor ---
+
+function renderNoticesEditor() {
+  const list = document.getElementById('noticesEditList');
+  if (editingNotices.length === 0) {
+    list.innerHTML = '<div class="empty-msg" style="text-align:left; padding:0 0 12px">아직 등록된 공지가 없어요. 아래 버튼으로 추가하세요.</div>';
+    return;
+  }
+  list.innerHTML = editingNotices.map((n, i) => `
+    <div class="notice-edit-item">
+      <div class="notice-edit-row">
+        <select class="notice-type-select" data-index="${i}" data-field="type">
+          <option value="important" ${n.type === 'important' ? 'selected' : ''}>중요</option>
+          <option value="info" ${!n.type || n.type === 'info' ? 'selected' : ''}>안내</option>
+          <option value="event" ${n.type === 'event' ? 'selected' : ''}>행사</option>
+        </select>
+        <input type="text" class="notice-title-input" data-index="${i}" data-field="title" placeholder="공지 제목" value="${escapeHtml(n.title || '')}">
+        <input type="date" class="notice-date-input" data-index="${i}" data-field="date" value="${escapeHtml(n.date || '')}">
+        <button class="btn-delete-notice" onclick="removeNotice(${i})">삭제</button>
+      </div>
+      <textarea class="notice-desc-input" data-index="${i}" data-field="desc" placeholder="상세 설명 (선택사항)">${escapeHtml(n.desc || '')}</textarea>
+    </div>
+  `).join('');
+
+  // 값 바뀔 때 editingNotices 동기화
+  list.querySelectorAll('[data-index]').forEach(el => {
+    const handler = () => {
+      const idx = parseInt(el.dataset.index);
+      const field = el.dataset.field;
+      editingNotices[idx][field] = el.value;
+    };
+    el.addEventListener('input', handler);
+    if (el.tagName === 'SELECT') el.addEventListener('change', handler);
+  });
+}
+
+function addNotice() {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  editingNotices.push({
+    type: 'info',
+    title: '',
+    desc: '',
+    date: todayStr
+  });
+  renderNoticesEditor();
+}
+
+function removeNotice(idx) {
+  if (!confirm('이 공지를 삭제하시겠어요?')) return;
+  editingNotices.splice(idx, 1);
+  renderNoticesEditor();
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = String(str == null ? '' : str);
+  return div.innerHTML;
+}
+
+// --- Save ---
+
+async function saveSettings() {
+  // URL 변경사항
+  const inputs = document.querySelectorAll('.url-input');
+  const urlUpdates = {};
+  inputs.forEach(input => {
+    const key = input.dataset.key;
+    const newUrl = input.value.trim();
+    if (newUrl && newUrl !== originalUrls[key]) {
+      urlUpdates[key] = { url: newUrl };
+    }
+  });
+
+  // 공지사항: 제목이 비어있는 항목 제외
+  const validNotices = editingNotices.filter(n => n.title && n.title.trim());
+  const noticesChanged = JSON.stringify(validNotices) !== originalNoticesJson;
+  const urlsChanged = Object.keys(urlUpdates).length > 0;
+
+  if (!urlsChanged && !noticesChanged) {
+    showToast('변경된 내용이 없어요', 'info');
+    closeSettings();
+    return;
+  }
+
+  const saveBtn = document.getElementById('saveBtn');
+  const saveErr = document.getElementById('saveError');
+  saveErr.style.display = 'none';
+  saveBtn.disabled = true;
+  saveBtn.textContent = '저장 중...';
+
+  const payload = { password: currentPassword };
+  if (urlsChanged) payload.urls = urlUpdates;
+  if (noticesChanged) payload.notices = validNotices;
+
+  try {
+    const res = await fetch(CONFIG_API_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+
+    if (result.success) {
+      if (urlsChanged) {
+        Object.keys(urlUpdates).forEach(key => {
+          TOOLS[key].url = urlUpdates[key].url;
+        });
+      }
+      if (noticesChanged) {
+        currentNotices = validNotices;
+        renderDashboard();
+      }
+      const changedCount = (urlsChanged ? Object.keys(urlUpdates).length : 0) + (noticesChanged ? validNotices.length : 0);
+      showToast(`저장 완료!`, 'success');
+      closeSettings();
+    } else {
+      saveErr.textContent = result.error || '저장에 실패했어요';
+      saveErr.style.display = 'block';
+      saveBtn.disabled = false;
+      saveBtn.textContent = '저장';
+    }
+  } catch (err) {
+    saveErr.textContent = '네트워크 오류: ' + err.message;
+    saveErr.style.display = 'block';
+    saveBtn.disabled = false;
+    saveBtn.textContent = '저장';
+  }
+}
+
+function showToast(msg, type) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + (type || '');
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+document.getElementById('pwInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') unlockSettings();
+});
+
+// --- Dashboard ---
+
+function renderDashboard() {
+  const now = new Date();
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+  const dow = now.getDay();
+
+  document.getElementById('dashDate').textContent = `${m}월 ${d}일`;
+  const dayEl = document.getElementById('dashDay');
+  dayEl.textContent = DAY_NAMES[dow];
+  dayEl.classList.toggle('weekend', dow === 0 || dow === 6);
+
+  const hour = now.getHours();
+  let greeting;
+  if (hour < 11) greeting = '좋은 아침이에요';
+  else if (hour < 14) greeting = '점심 잘 챙기세요';
+  else if (hour < 18) greeting = '오후도 파이팅';
+  else greeting = '오늘도 수고 많으셨어요';
+  document.getElementById('dashGreeting').textContent = greeting;
+
+  const noticeList = document.getElementById('noticeList');
+  if (currentNotices.length === 0) {
+    noticeList.innerHTML = '<div class="empty-msg">등록된 공지가 없어요</div>';
+  } else {
+    const typeLabels = { important: '중요', info: '안내', event: '행사' };
+    noticeList.innerHTML = currentNotices.map(n => `
+      <div class="notice-item">
+        <div class="notice-tag ${n.type || 'info'}">${typeLabels[n.type] || '안내'}</div>
+        <div class="notice-body">
+          <div class="notice-title">${escapeHtml(n.title)}</div>
+          ${n.desc ? `<div class="notice-desc">${escapeHtml(n.desc)}</div>` : ''}
+          ${n.date ? `<div class="notice-date">${escapeHtml(n.date)}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+// --- Tool Loading ---
 
 function loadTool(key, isInitial){
   const tool = TOOLS[key];
@@ -380,22 +1111,33 @@ function loadTool(key, isInitial){
   });
 
   pageTitle.textContent = tool.title;
-  openNewBtn.href = tool.url;
-  openNewBtn.style.display = 'inline-block';
   history.replaceState(null, '', '#' + key);
 
-  const newTabNotice = document.getElementById('newTabNotice');
+  if (tool.special === 'home') {
+    dashboard.style.display = 'block';
+    frame.style.display = 'none';
+    newTabNotice.style.display = 'none';
+    openNewBtn.style.display = 'none';
+    renderDashboard();
+    if(window.innerWidth <= 768){
+      sidebar.classList.remove('open');
+      overlay.classList.remove('show');
+    }
+    return;
+  }
+
+  openNewBtn.href = tool.url;
+  openNewBtn.style.display = 'inline-block';
+  dashboard.style.display = 'none';
 
   if (tool.openInNewTab) {
     if (!isInitial) window.open(tool.url, '_blank', 'noopener');
     frame.style.display = 'none';
-    welcome.style.display = 'none';
     document.getElementById('newTabTitle').textContent = tool.title;
     newTabNotice.style.display = 'flex';
   } else {
     frame.src = tool.url;
     frame.style.display = 'block';
-    welcome.style.display = 'none';
     newTabNotice.style.display = 'none';
   }
 
@@ -414,10 +1156,19 @@ document.querySelectorAll('.nav-item').forEach(el=>{
   el.addEventListener('click', ()=> loadTool(el.dataset.tool, false));
 });
 
-const initKey = window.location.hash.replace('#','');
-if(initKey && TOOLS[initKey]){
-  loadTool(initKey, true);
+// --- Boot ---
+
+async function boot() {
+  await loadConfig();
+  const initKey = window.location.hash.replace('#','');
+  if(initKey && TOOLS[initKey]){
+    loadTool(initKey, true);
+  } else {
+    loadTool('home', true);
+  }
 }
+
+boot();
 </script>
 
 </body>

@@ -305,6 +305,15 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
         도구가 화면에 뜨지 않으면 상단 우측 <b>↗ 새 탭</b> 버튼으로 열어보세요.
       </div>
     </div>
+    <div class="welcome" id="newTabNotice" style="display:none">
+      <div class="emoji">↗</div>
+      <h2 id="newTabTitle">도구</h2>
+      <p>이 도구는 새 탭에서 열려요.</p>
+      <div class="hint">
+        새 탭이 안 열렸거나 실수로 닫으셨다면<br>
+        상단 우측 <b>↗ 새 탭</b> 버튼을 눌러주세요.
+      </div>
+    </div>
     <iframe class="frame" id="frame" style="display:none" title="선택한 도구" allow="clipboard-read; clipboard-write"></iframe>
   </main>
 
@@ -338,7 +347,8 @@ const TOOLS = {
   },
   equip: {
     title: '기구점검',
-    url: 'https://script.google.com/macros/s/AKfycbywpy4d71ZV7YVlFDaEvWfI2W8c-7dYwnrUNECMVxxIcGGym-wE3VdiwS32m1ORqlKN/exec'
+    url: 'https://script.google.com/macros/s/AKfycbywpy4d71ZV7YVlFDaEvWfI2W8c-7dYwnrUNECMVxxIcGGym-wE3VdiwS32m1ORqlKN/exec',
+    openInNewTab: true
   },
   mwd: {
     title: '이동반 시간표 · 평일',
@@ -361,7 +371,7 @@ const openNewBtn = document.getElementById('openNewBtn');
 const sidebar = document.getElementById('sidebar');
 const overlay = document.getElementById('overlay');
 
-function loadTool(key){
+function loadTool(key, isInitial){
   const tool = TOOLS[key];
   if(!tool) return;
 
@@ -369,14 +379,25 @@ function loadTool(key){
     el.classList.toggle('active', el.dataset.tool === key);
   });
 
-  frame.src = tool.url;
-  frame.style.display = 'block';
-  welcome.style.display = 'none';
   pageTitle.textContent = tool.title;
   openNewBtn.href = tool.url;
   openNewBtn.style.display = 'inline-block';
-
   history.replaceState(null, '', '#' + key);
+
+  const newTabNotice = document.getElementById('newTabNotice');
+
+  if (tool.openInNewTab) {
+    if (!isInitial) window.open(tool.url, '_blank', 'noopener');
+    frame.style.display = 'none';
+    welcome.style.display = 'none';
+    document.getElementById('newTabTitle').textContent = tool.title;
+    newTabNotice.style.display = 'flex';
+  } else {
+    frame.src = tool.url;
+    frame.style.display = 'block';
+    welcome.style.display = 'none';
+    newTabNotice.style.display = 'none';
+  }
 
   if(window.innerWidth <= 768){
     sidebar.classList.remove('open');
@@ -390,12 +411,12 @@ function toggleSidebar(){
 }
 
 document.querySelectorAll('.nav-item').forEach(el=>{
-  el.addEventListener('click', ()=> loadTool(el.dataset.tool));
+  el.addEventListener('click', ()=> loadTool(el.dataset.tool, false));
 });
 
 const initKey = window.location.hash.replace('#','');
 if(initKey && TOOLS[initKey]){
-  loadTool(initKey);
+  loadTool(initKey, true);
 }
 </script>
 

@@ -275,6 +275,25 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
 .notice-desc{font-size:12px; color:var(--ink-soft); margin-top:3px; line-height:1.5; white-space:pre-wrap}
 .notice-date{font-size:11px; color:var(--ink-mute); margin-top:4px}
 
+.notice-link{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-top:10px;
+  padding:8px 14px;
+  background:var(--accent-blue-soft);
+  color:var(--accent-blue);
+  border-radius:8px;
+  text-decoration:none;
+  font-size:12px;
+  font-weight:600;
+  transition:all 0.12s ease;
+}
+.notice-link:hover{
+  background:var(--accent-blue);
+  color:white;
+}
+
 .empty-msg{
   padding:20px 0;
   font-size:13px;
@@ -970,6 +989,7 @@ function renderNoticesEditor() {
         <button class="btn-delete-notice" onclick="removeNotice(${i})">삭제</button>
       </div>
       <textarea class="notice-desc-input" data-index="${i}" data-field="desc" placeholder="상세 설명 (선택사항)">${escapeHtml(n.desc || '')}</textarea>
+      <input type="text" class="notice-desc-input" style="font-family:'Consolas','Monaco',monospace; font-size:11px; min-height:auto; margin-top:8px" data-index="${i}" data-field="url" placeholder="🔗 링크 URL (선택사항, 예: https://...)" value="${escapeHtml(n.url || '')}">
     </div>
   `).join('');
 
@@ -992,7 +1012,8 @@ function addNotice() {
     type: 'info',
     title: '',
     desc: '',
-    date: todayStr
+    date: todayStr,
+    url: ''
   });
   renderNoticesEditor();
 }
@@ -1135,6 +1156,7 @@ function renderDashboard() {
         <div class="notice-body">
           <div class="notice-title">${escapeHtml(n.title)}</div>
           ${n.desc ? `<div class="notice-desc">${escapeHtml(n.desc)}</div>` : ''}
+          ${n.url ? `<a href="${escapeHtml(n.url)}" target="_blank" rel="noopener" class="notice-link">🔗 링크 바로가기</a>` : ''}
           ${n.date ? `<div class="notice-date">${escapeHtml(n.date)}</div>` : ''}
         </div>
       </div>

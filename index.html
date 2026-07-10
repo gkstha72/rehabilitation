@@ -282,6 +282,26 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   text-align:center;
 }
 
+.dash-banner{
+  padding:18px 22px;
+  border-radius:14px;
+  background:linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+  color:white;
+  font-size:15px;
+  font-weight:700;
+  margin-bottom:16px;
+  max-width:720px;
+  box-shadow:0 4px 16px rgba(230, 126, 34, 0.25);
+  display:flex;
+  align-items:center;
+  gap:12px;
+  letter-spacing:-0.2px;
+}
+.dash-banner .banner-icon{
+  font-size:22px;
+  flex-shrink:0;
+}
+
 /* New Tab Notice */
 .newtab-notice{
   position:absolute;
@@ -664,6 +684,11 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
         <div class="dash-greeting" id="dashGreeting"></div>
       </div>
 
+      <div id="dashBanner" class="dash-banner" style="display:none">
+        <span class="banner-icon"></span>
+        <span id="dashBannerText"></span>
+      </div>
+
       <div class="dash-card">
         <h3><span class="dot"></span>공지사항</h3>
         <div id="noticeList"></div>
@@ -755,7 +780,7 @@ const TOOLS = {
   leave: { title: '연차달력', url: 'https://script.google.com/macros/s/AKfycbxsQ2Zs8Qab0MTNmZUdDcDW-OoaaEnKdpqEVlX9t2uC9lOEM_jo0oKeUnqS5Suoh2zX/exec' },
   gen: { title: '주말·공휴일 시간표 생성기', url: '광주365재활병원_시간표생성기.html' },
   opd: { title: '외래치료 확인', url: 'https://script.google.com/macros/s/AKfycbyTHcYeheArs7nSSseSQGUAwQbO4GCAGnN__vZngvi4grjy9VZw6ozJd_ylGZEzWHg-/exec' },
-  equip: { title: '기구점검', url: 'https://script.google.com/macros/s/AKfycbywpy4d71ZV7YVlFDaEvWfI2W8c-7dYwnrUNECMVxxIcGGym-wE3VdiwS32m1ORqlKN/exec', openInNewTab: true },
+  equip: { title: '기구점검', url: 'https://script.google.com/macros/s/AKfycbywpy4d71ZV7YVlFDaEvWfI2W8c-7dYwnrUNECMVxxIcGGym-wE3VdiwS32m1ORqlKN/exec' },
   mwd: { title: '이동반 시간표 · 평일', url: '이동반_시간표_평일.html' },
   mwe: { title: '이동반 시간표 · 주말', url: '이동반_시간표_주말.html' },
   stat: { title: 'EMR-시간표 교차 마감', url: '재활센터_통계.html' }
@@ -774,6 +799,12 @@ const sidebar = document.getElementById('sidebar');
 const overlay = document.getElementById('overlay');
 
 const DAY_NAMES = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
+
+// 요일별 배너 (0=일, 1=월, ..., 5=금, 6=토)
+// 여기에 항목 추가하면 해당 요일에만 자동으로 뜹니다
+const DAY_BANNERS = {
+  5: { icon: '📋', text: '오늘은 금요일! 주말시간표 배부하기 !!!' }
+};
 
 let currentNotices = [];        // 서버에서 로드한 공지 (대시보드 표시용)
 let editingNotices = [];        // 편집 중인 공지 (임시)
@@ -1081,6 +1112,17 @@ function renderDashboard() {
   else if (hour < 18) greeting = '오후도 파이팅';
   else greeting = '오늘도 수고 많으셨어요';
   document.getElementById('dashGreeting').textContent = greeting;
+
+  // 요일별 배너
+  const banner = document.getElementById('dashBanner');
+  const bannerData = DAY_BANNERS[dow];
+  if (bannerData) {
+    banner.querySelector('.banner-icon').textContent = bannerData.icon || '📌';
+    document.getElementById('dashBannerText').textContent = bannerData.text;
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
 
   const noticeList = document.getElementById('noticeList');
   if (currentNotices.length === 0) {

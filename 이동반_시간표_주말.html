@@ -323,11 +323,36 @@ table.sched .col-time{min-width:56px;width:56px}
 .status.show{opacity:1}
 .hidden-input{display:none}
 
+/* ===== 검증 패널 ===== */
+.verify-panel{
+  margin-bottom:12px;border-radius:8px;overflow:hidden;
+  border:1.5px solid #b9c8e6;font-size:13px;
+  box-shadow:0 2px 8px rgba(40,70,140,.08);
+}
+.vf-head{padding:10px 14px;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+.vf-head.ok{background:#e6f6ec;color:#1c7a3f}
+.vf-head.bad{background:#fdecec;color:#b3352c}
+.vf-close{margin-left:auto;background:transparent;border:none;font-size:15px;cursor:pointer;color:inherit;opacity:.6}
+.vf-close:hover{opacity:1}
+.vf-sec{padding:8px 14px;background:#fff;border-top:1px solid #eef1f6}
+.vf-sec-title{font-weight:700;font-size:12.5px;color:#3a4a63;margin-bottom:5px}
+.vf-hint{font-weight:400;color:#8a97ab;font-size:11.5px}
+.vf-row{padding:3px 0;color:#333;line-height:1.5;border-top:1px dashed #eef1f6}
+.vf-row:first-of-type{border-top:none}
+.vf-row .vf-room{font-weight:700;color:#2c3e5c;min-width:38px;display:inline-block}
+.vf-row .vf-day{font-weight:700;color:#7a5aa0;margin-right:4px}
+.vf-row .vf-nm{font-weight:600}
+.vf-row .vf-slot{color:#7a869a;font-size:12px}
+.vf-row b{color:#111}
+.vf-names{color:#667;font-size:12px}
+.vf-more{color:#8a97ab;font-size:12px;padding:4px 0}
+.vf-foot{padding:8px 14px;background:#f7f9fc;color:#7a869a;font-size:11.5px;border-top:1px solid #eef1f6}
+
 /* ===== PRINT — A3 portrait, 한 병동 = 한 장 ===== */
 @page{size:A3 portrait;margin:4mm}
 @media print{
   html,body{width:289mm;padding:0;margin:0;background:#fff;font-size:8pt;color:#000;line-height:1}
-  .header,.dash,.toolbar,.help,.status,.legend,.picker{display:none !important}
+  .header,.dash,.toolbar,.help,.status,.legend,.picker,.verify-panel{display:none !important}
   .sched-wrap{max-height:none;overflow:visible;border:none;border-radius:0;padding:0;background:#fff}
   .ward-page{
     page-break-after:always;page-break-inside:avoid;
@@ -447,6 +472,11 @@ table.sched .col-time{min-width:56px;width:56px}
       <button class="btn primary" onclick="printWard('5')">🖨 5병동</button>
     </div>
 
+    <!-- 4. 검증 -->
+    <div class="tb-group step" data-step="4" data-label="검증" title="원본과 대조">
+      <button class="btn" onclick="runVerification()" style="background:linear-gradient(180deg,#fff,#e8f0ff)">🔍 검증</button>
+    </div>
+
     <!-- 초기화 (분리됨) -->
     <div class="tb-group danger" title="초기화">
       <button class="btn subtle" onclick="clearRosterOnly()" title="환자명만 비움 (시간표는 유지)">🧑 환자명만</button>
@@ -459,6 +489,7 @@ table.sched .col-time{min-width:56px;width:56px}
   </div>
 
   <div class="sched-wrap">
+    <div id="verify-panel" class="verify-panel" style="display:none"></div>
     <div id="sched-content"></div>
   </div>
 
@@ -528,6 +559,10 @@ let state = {
 
 let pickerCtx = null;
 
+// ===== 검증용: 자동입력에 사용된 원본 워크북 보관 (세션 메모리) =====
+// 새로고침하면 사라지므로, 검증 시엔 파일을 다시 불러온 뒤 눌러야 함.
+let lastImportWb = null;  // { wb, sheetMap:{'토':name,'일':name} }
+
 function makeCellKey(room, p, slot){ return `${room}-${p}-${slot}`; }
 
 // 활성 요일의 cells 객체 반환 (room 기준)
@@ -584,6 +619,18 @@ function nameTagInfo(name){
 // ===== 저장 =====
 function saveLocal(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+// 오늘이 속한 주말(토요일 날짜)을 'YYYY-MM-DD'로 반환.
+// 토요일이면 오늘, 일요일이면 어제(토), 평일이면 그 주 토요일.
+function getCurrentWeekendSaturday(){
+  const d = new Date();
+  const wd = d.getDay();  // 0=일 … 6=토
+  if(wd === 0) d.setDate(d.getDate() - 1);        // 일 → 전날(토)
+  else if(wd !== 6) d.setDate(d.getDate() + (6 - wd));  // 평일 → 그 주 토요일
+  const y = d.getFullYear();
+  const mo = String(d.getMonth()+1).padStart(2,'0');
+  const da = String(d.getDate()).padStart(2,'0');
+  return `${y}-${mo}-${da}`;
 }
 function loadLocal(){
   try{
@@ -1848,6 +1895,161 @@ function verifySheetDate(ws, range, fileLabel){
   return true;
 }
 
+// ===== 검증 기능 (주말) =====
+// 원본에 자주 나오는 장비·치료·태그 단어 (환자명이 아님 → 미매칭 목록 제외)
+const EQUIP_WORDS = new Set([
+  '슬라','런닝','코로','코','워킹','아크','경사','바로','동적','기립','체어','리포머','캐딜락',
+  '전기','안면전기','전기펜','전기장갑','전동상지','어댑핏','클라','오토','패시브','스마트','하네스',
+  '엔젤','엑소','엘봇','알봇','로봇','필라테스','진동기','등속성','저속','한발로','호흡치료','호흡훈련',
+  '외래','화목','병동','치료실','침상','재택','방문','도수중재','인지치료','음악치료','음악치료실',
+  '연하치료','식이치료','상지운동','상지압박','하지압박','상지','안면운동','체외','크라이오','견인',
+  '스트레칭','필수','최대한','평가','재활센터','시간표','점심시간','토요일','일요일','주말시간표',
+  '월요일','화요일','수요일','목요일','금요일','근골격계','신경계','전기자극','열전기치료','도수',
+  'sono','SSP','ICT','HP','IR','BI','MI','CLT','FES','taVNS','TDCS','GJ','SN','EST','complex'
+]);
+
+// '검증' 버튼: 프로그램이 만든 시간표를 원본과 대조 (토·일 모두)
+// 방식: 실제 state를 백업 → 임시로 원본을 processSheetForDay로 다시 채움 →
+//       임시 결과 vs 실제 결과 비교 → state 원상복구. (로직 복제 없이 100% 동일 대조)
+function runVerification(){
+  if(!lastImportWb){
+    alert('먼저 합산 파일(🧠💪)을 불러와 주세요.\n\n검증은 방금 불러온 원본 파일과 현재 시간표를 대조합니다.\n(새로고침하면 원본이 사라지므로 파일을 다시 불러온 뒤 검증하세요.)');
+    return;
+  }
+  const nameMap = buildNameMap();
+  if(Object.keys(nameMap).length === 0){
+    alert('환자명이 없습니다. 병실현황을 먼저 불러와 주세요.');
+    return;
+  }
+
+  const { wb, sheetMap } = lastImportWb;
+
+  // 1) 현재(사용자가 보는) 셀 상태를 깊은 복사로 백업
+  const actualCells = {};   // day -> {key: cat}
+  DAYS.forEach(day=>{
+    actualCells[day] = {};
+    ALL_ROOMS.forEach(room=>{
+      const cells = state.rooms[room].cellsByDay[day];
+      for(const k in cells){ actualCells[day][k] = cells[k]; }
+    });
+  });
+
+  // 2) 원본으로 '기대 상태' 재생성 — 임시로 빈 셀에 다시 채움
+  //    state를 직접 쓰므로, 셀/소스를 잠깐 비우고 채운 뒤 결과를 읽고 복원.
+  const backupCellsByDay = {};
+  const backupSourceByDay = {};
+  DAYS.forEach(day=>{
+    backupCellsByDay[day] = {};
+    ALL_ROOMS.forEach(room=>{ backupCellsByDay[day][room] = state.rooms[room].cellsByDay[day]; });
+    backupSourceByDay[day] = state.cellSourceByDay[day];
+  });
+  // 임시 초기화
+  DAYS.forEach(day=>{
+    ALL_ROOMS.forEach(room=>{ state.rooms[room].cellsByDay[day] = {}; });
+    state.cellSourceByDay[day] = {};
+  });
+
+  const allUnmatched = new Set();
+  try{
+    DAYS.forEach(day=>{
+      const sheetName = sheetMap[day];
+      if(!sheetName) return;
+      const result = processSheetForDay(wb, sheetName, day, nameMap);
+      if(result && result.unmatched){ result.unmatched.forEach(n=>allUnmatched.add(n)); }
+    });
+  }catch(e){
+    // 실패 시 복원하고 알림
+    DAYS.forEach(day=>{
+      ALL_ROOMS.forEach(room=>{ state.rooms[room].cellsByDay[day] = backupCellsByDay[day][room]; });
+      state.cellSourceByDay[day] = backupSourceByDay[day];
+    });
+    console.error('검증 재생성 실패:', e);
+    alert('검증 중 오류가 발생했습니다: ' + e.message);
+    return;
+  }
+
+  // 3) 기대 상태 수집
+  const expectedCells = {};
+  DAYS.forEach(day=>{
+    expectedCells[day] = {};
+    ALL_ROOMS.forEach(room=>{
+      const cells = state.rooms[room].cellsByDay[day];
+      for(const k in cells){ expectedCells[day][k] = cells[k]; }
+    });
+  });
+
+  // 4) state 원상복구
+  DAYS.forEach(day=>{
+    ALL_ROOMS.forEach(room=>{ state.rooms[room].cellsByDay[day] = backupCellsByDay[day][room]; });
+    state.cellSourceByDay[day] = backupSourceByDay[day];
+  });
+
+  // 5) 기대 vs 실제 대조
+  const problems = { missing: [], wrongFloor: [] };
+  let checkedCells = 0;
+  DAYS.forEach(day=>{
+    for(const key in expectedCells[day]){
+      checkedCells++;
+      const exp = expectedCells[day][key];
+      const act = actualCells[day][key];
+      const [room, p] = [key.split('-')[0], key.split('-')[1]];
+      const slot = key.split('-').slice(2).join('-');
+      const name = (state.rooms[room] && state.rooms[room].patients[p] && state.rooms[room].patients[p].name) || '';
+      if(act == null || act === ''){
+        problems.missing.push({ day, room, slot, name, expected: exp });
+      }else if(act !== exp){
+        problems.wrongFloor.push({ day, room, slot, name, expected: exp, actual: act });
+      }
+    }
+  });
+
+  // 미매칭 이름 정리 (장비명 제외)
+  const cleanUnmatched = [...allUnmatched].filter(n => n && n.length >= 2 && !EQUIP_WORDS.has(n));
+  showVerificationReport(problems, { checkedCells, unmatched: cleanUnmatched });
+}
+
+function showVerificationReport(problems, meta){
+  const panel = document.getElementById('verify-panel');
+  if(!panel) return;
+  const total = problems.missing.length + problems.wrongFloor.length;
+  const pass = total === 0;
+  let html = '';
+  html += `<div class="vf-head ${pass?'ok':'bad'}">`;
+  html += pass
+    ? `✅ 통과 — 원본과 시간표가 일치합니다 (토·일 ${meta.checkedCells}칸 확인)`
+    : `⚠️ 문제 ${total}건 발견 (토·일 ${meta.checkedCells}칸 확인)`;
+  html += `<button class="vf-close" onclick="document.getElementById('verify-panel').style.display='none'">✕</button></div>`;
+
+  if(problems.missing.length){
+    html += `<div class="vf-sec"><div class="vf-sec-title">🔴 누락 — 원본엔 있는데 표에 안 채워진 칸 (${problems.missing.length})</div>`;
+    problems.missing.slice(0,60).forEach(m=>{
+      html += `<div class="vf-row"><span class="vf-day">${m.day}</span><span class="vf-room">${m.room}호</span> <span class="vf-nm">${m.name||'(이름?)'}</span> <span class="vf-slot">${m.slot}</span> → 원본 <b>${m.expected}</b>인데 <b>빈칸</b></div>`;
+    });
+    if(problems.missing.length>60) html += `<div class="vf-more">…외 ${problems.missing.length-60}건</div>`;
+    html += `</div>`;
+  }
+  if(problems.wrongFloor.length){
+    html += `<div class="vf-sec"><div class="vf-sec-title">🟠 층 다름 — 원본과 다른 층으로 채워진 칸 (${problems.wrongFloor.length})</div>`;
+    problems.wrongFloor.slice(0,60).forEach(m=>{
+      html += `<div class="vf-row"><span class="vf-day">${m.day}</span><span class="vf-room">${m.room}호</span> <span class="vf-nm">${m.name||'(이름?)'}</span> <span class="vf-slot">${m.slot}</span> → 표 <b>${m.actual}</b> / 원본 <b>${m.expected}</b></div>`;
+    });
+    if(problems.wrongFloor.length>60) html += `<div class="vf-more">…외 ${problems.wrongFloor.length-60}건</div>`;
+    html += `</div>`;
+  }
+  if(meta.unmatched && meta.unmatched.length){
+    html += `<div class="vf-sec"><div class="vf-sec-title">⚪ 참고 — 원본에 있으나 병실 명단에 없는 이름 (${meta.unmatched.length})<span class="vf-hint"> · 외래·타병동일 수 있음</span></div>`;
+    html += `<div class="vf-row vf-names">${meta.unmatched.slice(0,40).join(', ')}${meta.unmatched.length>40?` …외 ${meta.unmatched.length-40}`:''}</div></div>`;
+  }
+  if(pass){
+    html += `<div class="vf-sec"><div class="vf-row" style="color:#2c7a3f">토·일 모든 환자가 원본과 동일한 층으로 정확히 채워졌습니다.</div></div>`;
+  }else{
+    html += `<div class="vf-foot">※ 손으로 직접 바꾼 칸은 '층 다름/누락'으로 표시될 수 있어요. 실제 수정한 칸이면 무시하세요.</div>`;
+  }
+  panel.innerHTML = html;
+  panel.style.display = 'block';
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
 function autoFillDaily(ev){
   const file = ev.target.files[0];
   if(!file) return;
@@ -1946,6 +2148,9 @@ function autoFillDaily(ev){
       }
 
       // === 두 요일(토/일) 시트 각각 처리 ===
+      // 검증용 원본 보관 (세션 메모리) — '검증' 버튼이 이 원본으로 재대조
+      lastImportWb = { wb, sheetMap: {...sheetMap} };
+
       let totalFilled = 0;
       const totalMatched = new Set();
       const totalUnmatched = new Set();
@@ -2392,6 +2597,21 @@ document.querySelectorAll('.tab').forEach(t=>{
 // 날짜는 사용자가 입력하지 않음 — 병실현황/합산 파일을 import할 때 자동 인식됨
 initState();
 loadLocal();
+
+// === 지난 주말 데이터 자동 초기화 ===
+// 저장된 토요일 날짜가 '이번 주말'이 아니면(지난주 등) 시간표를 비운다.
+// 어제/지난주 데이터가 남아 층이 옛 값으로 잘못 표시되는 문제를 원천 차단.
+(function clearIfStale(){
+  const thisSat = getCurrentWeekendSaturday();
+  if(state.date && state.date !== thisSat){
+    ALL_ROOMS.forEach(r=>{ state.rooms[r].cellsByDay = {'토':{}, '일':{}}; });
+    state.cellSourceByDay = {'토':{}, '일':{}};
+    if(state.loadCounts){ state.loadCounts.combined = 0; }
+    state.date = '';  // 지난 날짜 제거 → 이번 파일 불러오면 바로 채워짐
+    saveLocal();
+  }
+})();
+
 // 탭 동기화
 document.querySelectorAll('.tab').forEach(t=>{
   t.classList.toggle('active', t.dataset.floor === state.view);

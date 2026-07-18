@@ -1,0 +1,2917 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>이동반 시간표 (주말)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/[email protected]/dist/web/static/pretendard.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#f6f3eb;
+  --surface:#fff;
+  --surface-mute:#faf7ef;
+  --ink:#181818;
+  --ink-soft:#555;
+  --ink-mute:#9a9a9a;
+  --line:#d8d4c5;
+  --line-soft:#ece8d9;
+  --line-strong:#181818;
+
+  /* category colors — matched from print image */
+  --c3:#fff0e0;  --c3-text:#7a4815;  --c3-hover:#ffe5cc;
+  --c1:#f5a8c0;  --c1-text:#7a1f3d;  --c1-hover:#ef94b0;
+  --ct:#b8e0a8;  --ct-text:#2c5e1e;  --ct-hover:#a5d695;
+  --cw:#f5c842;  --cw-text:#6b5a05;  --cw-hover:#e3b836;
+  --co:#5b9cd6;  --co-text:#fff;     --co-hover:#4a8bc7;
+}
+
+html{font-family:'Pretendard','Noto Sans KR',-apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-size:13px;
+  line-height:1.4;
+  font-feature-settings:"tnum" 1;
+  min-height:100vh;
+  padding:18px 22px 60px;
+}
+.app{max-width:1700px;margin:0 auto}
+
+/* ===== HEADER ===== */
+.header{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:18px;
+  border-bottom:2px solid var(--line-strong);
+  padding-bottom:12px;
+  margin-bottom:14px;
+  flex-wrap:wrap;
+}
+.header h1{font-size:21px;font-weight:800;letter-spacing:-0.02em}
+.header .sub{color:var(--ink-soft);font-size:12px;margin-top:3px}
+.date-display{
+  font-family:inherit;font-size:13px;font-weight:600;
+  color:var(--ink-soft);min-height:30px;display:flex;align-items:center;
+}
+.date-display.has-date{
+  color:var(--ink);background:#fff;
+  border:1px solid var(--line);border-radius:5px;
+  padding:5px 12px;
+}
+.date-display .placeholder{color:var(--ink-mute);font-weight:500;font-style:italic}
+/* 날짜 선택 (달력 클릭 + 일수) */
+.date-pick{
+  display:inline-flex;align-items:center;gap:6px;
+  background:#fff;border:1px solid var(--line);border-radius:5px;
+  padding:4px 8px 4px 10px;cursor:pointer;
+}
+.date-pick:hover{border-color:#9db4d8;box-shadow:0 1px 4px rgba(40,70,140,.10)}
+.date-pick .dp-label{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap}
+.date-pick .dp-label.empty{color:var(--ink-mute);font-weight:500;font-style:italic}
+.date-pick input[type="date"]{
+  font-family:inherit;font-size:12px;color:var(--ink-soft);
+  border:none;background:transparent;outline:none;cursor:pointer;padding:0;width:130px;
+}
+.date-pick select{
+  font-family:inherit;font-size:12px;color:var(--ink-soft);
+  border:1px solid var(--line);border-radius:4px;background:#fff;
+  outline:none;cursor:pointer;padding:1px 3px;
+}
+.date-pick .dp-clear{
+  border:none;background:transparent;cursor:pointer;
+  color:var(--ink-mute);font-size:13px;line-height:1;padding:2px 3px;
+}
+.date-pick .dp-clear:hover{color:#b3352c}
+.legend{display:flex;gap:7px;flex-wrap:wrap}
+.legend-chip{
+  display:flex;align-items:center;gap:5px;
+  padding:3px 8px 3px 4px;border:1px solid var(--line);
+  border-radius:4px;font-size:11px;font-weight:600;
+  background:#fff;
+}
+.legend-chip .sw{
+  width:24px;height:18px;border-radius:2px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;
+}
+.lc-3 .sw{background:var(--c3);color:var(--c3-text)}
+.lc-1 .sw{background:var(--c1);color:var(--c1-text)}
+.lc-t .sw{background:var(--ct);color:var(--ct-text)}
+.lc-w .sw{background:var(--cw);color:var(--cw-text)}
+.lc-o .sw{background:var(--co);color:#fff}
+
+/* ===== DASHBOARD ===== */
+.dash{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+  gap:7px;margin-bottom:12px;
+}
+.dash .card{
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:5px;padding:7px 10px;
+}
+.card-lbl{font-size:10px;color:var(--ink-mute);font-weight:700;letter-spacing:0.04em}
+.card-val{
+  font-size:21px;font-weight:700;margin-top:2px;
+  font-variant-numeric:tabular-nums;letter-spacing:-0.02em;
+}
+.card-val .unit{font-size:12px;color:var(--ink-soft);font-weight:500;margin-left:3px}
+.card.c3 .card-val{color:var(--c3-text)}
+.card.c1 .card-val{color:var(--c1-text)}
+.card.ct .card-val{color:var(--ct-text)}
+.card.cw .card-val{color:var(--cw-text)}
+.card.co .card-val{color:#13395c}
+
+/* ===== TOOLBAR ===== */
+.toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+/* 워크플로우 그룹: 시각적으로 묶음 */
+.tb-group{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 8px;border-radius:7px;background:rgba(255,255,255,.5);
+  border:1px solid var(--line-soft);position:relative;
+}
+.tb-group.step::before{
+  content:attr(data-step) ". " attr(data-label);
+  position:absolute;top:-7px;left:6px;
+  background:#181818;color:#fff;font-size:10px;font-weight:700;
+  padding:1px 8px;border-radius:8px;line-height:1.3;letter-spacing:.3px;
+  white-space:nowrap;
+}
+.tb-group.danger{background:rgba(253,230,234,.4);border-color:#e8c4cc;position:relative}
+.tb-group.danger::before{
+  content:"초기화";position:absolute;top:-7px;left:6px;
+  background:#9a2233;color:#fff;font-size:10px;font-weight:700;
+  padding:1px 7px;border-radius:8px;line-height:1.3;letter-spacing:.5px;
+}
+.tb-divider{width:1px;height:22px;background:var(--line);margin:0 2px}
+.tabs{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:3px}
+.tab{
+  background:transparent;border:none;padding:6px 14px;
+  font-size:12px;font-weight:600;color:var(--ink-soft);
+  cursor:pointer;border-radius:3px;font-family:inherit;
+  transition:all .12s;
+}
+.tab.active{background:var(--ink);color:#fff}
+.tab:not(.active):hover{background:var(--surface-mute);color:var(--ink)}
+.btn{
+  background:var(--surface);border:1px solid var(--line);
+  padding:6px 11px;font-size:12px;font-weight:500;color:var(--ink);
+  cursor:pointer;border-radius:5px;font-family:inherit;
+  transition:all .12s;display:inline-flex;align-items:center;gap:4px;
+}
+.btn:hover{background:var(--surface-mute);border-color:var(--ink-mute)}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.primary:hover{background:#000}
+.btn.danger{color:#9a2233}
+.btn.danger:hover{background:#fde6ea;border-color:#9a2233}
+/* 약한 톤 버튼 — 초기화처럼 위험하지만 자주 안 쓰는 버튼 */
+.btn.subtle{color:var(--ink-soft);background:transparent;border-color:transparent}
+.btn.subtle:hover{background:#fff;border-color:var(--line)}
+.spacer{flex:1}
+
+/* ===== SCHEDULE WRAPPER ===== */
+.sched-wrap{
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:6px;padding:14px;
+  overflow:auto;max-height:78vh;
+}
+.ward-page{margin-bottom:30px}
+.ward-page:last-child{margin-bottom:0}
+.ward-title{
+  font-size:14px;font-weight:700;
+  margin-bottom:8px;padding:6px 12px;
+  background:var(--surface-mute);
+  border-left:3px solid var(--ink);
+  letter-spacing:-0.01em;
+}
+.weekday-label{
+  font-size:11px;font-weight:700;
+  text-align:center;color:var(--ink-soft);
+  margin-bottom:4px;letter-spacing:0.05em;
+}
+.session-row{
+  display:flex;gap:12px;align-items:flex-start;
+  margin-bottom:14px;
+}
+.session-row:last-child{margin-bottom:0}
+
+/* 4개 표 블록 레이아웃 — 화면에서는 2개씩 줄바꿈, 인쇄에서는 한 줄 */
+.session-grid{
+  display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;
+}
+.tbl-block{display:inline-block}
+.blk-label{
+  font-size:11px;font-weight:700;text-align:center;
+  color:var(--ink-soft);margin-bottom:4px;letter-spacing:0.04em;
+}
+
+/* ===== TABLES ===== */
+table.sched{
+  border-collapse:separate;border-spacing:0;
+  font-variant-numeric:tabular-nums;
+  background:#fff;
+  border:1.5px solid var(--ink);
+}
+table.sched th, table.sched td{
+  border-right:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+  padding:0;text-align:center;vertical-align:middle;
+  background:var(--surface);
+}
+table.sched tr:last-child td, table.sched tr:last-child th{border-bottom:none}
+table.sched th:last-child, table.sched td:last-child{border-right:none}
+
+/* Header */
+table.sched thead th{
+  background:#ebe5d3;
+  font-weight:700;font-size:11px;
+  color:var(--ink);
+  padding:6px 4px;
+  border-bottom:1.5px solid var(--ink);
+}
+table.sched .col-room{min-width:32px;width:32px}
+table.sched .col-name{min-width:64px;width:64px}
+table.sched .col-time{min-width:56px;width:56px}
+
+/* Cells */
+.room-cell{
+  background:var(--surface-mute) !important;
+  font-weight:700;font-size:12px;
+  padding:0 2px;
+  border-right:1.5px solid var(--ink) !important;
+}
+.name-cell{
+  padding:0;
+  border-right:1.5px solid var(--ink) !important;
+}
+.name-cell input{
+  width:100%;height:100%;
+  border:none;background:transparent;
+  text-align:center;
+  font-family:inherit;font-size:12px;font-weight:500;
+  padding:4px 2px;color:var(--ink);
+  outline:none;min-height:24px;
+}
+.name-cell input:focus{background:#fffbe6}
+.name-cell input::placeholder{color:#ccc}
+.name-cell.tag-1 input{color:var(--c1-text);font-weight:600}
+.name-cell.tag-3 input{color:var(--c3-text);font-weight:600}
+.name-cell.tag-w input{color:var(--cw-text);font-weight:600}
+.name-cell.tag-o input{color:#13395c;font-weight:600}
+.name-cell.excluded input{color:var(--ink-mute);text-decoration:line-through}
+
+/* Patient row separator (every 4th row, except inside same room) */
+.room-end td, .room-end th{border-bottom:1.5px solid var(--ink) !important}
+
+/* Data cells */
+.cell{
+  cursor:pointer;user-select:none;
+  font-weight:700;font-size:12px;
+  height:24px;
+  transition:filter .1s;
+}
+.cell.empty{color:transparent;background:#fff}
+.cell:hover{outline:2px solid var(--ink);outline-offset:-2px;z-index:1;position:relative}
+.cell.has-3{background:var(--c3);color:var(--c3-text)}
+.cell.has-3:hover{background:var(--c3-hover)}
+.cell.has-1{background:var(--c1);color:var(--c1-text)}
+.cell.has-1:hover{background:var(--c1-hover)}
+.cell.has-t{background:var(--ct);color:var(--ct-text)}
+.cell.has-t:hover{background:var(--ct-hover)}
+.cell.has-w{background:var(--cw);color:var(--cw-text)}
+.cell.has-w:hover{background:var(--cw-hover)}
+.cell.has-o{background:var(--co);color:#fff}
+.cell.has-o:hover{background:var(--co-hover)}
+
+/* 버튼 인디케이터 - 불러옴 표시 */
+.ind{
+  display:inline-block;
+  margin-left:5px;
+  padding:1px 6px;
+  background:#2c5e1e;
+  color:#fff;
+  font-size:10px;
+  font-weight:700;
+  border-radius:8px;
+  vertical-align:middle;
+}
+.ind:empty{display:none}
+
+/* ===== CELL PICKER ===== */
+.picker{
+  position:fixed;z-index:1000;
+  background:var(--surface);border:1.5px solid var(--ink);
+  border-radius:6px;padding:6px;
+  box-shadow:0 8px 28px rgba(0,0,0,0.2);
+  display:none;
+}
+.picker.show{display:flex;gap:4px;flex-wrap:nowrap}
+.picker button{
+  border:none;padding:6px 10px;
+  font-family:inherit;font-size:12px;font-weight:700;
+  border-radius:4px;cursor:pointer;min-width:48px;
+}
+.picker .p3{background:var(--c3);color:var(--c3-text)}
+.picker .p1{background:var(--c1);color:var(--c1-text)}
+.picker .pt{background:var(--ct);color:var(--ct-text)}
+.picker .pw{background:var(--cw);color:var(--cw-text)}
+.picker .po{background:var(--co);color:#fff}
+.picker .pclr{background:#eee;color:var(--ink-soft)}
+.picker button:hover{filter:brightness(1.04)}
+
+/* ===== HELP / STATUS ===== */
+.help{
+  margin-top:10px;padding:8px 12px;
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:5px;font-size:11px;color:var(--ink-soft);
+  display:flex;gap:18px;flex-wrap:wrap;
+}
+.help b{color:var(--ink)}
+.help kbd{
+  background:#f0ece0;border:1px solid var(--line);
+  border-radius:3px;padding:1px 5px;
+  font-size:10px;font-weight:600;
+}
+.status{
+  position:fixed;bottom:14px;right:18px;
+  background:var(--ink);color:#fff;
+  padding:7px 13px;border-radius:5px;
+  font-size:11px;font-weight:500;
+  opacity:0;pointer-events:none;
+  transition:opacity .2s;z-index:999;
+}
+.status.show{opacity:1}
+.hidden-input{display:none}
+
+/* ===== 검증 패널 ===== */
+.verify-panel{
+  margin-bottom:12px;border-radius:8px;overflow:hidden;
+  border:1.5px solid #b9c8e6;font-size:13px;
+  box-shadow:0 2px 8px rgba(40,70,140,.08);
+}
+.vf-head{padding:10px 14px;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+.vf-head.ok{background:#e6f6ec;color:#1c7a3f}
+.vf-head.bad{background:#fdecec;color:#b3352c}
+.vf-close{margin-left:auto;background:transparent;border:none;font-size:15px;cursor:pointer;color:inherit;opacity:.6}
+.vf-close:hover{opacity:1}
+.vf-sec{padding:8px 14px;background:#fff;border-top:1px solid #eef1f6}
+.vf-sec-title{font-weight:700;font-size:12.5px;color:#3a4a63;margin-bottom:5px}
+.vf-hint{font-weight:400;color:#8a97ab;font-size:11.5px}
+.vf-row{padding:3px 0;color:#333;line-height:1.5;border-top:1px dashed #eef1f6}
+.vf-row:first-of-type{border-top:none}
+.vf-row .vf-room{font-weight:700;color:#2c3e5c;min-width:38px;display:inline-block}
+.vf-row .vf-day{font-weight:700;color:#7a5aa0;margin-right:4px}
+.vf-row .vf-nm{font-weight:600}
+.vf-row .vf-slot{color:#7a869a;font-size:12px}
+.vf-row b{color:#111}
+.vf-names{color:#667;font-size:12px}
+.vf-more{color:#8a97ab;font-size:12px;padding:4px 0}
+.vf-foot{padding:8px 14px;background:#f7f9fc;color:#7a869a;font-size:11.5px;border-top:1px solid #eef1f6}
+
+/* ===== PRINT — A3 portrait, 한 병동 = 한 장 ===== */
+@page{size:A3 portrait;margin:4mm}
+@media print{
+  html,body{width:289mm;padding:0;margin:0;background:#fff;font-size:8pt;color:#000;line-height:1}
+  .header,.dash,.toolbar,.help,.status,.legend,.picker,.verify-panel{display:none !important}
+  .sched-wrap{max-height:none;overflow:visible;border:none;border-radius:0;padding:0;background:#fff}
+  .ward-page{
+    page-break-after:always;page-break-inside:avoid;
+    break-inside:avoid;break-after:page;
+    margin:0;background:#fff;
+    width:289mm;overflow:visible;
+  }
+  .ward-page:last-child{page-break-after:auto;break-after:auto}
+  .ward-title{
+    font-size:13pt;font-weight:700;color:#000;line-height:1.1;
+    padding:0 0 2mm;background:#fff;border:none;text-align:left;
+  }
+  /* 표 2개씩 한 줄 (오전 줄 / 오후 줄) — A3 세로 한 장, 크게 */
+  .session-grid{
+    display:flex !important;flex-wrap:nowrap !important;
+    gap:5mm;align-items:flex-start;margin-bottom:4mm;
+  }
+  .tbl-block{flex:0 0 auto}
+  /* 각 줄의 첫 블록(좌측 표) 자리를 오후 표(시간 7칸=134mm) 너비로 고정.
+     표 자체는 본래 너비(오전 106mm)를 유지하고 왼쪽 정렬 →
+     오전·우 표와 오후·우 표의 시작 x좌표가 정확히 일치, 시간칸 너비는 통일 */
+  .session-grid > .tbl-block:first-child{
+    width:134mm;flex:0 0 134mm;
+  }
+  .blk-label{display:none !important}
+  table.sched{width:auto;table-layout:fixed;font-size:12pt;border:1.2pt solid #000;background:#fff;border-collapse:collapse}
+  table.sched th, table.sched td{border:0.6pt solid #888;line-height:1;vertical-align:middle}
+  table.sched thead th{
+    font-size:11pt;padding:1mm 0.3mm;line-height:1;
+    background:#e8e8e8 !important;color:#000;font-weight:700;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+    border-bottom:1.2pt solid #000;
+  }
+  table.sched .col-room{min-width:10mm;width:10mm}
+  table.sched .col-name{min-width:26mm;width:26mm}
+  table.sched .col-time{min-width:14mm;width:14mm}
+  .room-cell{
+    font-size:13pt;padding:0 0.5mm;font-weight:700;color:#000;line-height:1;
+    background:#f0ede4 !important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+    border-right:1.2pt solid #000 !important;
+  }
+  .name-cell{border-right:1.2pt solid #000 !important;background:#fff;padding:0}
+  .name-cell input{
+    font-size:12.5pt;padding:0 0.5mm;color:#000 !important;line-height:1;
+    font-weight:700;min-height:0;background:#fff;height:5.5mm;
+  }
+  .name-cell.tag-1 input,
+  .name-cell.tag-3 input,
+  .name-cell.tag-w input,
+  .name-cell.tag-o input{color:#000 !important;font-weight:700}
+  .name-cell.excluded input{color:#888 !important;font-weight:400}
+  .room-end td, .room-end th{border-bottom:1.2pt solid #000 !important}
+  .cell{
+    height:5.5mm;padding:0;line-height:1;
+    font-size:12.5pt;font-weight:800;color:#000 !important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+  /* 카테고리: 구분되는 연한 배경 + 검정 굵은 글씨 */
+  .cell.has-3{background:#fff0e0 !important;color:#000 !important}  /* 3층: 최대한 연한 살구 */
+  .cell.has-1{background:#f9aac4 !important;color:#000 !important}  /* 1층: 분홍 */
+  .cell.has-t{background:#a8dd8d !important;color:#000 !important}  /* 통증: 초록 */
+  .cell.has-w{background:#f5c842 !important;color:#000 !important}  /* 병동: 머스타드(진한 노랑) */
+  .cell.has-o{background:#8fc0ec !important;color:#000 !important}  /* 외래: 파랑 */
+
+  /* 한 병동만 인쇄할 때: print-single 클래스로 단일 페이지 강제 */
+  body.print-single .ward-page{page-break-after:auto;break-after:auto}
+}
+
+
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div>
+      <h1>이동반 시간표 <span style="font-size:14px;color:var(--ink-soft);font-weight:600">· 주말</span></h1>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center">
+      <div id="date-display" class="date-display"></div>
+    </div>
+    <div class="legend">
+      <div class="legend-chip lc-3"><span class="sw">3층</span></div>
+      <div class="legend-chip lc-1"><span class="sw">1층</span></div>
+      <div class="legend-chip lc-t"><span class="sw">통증</span></div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <!-- 보기 전환: 병동 + 요일 -->
+    <div class="tabs">
+      <button class="tab active" data-floor="4">4병동</button>
+      <button class="tab" data-floor="5">5병동</button>
+      <button class="tab" data-floor="all">전체</button>
+    </div>
+    <div class="day-toggle" id="day-toggle" style="display:flex;gap:0;margin-left:8px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#fff"></div>
+
+    <div class="spacer"></div>
+
+    <!-- 1. 병실현황 -->
+    <div class="tb-group step" data-step="1" data-label="병실현황" title="환자명 가져오기">
+      <button class="btn" onclick="document.getElementById('backup-input').click()">📂 병실현황<span class="ind" id="ind-roster"></span></button>
+    </div>
+
+    <!-- 2. 합산 자동입력 -->
+    <div class="tb-group step" data-step="2" data-label="합산 자동입력" title="시간표 자동 채우기">
+      <button class="btn" onclick="document.getElementById('combined-input').click()" style="background:linear-gradient(180deg,#fff,#ffe8d4)">🧠💪 합산 자동입력<span class="ind" id="ind-combined"></span></button>
+    </div>
+
+    <!-- 3. 인쇄 -->
+    <div class="tb-group step" data-step="3" data-label="인쇄" title="인쇄">
+      <button class="btn primary" onclick="printWard('4')">🖨 4병동</button>
+      <button class="btn primary" onclick="printWard('5')">🖨 5병동</button>
+    </div>
+
+    <!-- 4. 검증 -->
+    <div class="tb-group step" data-step="4" data-label="검증" title="원본과 대조">
+      <button class="btn" onclick="runVerification()" style="background:linear-gradient(180deg,#fff,#e8f0ff)">🔍 검증</button>
+    </div>
+
+    <!-- 초기화 (분리됨) -->
+    <div class="tb-group danger" title="초기화">
+      <button class="btn subtle" onclick="clearRosterOnly()" title="환자명만 비움 (시간표는 유지)">🧑 환자명만</button>
+      <button class="btn subtle" onclick="clearScheduleOnly()" title="시간표 셀만 비움 (환자명은 유지)">📋 시간표만</button>
+      <button class="btn danger" onclick="clearCells()" title="환자명 + 시간표 모두 비움">🗑 모두</button>
+    </div>
+
+    <input type="file" id="combined-input" class="hidden-input" accept=".xlsx,.xls" onchange="autoFillDaily(event)">
+    <input type="file" id="backup-input" class="hidden-input" accept=".xlsx,.xls,.json" onchange="importBackup(event)">
+  </div>
+
+  <div class="sched-wrap">
+    <div id="verify-panel" class="verify-panel" style="display:none"></div>
+    <div id="sched-content"></div>
+  </div>
+
+</div>
+
+<div class="picker" id="picker">
+  <button class="p3" onclick="pickValue('3층')">3층</button>
+  <button class="p1" onclick="pickValue('1층')">1층</button>
+  <button class="pt" onclick="pickValue('통증')">통증</button>
+  <button class="pclr" onclick="pickValue(null)">지움</button>
+</div>
+
+<div class="status" id="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+// ===== 설정 =====
+const TIME_SLOTS_AM = [
+  {short:"09:00", label:"09:00"},
+  {short:"09:35", label:"09:35"},
+  {short:"10:10", label:"10:10"},
+  {short:"10:45", label:"10:45"},
+  {short:"11:20", label:"11:20"},
+  {short:"11:55", label:"11:55"}
+];
+const TIME_SLOTS_PM = [
+  {short:"01:30", label:"01:30"},
+  {short:"02:05", label:"02:05"},
+  {short:"02:40", label:"02:40"},
+  {short:"03:15", label:"03:15"},
+  {short:"03:50", label:"03:50"},
+  {short:"04:25", label:"04:25"},
+  {short:"05:00", label:"05:00"}
+];
+
+const ROOMS_4F_LEFT  = [401,402,403,404,405,406,407,408];
+const ROOMS_4F_RIGHT = [409,410,411,412,413,414,415];
+const ROOMS_5F_LEFT  = [501,502,503,504,505,506,507,508];
+const ROOMS_5F_RIGHT = [509,510,511,512,513,514,515];
+const ALL_ROOMS = [...ROOMS_4F_LEFT,...ROOMS_4F_RIGHT,...ROOMS_5F_LEFT,...ROOMS_5F_RIGHT];
+const PATIENTS_PER_ROOM = 4;
+const STORAGE_KEY = 'idongban_weekend_v1';
+
+const CATEGORIES = {
+  '3층':{cls:'has-3'},
+  '1층':{cls:'has-1'},
+  '통증':{cls:'has-t'}
+};
+
+// ===== 상태 =====
+// 주말 버전: 여러 날(보통 토·일, 공휴일이 끼면 3일 이상)의 셀을 분리 저장. 환자명은 공통.
+// dayList: [{key:'금', date:'2026-07-17'}, {key:'토', ...}, {key:'일', ...}]
+//   key = 요일 한 글자. 같은 주말 안에서 요일이 겹치지 않으므로 키로 사용 가능.
+const WD_NAMES = ['일','월','화','수','목','금','토'];
+let DAYS = ['토','일'];   // dayList와 동기화되는 요일 키 배열 (기존 코드 호환)
+
+function syncDays(){
+  DAYS = (state.dayList && state.dayList.length)
+    ? state.dayList.map(d=>d.key)
+    : ['토','일'];
+  return DAYS;
+}
+function makeEmptyDayMap(){
+  const o = {};
+  syncDays().forEach(d=>{ o[d] = {}; });
+  return o;
+}
+// 날짜 문자열 'YYYY-MM-DD' → 요일 키('토' 등)
+function wdKeyOf(iso){
+  const [y,m,d] = String(iso).split('-').map(Number);
+  return WD_NAMES[new Date(y, m-1, d).getDay()];
+}
+// 시작일 + 일수 → dayList 생성
+function buildDayList(startISO, count){
+  const [y,m,d] = String(startISO).split('-').map(Number);
+  const out = [];
+  for(let i=0; i<count; i++){
+    const dt = new Date(y, m-1, d+i);
+    const iso = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+    out.push({ key: WD_NAMES[dt.getDay()], date: iso });
+  }
+  return out;
+}
+// dayList가 바뀔 때 각 방의 cellsByDay를 새 요일 구성에 맞게 정리(기존 값 유지)
+function reconcileDayMaps(){
+  const keys = syncDays();
+  ALL_ROOMS.forEach(r=>{
+    const cur = state.rooms[r].cellsByDay || {};
+    const next = {};
+    keys.forEach(k=>{ next[k] = cur[k] || {}; });
+    state.rooms[r].cellsByDay = next;
+  });
+  const curSrc = state.cellSourceByDay || {};
+  const nextSrc = {};
+  keys.forEach(k=>{ nextSrc[k] = curSrc[k] || {}; });
+  state.cellSourceByDay = nextSrc;
+  if(!keys.includes(state.activeDay)) state.activeDay = keys[0];
+}
+
+let state = {
+  date:'',                // 첫날(보통 토요일) 날짜
+  dayList:[],             // [{key,date}] — 비어있으면 토·일 2일로 간주
+  view:'4',
+  activeDay:'토',          // 현재 화면에 보이는 요일
+  loadCounts:{roster:0, combined:0},
+  // rooms[room]: {
+  //   patients:[{name}×4],   ← 모든 요일 공통
+  //   cellsByDay: { '토': {key→cat}, '일': {...}, ... }
+  // }
+  rooms:{},
+  // 자동입력 시 셀이 태그(override)로 채워졌는지 추적 — 요일별로 분리
+  cellSourceByDay:{}
+};
+
+let pickerCtx = null;
+
+// ===== 검증용: 자동입력에 사용된 원본 워크북 보관 (세션 메모리) =====
+// 새로고침하면 사라지므로, 검증 시엔 파일을 다시 불러온 뒤 눌러야 함.
+let lastImportWb = null;  // { wb, sheetMap:{요일키: 시트명} }
+
+function makeCellKey(room, p, slot){ return `${room}-${p}-${slot}`; }
+
+// 활성 요일의 cells 객체 반환 (room 기준)
+function getActiveCells(room){
+  return state.rooms[room].cellsByDay[state.activeDay];
+}
+// 특정 요일의 cells 객체 반환
+function getCellsForDay(room, day){
+  return state.rooms[room].cellsByDay[day];
+}
+// 활성 요일의 cellSource 반환
+function getActiveCellSource(){
+  return state.cellSourceByDay[state.activeDay];
+}
+
+function initState(){
+  ALL_ROOMS.forEach(r=>{
+    state.rooms[r] = {
+      patients: Array.from({length:PATIENTS_PER_ROOM},()=>({name:''})),
+      cellsByDay: makeEmptyDayMap()
+    };
+  });
+  state.cellSourceByDay = makeEmptyDayMap();
+}
+
+// ===== 태그 처리 =====
+function nameTagInfo(name){
+  if(!name) return {display:'', tag:null, excluded:false};
+  let s = name;
+  // 제외 태그
+  if(/\(침상\)|\(HOLD\)/i.test(s)) return {display:s, tag:null, excluded:true};
+
+  // 강제 카테고리 (변환표 적용)
+  let forceTag = null;
+  // (치료실→병동) → 3층 으로 강제 + 태그 제거
+  if(/\(치료실\s*[→\->]+\s*병동\)/.test(s)){
+    forceTag = '3층';
+    s = s.replace(/\(치료실\s*[→\->]+\s*병동\)/g, '');
+  }
+  // (병동→치료실) 표시는 그대로 제거 (주말은 병동 카테고리 없음)
+  s = s.replace(/\(병동\s*[→\->]+\s*치료실\)/g, '');
+  s = s.trim();
+
+  // 일반 태그 감지 (주말: 1층/3층/통증만)
+  let tag = forceTag;
+  if(!tag){
+    if(/\(1층\)/.test(s)) tag = '1층';
+    else if(/\(3층\)/.test(s)) tag = '3층';
+    else if(/\(통증\)/.test(s)) tag = '통증';
+  }
+  return {display:s, tag, excluded:false};
+}
+
+// ===== 저장 =====
+function saveLocal(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+// 오늘이 속한 주말(토요일 날짜)을 'YYYY-MM-DD'로 반환.
+// 토요일이면 오늘, 일요일이면 어제(토), 평일이면 그 주 토요일.
+function getCurrentWeekendSaturday(){
+  const d = new Date();
+  const wd = d.getDay();  // 0=일 … 6=토
+  if(wd === 0) d.setDate(d.getDate() - 1);        // 일 → 전날(토)
+  else if(wd !== 6) d.setDate(d.getDate() + (6 - wd));  // 평일 → 그 주 토요일
+  const y = d.getFullYear();
+  const mo = String(d.getMonth()+1).padStart(2,'0');
+  const da = String(d.getDate()).padStart(2,'0');
+  return `${y}-${mo}-${da}`;
+}
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return false;
+    const loaded = JSON.parse(raw);
+    if(loaded && loaded.rooms){
+      // 저장된 요일 구성을 먼저 복원해야 셀 맵이 올바른 키로 만들어짐
+      if(Array.isArray(loaded.dayList) && loaded.dayList.length){
+        state.dayList = loaded.dayList.filter(d=>d && d.key);
+      }else if(loaded.date){
+        // 구버전(토·일 고정) 호환 — 저장된 날짜를 첫날로 보고 2일 구성
+        state.dayList = buildDayList(loaded.date, 2);
+      }
+      syncDays();
+      reconcileDayMaps();
+      ALL_ROOMS.forEach(r=>{
+        if(loaded.rooms[r]){
+          if(Array.isArray(loaded.rooms[r].patients)){
+            for(let p=0;p<PATIENTS_PER_ROOM;p++){
+              if(loaded.rooms[r].patients[p]){
+                state.rooms[r].patients[p] = loaded.rooms[r].patients[p];
+              }
+            }
+          }
+          // 새 구조 (cellsByDay)
+          if(loaded.rooms[r].cellsByDay){
+            DAYS.forEach(d=>{
+              if(loaded.rooms[r].cellsByDay[d]){
+                state.rooms[r].cellsByDay[d] = {...loaded.rooms[r].cellsByDay[d]};
+              }
+            });
+          }
+          // 구 구조 (cells) — 토요일로 마이그레이션
+          else if(loaded.rooms[r].cells){
+            state.rooms[r].cellsByDay[syncDays()[0]] = {...loaded.rooms[r].cells};
+          }
+        }
+      });
+      state.date = loaded.date || (state.dayList[0] ? state.dayList[0].date : '');
+      state.view = loaded.view || '4';
+      state.activeDay = (loaded.activeDay && syncDays().includes(loaded.activeDay))
+        ? loaded.activeDay
+        : syncDays()[0];
+      if(loaded.loadCounts) state.loadCounts = {...state.loadCounts, ...loaded.loadCounts};
+      if(loaded.cellSourceByDay){
+        DAYS.forEach(d=>{
+          if(loaded.cellSourceByDay[d]){
+            state.cellSourceByDay[d] = {...loaded.cellSourceByDay[d]};
+          }
+        });
+      }
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+function showStatus(msg){
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(showStatus._t);
+  showStatus._t = setTimeout(()=>el.classList.remove('show'), 1700);
+}
+
+// ===== 셀 픽커 =====
+function openPicker(room, p, slot, evt){
+  pickerCtx = {room, p, slot};
+  const picker = document.getElementById('picker');
+  picker.classList.add('show');
+  const rect = evt.currentTarget.getBoundingClientRect();
+  let x = rect.left;
+  let y = rect.bottom + 4;
+  const pw = 360, ph = 38;
+  if(x + pw > window.innerWidth - 8) x = window.innerWidth - pw - 8;
+  if(y + ph > window.innerHeight - 8) y = rect.top - ph - 4;
+  picker.style.left = Math.max(8, x) + 'px';
+  picker.style.top = y + 'px';
+  evt.stopPropagation();
+}
+function closePicker(){
+  document.getElementById('picker').classList.remove('show');
+  pickerCtx = null;
+}
+function pickValue(val){
+  if(!pickerCtx) return;
+  const {room, p, slot} = pickerCtx;
+  const key = makeCellKey(room, p, slot);
+  const cells = getActiveCells(room);
+  if(val === null) delete cells[key];
+  else cells[key] = val;
+  saveLocal();
+  closePicker();
+  render();
+}
+
+document.addEventListener('click', (e)=>{
+  if(!e.target.closest('.picker') && !e.target.closest('.cell')){
+    closePicker();
+  }
+});
+
+// ===== 환자명 편집 =====
+// 이름 입력 (oninput) — 상태만 갱신, 재렌더 안 함 (커서 점프 방지)
+function setNameRaw(room, p, val){
+  state.rooms[room].patients[p].name = val;
+  saveLocal();
+}
+
+// 이름 확정 (onchange = 포커스 해제) — 정규화 + 재렌더
+function commitName(room, p){
+  state.rooms[room].patients[p].name = (state.rooms[room].patients[p].name || '').trim();
+  saveLocal();
+  render();
+}
+
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+// ===== 렌더링 =====
+function getWardSections(){
+  if(state.view === '4') return [
+    {label:'4병동', left:ROOMS_4F_LEFT, right:ROOMS_4F_RIGHT}
+  ];
+  if(state.view === '5') return [
+    {label:'5병동', left:ROOMS_5F_LEFT, right:ROOMS_5F_RIGHT}
+  ];
+  return [
+    {label:'4병동', left:ROOMS_4F_LEFT, right:ROOMS_4F_RIGHT},
+    {label:'5병동', left:ROOMS_5F_LEFT, right:ROOMS_5F_RIGHT}
+  ];
+}
+
+function buildHalfTable(rooms, slots){
+  // rooms: 배열, slots: 시간 슬롯 배열
+  let html = '<table class="sched">';
+  html += '<thead><tr>';
+  html += '<th class="col-room">호실</th>';
+  html += '<th class="col-name">이름</th>';
+  slots.forEach(s=>{
+    html += `<th class="col-time">${s.label}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  rooms.forEach(room=>{
+    for(let p=0;p<PATIENTS_PER_ROOM;p++){
+      const rowEnd = (p === PATIENTS_PER_ROOM - 1);
+      html += `<tr${rowEnd?' class="room-end"':''}>`;
+      // 호실 칸 (병합)
+      if(p===0){
+        html += `<td class="room-cell" rowspan="${PATIENTS_PER_ROOM}">${room}</td>`;
+      }
+      // 이름 칸
+      const patient = state.rooms[room].patients[p];
+      const info = nameTagInfo(patient.name);
+      let tagCls = '';
+      if(info.excluded) tagCls = 'excluded';
+      else if(info.tag === '1층') tagCls = 'tag-1';
+      else if(info.tag === '3층') tagCls = 'tag-3';
+      else if(info.tag === '통증') tagCls = 'tag-t';
+      // 표시값: 제외(HOLD/침상)면 빈칸, 그 외엔 변환된 표시명
+      const displayValue = info.excluded ? '' : info.display;
+      // 원본은 title로 보존 (호버하면 확인 가능)
+      const titleAttr = info.excluded || info.display !== patient.name
+        ? ` title="${escapeHtml(patient.name)}"` : '';
+      html += `<td class="name-cell ${tagCls}"${titleAttr}>
+        <input type="text" value="${escapeHtml(displayValue)}"
+          oninput="setNameRaw(${room},${p},this.value)"
+          onchange="commitName(${room},${p})"
+          placeholder="">
+      </td>`;
+      // 시간 셀들 (활성 요일의 cells)
+      const cells = getActiveCells(room);
+      slots.forEach(slot=>{
+        const key = makeCellKey(room, p, slot.short);
+        const v = cells[key];
+        let cls = 'cell';
+        if(v && CATEGORIES[v]) cls += ' '+CATEGORIES[v].cls;
+        else cls += ' empty';
+        const text = v || '';
+        html += `<td class="${cls}" data-room="${room}" data-p="${p}" data-slot="${slot.short}">${text}</td>`;
+      });
+      html += '</tr>';
+    }
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+// 활성 요일의 날짜 문자열. dayList에 날짜가 있으면 그걸 쓰고,
+// 없으면 state.date(첫날) 기준으로 순서만큼 더해 계산 (하위호환).
+function dateOfDay(dayKey){
+  const list = state.dayList || [];
+  const hit = list.find(d=>d.key === dayKey);
+  if(hit && hit.date) return hit.date;
+  if(!state.date) return '';
+  const idx = Math.max(0, syncDays().indexOf(dayKey));
+  try{
+    const [y,m,d] = state.date.split('-').map(Number);
+    const dt = new Date(y, m-1, d+idx);
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  }catch(e){ return ''; }
+}
+function getDayDateStr(){
+  const iso = dateOfDay(state.activeDay);
+  return iso ? formatDateKorean(iso) : '';
+}
+
+function renderTable(){
+  const target = document.getElementById('sched-content');
+  const sections = getWardSections();
+  const dateStr = getDayDateStr();
+  const dayLabel = `${state.activeDay}요일`;
+
+  let html = '';
+  sections.forEach(sec=>{
+    html += `<div class="ward-page">`;
+    html += `<div class="ward-title">[${sec.label}] ${dateStr ? dateStr+' ' : dayLabel+' '}이동반 시간표</div>`;
+
+    html += `<div class="session-grid">`;
+    html += `<div class="tbl-block"><div class="blk-label">오전 · 좌</div>${buildHalfTable(sec.left, TIME_SLOTS_AM)}</div>`;
+    html += `<div class="tbl-block"><div class="blk-label">오전 · 우</div>${buildHalfTable(sec.right, TIME_SLOTS_AM)}</div>`;
+    html += `</div>`;
+    html += `<div class="session-grid">`;
+    html += `<div class="tbl-block"><div class="blk-label">오후 · 좌</div>${buildHalfTable(sec.left, TIME_SLOTS_PM)}</div>`;
+    html += `<div class="tbl-block"><div class="blk-label">오후 · 우</div>${buildHalfTable(sec.right, TIME_SLOTS_PM)}</div>`;
+    html += `</div>`;
+
+    html += `</div>`;
+  });
+
+  target.innerHTML = html;
+
+  // 셀 클릭
+  target.querySelectorAll('.cell').forEach(cell=>{
+    cell.addEventListener('click', e=>{
+      const room = parseInt(cell.dataset.room);
+      const p = parseInt(cell.dataset.p);
+      const slot = cell.dataset.slot;
+      openPicker(room, p, slot, e);
+    });
+  });
+}
+
+function formatDateKorean(iso){
+  if(!iso) return '';
+  try{
+    const [y,m,d] = iso.split('-').map(Number);
+    const date = new Date(y,m-1,d);
+    const wd = ['일','월','화','수','목','금','토'][date.getDay()];
+    return `${m}월 ${d}일 ${wd}요일`;
+  }catch(e){return ''}
+}
+
+function render(){
+  renderTable();
+}
+
+// ===== 컨트롤 =====
+function setView(v){
+  state.view = v;
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.classList.toggle('active', t.dataset.floor===v);
+  });
+  saveLocal();
+  render();
+}
+
+function clearAll(){
+  if(!confirm('정말 모든 셀과 환자명을 지울까요?')) return;
+  initState();
+  saveLocal();
+  render();
+  showStatus('모두 지웠습니다');
+}
+
+// 특정 병동만 임시로 표시한 뒤 인쇄 (A3 한 장)
+function printWard(view){
+  const oldView = state.view;
+  state.view = view;
+  render();
+  document.body.classList.add('print-single');
+  setTimeout(()=>{
+    window.print();
+    document.body.classList.remove('print-single');
+    state.view = oldView;
+    render();
+  }, 100);
+}
+
+// 요일 버튼 동적 렌더링 (2일이든 3일이든 dayList에 맞춰 생성)
+function renderDayButtons(){
+  const box = document.getElementById('day-toggle');
+  if(!box) return;
+  const keys = syncDays();
+  const list = (state.dayList && state.dayList.length) ? state.dayList : keys.map(k=>({key:k, date:''}));
+  box.innerHTML = list.map((d, i)=>{
+    const isActive = d.key === state.activeDay;
+    const dnum = d.date ? Number(d.date.split('-')[2]) : null;
+    const label = dnum ? `${d.key} ${dnum}일` : `${d.key}요일`;
+    return `<button class="day-btn${isActive?' active':''}" data-day="${d.key}" onclick="setActiveDay('${d.key}')" `+
+      `style="border:none;padding:6px 13px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;`+
+      `background:${isActive?'#181818':'#fff'};color:${isActive?'#fff':'var(--ink-soft)'};`+
+      `${i>0?'border-left:1px solid var(--line);':''}">${label}</button>`;
+  }).join('');
+}
+
+// 활성 요일 전환
+function setActiveDay(day){
+  const keys = syncDays();
+  if(!keys.includes(day)) return;
+  state.activeDay = day;
+  renderDayButtons();
+  saveLocal();
+  render();
+}
+
+// 환자명만 초기화 (시간표 셀은 유지, 날짜 유지)
+function clearRosterOnly(){
+  if(!confirm('환자명만 비울까요? (시간표 셀은 그대로 유지됩니다)')) return;
+  ALL_ROOMS.forEach(r=>{
+    state.rooms[r].patients = Array.from({length:PATIENTS_PER_ROOM},()=>({name:''}));
+  });
+  state.loadCounts.roster = 0;
+  saveLocal();
+  render();
+  updateLoadIndicators();
+  showStatus('환자명이 비워졌습니다 (시간표 셀은 유지)');
+}
+
+// 시간표 셀만 초기화 (환자명은 유지, 날짜 유지)
+function clearScheduleOnly(){
+  if(!confirm('시간표만 비울까요? (환자명은 그대로 유지됩니다 · 토·일 모두)')) return;
+  ALL_ROOMS.forEach(r=>{
+    state.rooms[r].cellsByDay = makeEmptyDayMap();
+  });
+  state.cellSourceByDay = makeEmptyDayMap();
+  state.importDates = {};
+  state.loadCounts.combined = 0;
+  saveLocal();
+  render();
+  updateLoadIndicators();
+  showStatus('시간표 셀이 비워졌습니다 (환자명은 유지)');
+}
+
+// (기존) 환자명 + 셀 모두 초기화 — 이름만 변경
+function clearCells(){
+  if(!confirm('셀 값과 환자명을 모두 비울까요? (토·일 모두)')) return;
+  ALL_ROOMS.forEach(r=>{
+    state.rooms[r].cellsByDay = makeEmptyDayMap();
+    state.rooms[r].patients = Array.from({length:PATIENTS_PER_ROOM},()=>({name:''}));
+  });
+  state.cellSourceByDay = makeEmptyDayMap();
+  state.importDates = {};
+  state.loadCounts.roster = 0;
+  state.loadCounts.combined = 0;
+  saveLocal();
+  render();
+  updateLoadIndicators();
+  showStatus('셀과 환자명이 모두 비워졌습니다');
+}
+
+// ===== 엑셀 저장 (토/일 각각 시트로) =====
+function exportXLSX(){
+  try{
+    const wb = XLSX.utils.book_new();
+    const allSlots = [...TIME_SLOTS_AM, ...TIME_SLOTS_PM];
+    const header = ['호실','이름'].concat(allSlots.map(s=>s.short));
+
+    DAYS.forEach(day=>{
+      const rows = [header];
+      ALL_ROOMS.forEach(room=>{
+        const cells = getCellsForDay(room, day);
+        state.rooms[room].patients.forEach((pt, p)=>{
+          const row = [
+            (p===0) ? room : '',
+            pt.name || ''
+          ];
+          allSlots.forEach(s=>{
+            const key = makeCellKey(room, p, s.short);
+            row.push(cells[key] || '');
+          });
+          rows.push(row);
+        });
+      });
+
+      // 메타데이터
+      rows.push([]);
+      rows.push(['__meta__','요일',day]);
+      rows.push(['__meta__','토요일 날짜',state.date || '']);
+      rows.push(['__meta__','저장일시',new Date().toISOString()]);
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [
+        {wch:7}, {wch:14},
+        ...allSlots.map(()=>({wch:8}))
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, `${day}요일`);
+    });
+
+    const stamp = state.date || new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `이동반_시간표_주말_${stamp}.xlsx`);
+    showStatus('엑셀 파일로 저장 완료 (토/일 시트)');
+  }catch(err){
+    alert('저장 실패: '+err.message);
+  }
+}
+
+// ===== 통합 불러오기 (엑셀 + JSON 자동 감지) =====
+function importBackup(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const ext = file.name.toLowerCase().split('.').pop();
+  if(ext === 'xlsx' || ext === 'xls'){
+    importBackupXLSX(file);
+  }else if(ext === 'json'){
+    importBackupJSON(file);
+  }else{
+    alert('지원하지 않는 파일 형식: .'+ext+'\n.xlsx 또는 .json 파일을 선택해주세요');
+  }
+  ev.target.value = '';
+}
+
+function importBackupXLSX(file){
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      // ArrayBuffer → binary string 변환 (type:'binary'에서 codepage가 제대로 적용됨)
+      // EMR이 내보낸 EUC-KR .xls(텍스트형)도 이 방식이라야 한글이 안 깨짐
+      const bytes = new Uint8Array(e.target.result);
+      let binStr = '';
+      const CHUNK = 0x8000;
+      for(let i = 0; i < bytes.length; i += CHUNK){
+        binStr += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+      }
+      const wb = XLSX.read(binStr, {
+        type:'binary',
+        cellFormula:false,
+        cellStyles:false,
+        cellNF:false,
+        cellHTML:false,
+        cellText:false,
+        bookVBA:false,
+        bookSheets:false,
+        codepage:949  // EMR이 내보낸 EUC-KR(.xls) 한글 디코딩
+      });
+
+      // 시트 자동 감지: 우리 저장본 → RBCLR → 병실현황 → 그 외
+      const sheetName = wb.SheetNames.find(n=>n === '이동반 시간표')
+                     || wb.SheetNames.find(n=>n.includes('수정') && n.includes('이동반'))
+                     || wb.SheetNames.find(n=>n.includes('병실현황'))
+                     || wb.SheetNames.find(n=>n.includes('이동반'))
+                     || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows = readSheetAsRows(ws);
+
+      if(rows.length < 2){
+        alert('빈 파일이거나 형식이 맞지 않아요');
+        return;
+      }
+
+      // 형식 자동 감지
+      let formatA_idx = -1;  // RBCLR / 저장본: '호실'+'이름' 헤더
+      let formatB_idx = -1;  // 병실현황: '병실' 또는 '병동' 헤더(호실별 가로 4명)
+      let formatC_idx = -1;  // EMR 명단: '수진자명'+'병실' 헤더(환자별 세로 1명)
+      for(let i = 0; i < Math.min(rows.length, 20); i++){
+        const r = rows[i].map(c=>String(c).trim());
+        if(formatA_idx === -1 && r.includes('호실') && r.includes('이름')) formatA_idx = i;
+        if(formatC_idx === -1 && r.includes('수진자명') && r.includes('병실')) formatC_idx = i;
+        if(formatB_idx === -1 && (r.includes('병실') || r.includes('병동'))) formatB_idx = i;
+      }
+
+      if(formatA_idx >= 0){
+        parseFormatA(rows, formatA_idx, sheetName);
+      }else if(formatC_idx >= 0){
+        parseFormatC(rows, formatC_idx, sheetName);
+      }else if(formatB_idx >= 0){
+        parseFormatB(rows, formatB_idx, sheetName);
+      }else{
+        alert('헤더를 찾지 못했어요.\n시트: "'+sheetName+'"\n\n지원 형식:\n• 수진자명/병실 컬럼 (EMR 명단)\n• 병실/병동 컬럼 (병실현황)\n• 호실/이름 컬럼 (저장본)');
+      }
+    }catch(err){
+      console.error('엑셀 읽기 에러:', err);
+      alert('엑셀 읽기 실패: '+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// 형식 A: RBCLR / 우리 저장본 — 환자별 행, 호실/이름 컬럼
+function parseFormatA(rows, headerRowIdx, sheetName){
+  const header = rows[headerRowIdx].map(c=>String(c).trim());
+  const roomCol = header.indexOf('호실');
+  const nameCol = header.indexOf('이름');
+
+  const slotIdx = {};
+  header.forEach((h,i)=>{
+    if(SLOT_24H[h]) slotIdx[h] = i;
+  });
+
+  // 전체 백업이라 보고 상태 리셋 (날짜만 유지)
+  const prevDate = state.date;
+  initState();
+  state.date = prevDate;
+
+  let lastRoom = null;
+  let pIdx = 0;
+  let namesImported = 0;
+  let cellsImported = 0;
+
+  rows.slice(headerRowIdx + 1).forEach(row=>{
+    const c0 = String(row[roomCol]||'').trim();
+    const c1 = String(row[nameCol]||'').trim();
+
+    if(c0 === '__meta__'){
+      if(c1 === '날짜' && row[roomCol+2]) state.date = String(row[roomCol+2]||'').trim();
+      return;
+    }
+
+    let room = parseInt(c0);
+    if(!isNaN(room) && ALL_ROOMS.includes(room)){
+      lastRoom = room;
+      pIdx = 0;
+    }else{
+      if(!lastRoom || pIdx >= PATIENTS_PER_ROOM) return;
+      room = lastRoom;
+    }
+
+    if(c1){
+      state.rooms[room].patients[pIdx].name = c1;
+      namesImported++;
+    }
+
+    Object.entries(slotIdx).forEach(([slot, colIdx])=>{
+      const v = String(row[colIdx]||'').trim();
+      if(v && CATEGORIES[v]){
+        // 우리 저장본을 불러올 땐 현재 활성 요일에 적용
+        // (토/일 시트가 각각 있는 새 저장본은 importBackupXLSX에서 별도 처리)
+        state.rooms[room].cellsByDay[state.activeDay][makeCellKey(room, pIdx, slot)] = v;
+        cellsImported++;
+      }
+    });
+
+    pIdx++;
+  });
+
+  state.loadCounts.roster = namesImported;
+  // 우리 저장본을 불러오면 자동 채움 카운트도 복원
+  if(cellsImported > 0){
+    // 형식 A는 전체 백업이므로 자동입력 카운트 초기화
+    state.loadCounts.combined = 0;
+  }
+  saveLocal();
+  render();
+  updateLoadIndicators();
+  updateDateDisplay();
+  let msg = `환자명 ${namesImported}개 불러옴`;
+  if(cellsImported > 0) msg += ` · 셀 ${cellsImported}개`;
+  showStatus(msg);
+  if(namesImported === 0) alert('환자명을 찾지 못했어요. 시트: "'+sheetName+'"');
+}
+
+// 형식 B: 병실현황 — 호실별 행, 환자 4명이 가로로 (이름에 '(여)79세' 같은 정보 포함)
+// 환자명만 업데이트, 기존 셀 값은 그대로 둠 (4·5병동 파일을 따로 합칠 수 있게)
+function parseFormatB(rows, headerRowIdx, sheetName){
+  let namesImported = 0;
+  const updatedRooms = new Set();
+  const TAG_RE = /\((?:침상|HOLD|병동|1층|3층|외래|치료실\s*[→\->]+\s*병동|병동\s*[→\->]+\s*치료실)\)/g;
+
+  // 어떤 행이 환자 데이터 행인지 미리 인덱싱 (호실번호 있는 행)
+  const dataRows = [];
+  for(let i = headerRowIdx + 1; i < rows.length; i++){
+    const row = rows[i];
+    for(let c = 0; c < Math.min(3, row.length); c++){
+      const s = String(row[c]||'').trim();
+      const m = s.match(/(\d{3})/);
+      if(m){
+        const r = parseInt(m[1]);
+        if(ALL_ROOMS.includes(r)){ dataRows.push({rowIdx:i, room:r}); break; }
+      }
+    }
+  }
+
+  dataRows.forEach(({rowIdx, room}, dataIdx)=>{
+    const row = rows[rowIdx];
+    // 다음 환자 행까지의 사이 행들 — 거기 떠 있는 (병동)/(침상) 같은 태그를 같은 컬럼 환자에게 붙임
+    const nextDataRowIdx = dataIdx + 1 < dataRows.length ? dataRows[dataIdx + 1].rowIdx : rows.length;
+    const extraTagsByCol = {};  // {col: [tags...]}
+    for(let i = rowIdx + 1; i < nextDataRowIdx; i++){
+      const r2 = rows[i];
+      for(let c = 0; c < r2.length; c++){
+        const v = String(r2[c]||'').trim();
+        if(!v) continue;
+        const tagsHere = v.match(TAG_RE);
+        if(tagsHere){
+          if(!extraTagsByCol[c]) extraTagsByCol[c] = [];
+          extraTagsByCol[c].push(...tagsHere);
+        }
+      }
+    }
+
+    // 환자명 추출: 한 행에 가로로 4명 ('김명심(여)79세' 형식)
+    let pIdx = 0;
+    for(let c = 0; c < row.length && pIdx < PATIENTS_PER_ROOM; c++){
+      const val = String(row[c]||'').trim();
+      if(!val) continue;
+      // 호실번호 자체 또는 병동 이름은 건너뜀
+      if(val.match(/^\d{3}호?$/) || val.match(/^[45]병동$/) || val === '병동' || val === '병실') continue;
+      // 앞부분 한글 이름 + (선택) 동명이인 번호 추출
+      //   예) "이종례2(여)85세" → 이름 "이종례", 번호 "2" → 저장 "이종례2"
+      //   번호는 반드시 보존해야 함. 안 그러면 치료시트의 'H이종례2'와 매칭할 때
+      //   '명단엔 번호 없는 이종례 1명만 있음 → 외래 의심'으로 잘못 경고가 뜸.
+      const m = val.match(/^([가-힣]+)(\d)?/);
+      if(m && m[1].length >= 2){
+        const suffix = m[2] || '';
+        let fullName = m[1] + suffix;
+        // 셀 내부에 있는 태그 보존: (침상)/(HOLD)/(병동)/(1층)/(3층)/(외래)/(치료실→병동)/(병동→치료실)
+        const rest = val.slice(m[1].length + suffix.length);
+        const tagsInCell = rest.match(TAG_RE);
+        if(tagsInCell) fullName += tagsInCell.join('');
+        // 같은 컬럼 아래 행에 있는 태그도 추가
+        if(extraTagsByCol[c]){
+          fullName += extraTagsByCol[c].join('');
+        }
+        console.log(`[병실현황 import] ${room}호 p${pIdx}: 원본="${val.replace(/\n/g,'⏎')}" 아래태그=${JSON.stringify(extraTagsByCol[c]||[])} 저장="${fullName}"`);
+        state.rooms[room].patients[pIdx].name = fullName;
+        namesImported++;
+        pIdx++;
+      }
+    }
+
+    // 환자 수 부족하면 나머지 슬롯 비우기 (예: 408호는 3명)
+    for(let p = pIdx; p < PATIENTS_PER_ROOM; p++){
+      state.rooms[room].patients[p].name = '';
+    }
+
+    updatedRooms.add(room);
+  });
+
+  // 누적 카운트 (4병실현황 + 5병실현황 합쳐서)
+  state.loadCounts.roster = countLoadedNames();
+  saveLocal();
+  render();
+  updateLoadIndicators();
+  const wards = new Set();
+  updatedRooms.forEach(r=>wards.add(r < 500 ? '4병동' : '5병동'));
+  const wardTxt = [...wards].join('·');
+  showStatus(`병실현황 불러옴: ${namesImported}명 (${updatedRooms.size}개 호실, ${wardTxt})`);
+}
+
+// 형식 C: EMR 명단 — 환자별 세로 1행, '수진자명'+'병실' 컬럼
+// 병실 컬럼으로 호실을 정하고, 같은 호실 환자를 순서대로 4명까지 채움
+function parseFormatC(rows, headerRowIdx, sheetName){
+  const header = rows[headerRowIdx].map(c=>String(c).trim());
+  const nameCol = header.indexOf('수진자명');
+  const roomCol = header.indexOf('병실');
+
+  // 호실별로 환자명 수집
+  const byRoom = {};  // {room: [name, ...]}
+  for(let i = headerRowIdx + 1; i < rows.length; i++){
+    const row = rows[i];
+    const rawRoom = String(row[roomCol]||'').trim();
+    const rawName = String(row[nameCol]||'').trim();
+    if(!rawName) continue;
+    const rm = rawRoom.match(/(\d{3})/);
+    if(!rm) continue;
+    const room = parseInt(rm[1]);
+    if(!ALL_ROOMS.includes(room)) continue;
+    const nm = (rawName.match(/^([가-힣]+)/)||[])[1];
+    if(!nm || nm.length < 2) continue;
+    (byRoom[room] = byRoom[room] || []).push(nm);
+  }
+
+  // 호실별로 최대 4명 배치 (해당 병동 파일이면 그 병동 호실만 갱신됨)
+  let namesImported = 0;
+  const updatedRooms = new Set();
+  Object.entries(byRoom).forEach(([roomStr, names])=>{
+    const room = parseInt(roomStr);
+    for(let p = 0; p < PATIENTS_PER_ROOM; p++){
+      state.rooms[room].patients[p].name = (p < names.length) ? names[p] : '';
+    }
+    if(names.length > PATIENTS_PER_ROOM){
+      console.warn(`[EMR명단] ${room}호 환자 ${names.length}명 — 4명 초과분 표시 안 됨:`, names.slice(PATIENTS_PER_ROOM));
+    }
+    namesImported += Math.min(names.length, PATIENTS_PER_ROOM);
+    updatedRooms.add(room);
+  });
+
+  state.loadCounts.roster = countLoadedNames();
+  saveLocal();
+  render();
+  updateLoadIndicators();
+  const wards = new Set();
+  updatedRooms.forEach(r=>wards.add(r < 500 ? '4병동' : '5병동'));
+  showStatus(`EMR 명단 불러옴: ${namesImported}명 (${updatedRooms.size}개 호실, ${[...wards].join('·')})`);
+}
+
+// 현재 명단에 입력된 환자 총수 계산
+function countLoadedNames(){
+  let n = 0;
+  ALL_ROOMS.forEach(r=>{
+    state.rooms[r].patients.forEach(p=>{
+      if(p.name && p.name.trim()) n++;
+    });
+  });
+  return n;
+}
+
+function importBackupJSON(file){
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const parsed = JSON.parse(e.target.result);
+      const data = parsed.rooms ? parsed : (parsed.state || parsed);
+      initState();
+      if(data.rooms){
+        ALL_ROOMS.forEach(r=>{
+          if(data.rooms[r]){
+            if(Array.isArray(data.rooms[r].patients)){
+              for(let p=0;p<PATIENTS_PER_ROOM;p++){
+                if(data.rooms[r].patients[p]){
+                  state.rooms[r].patients[p] = data.rooms[r].patients[p];
+                }
+              }
+            }
+            // 새 구조 (cellsByDay)
+            if(data.rooms[r].cellsByDay){
+              DAYS.forEach(d=>{
+                if(data.rooms[r].cellsByDay[d]){
+                  state.rooms[r].cellsByDay[d] = {...data.rooms[r].cellsByDay[d]};
+                }
+              });
+            }
+            // 구 cells 구조 → 토요일로 마이그
+            else if(data.rooms[r].cells){
+              state.rooms[r].cellsByDay[syncDays()[0]] = {...data.rooms[r].cells};
+            }
+          }
+        });
+      }
+      state.date = data.date || '';
+      state.activeDay = data.activeDay || '토';
+      saveLocal();
+      render();
+      setActiveDay(state.activeDay);
+      updateDateDisplay();
+      showStatus('JSON 불러오기 완료');
+    }catch(err){
+      alert('JSON 읽기 실패: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ===== JSON (호환용, 숨김) =====
+function exportJSON(){
+  const data = JSON.stringify({version:3, exported:new Date().toISOString(), ...state}, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = state.date || new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `이동반_시간표_${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showStatus('JSON 저장 완료');
+}
+
+function importJSON(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const parsed = JSON.parse(e.target.result);
+      const data = parsed.rooms ? parsed : (parsed.state || parsed);
+      initState();
+      if(data.rooms){
+        ALL_ROOMS.forEach(r=>{
+          if(data.rooms[r]){
+            if(Array.isArray(data.rooms[r].patients)){
+              for(let p=0;p<PATIENTS_PER_ROOM;p++){
+                if(data.rooms[r].patients[p]){
+                  state.rooms[r].patients[p] = data.rooms[r].patients[p];
+                }
+              }
+            }
+            if(data.rooms[r].cells){
+              state.rooms[r].cells = {...data.rooms[r].cells};
+            }
+          }
+        });
+      }
+      state.date = data.date || '';
+      saveLocal();
+      render();
+      updateDateDisplay();
+      showStatus('JSON 불러오기 완료');
+    }catch(err){
+      alert('파일 읽기 실패: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+  ev.target.value = '';
+}
+
+// ===== 일일업무보고 자동 채우기 =====
+// SheetJS sheet_to_json 우회 — 수식 셀에서 죽는 버그 회피
+function readSheetAsRows(ws){
+  const rows = [];
+  if(!ws || !ws['!ref']) return rows;
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for(let r = range.s.r; r <= range.e.r; r++){
+    const row = [];
+    for(let c = range.s.c; c <= range.e.c; c++){
+      const ref = XLSX.utils.encode_cell({r, c});
+      const cell = ws[ref];
+      if(!cell){ row.push(''); continue; }
+      // 수식셀이든 일반셀이든 .v(값)만 가져옴
+      row.push(cell.v != null ? cell.v : '');
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+// 여러 시트 중 사용자 날짜에 맞거나 데이터가 가장 많은 시트 선택
+function pickBestSheet(wb, targetDate){
+  // 1) 날짜 기반 매칭: '06_02', '06.02', '6_2', '06_02화요일...' 등
+  if(targetDate){
+    const [y, m, d] = targetDate.split('-').map(Number);
+    const mPad = String(m).padStart(2,'0');
+    const dPad = String(d).padStart(2,'0');
+    const patterns = [
+      `${mPad}_${dPad}`, `${mPad}.${dPad}`,
+      `${m}_${d}`, `${m}.${d}`,
+      `${mPad}_${d}`, `${m}_${dPad}`,
+      `${mPad}.${d}`, `${m}.${dPad}`
+    ];
+    for(const sn of wb.SheetNames){
+      for(const p of patterns){
+        // 시트명이 패턴으로 시작하거나 포함하면 매칭
+        if(sn.startsWith(p) || sn.includes('_'+p) || sn.includes(' '+p)){
+          return sn;
+        }
+      }
+    }
+  }
+
+  // 2) 한글 셀이 가장 많은 시트 (가장 채워진 시트)
+  let best = null, max = 0;
+  for(const name of wb.SheetNames){
+    const ws = wb.Sheets[name];
+    if(!ws['!ref']) continue;
+    let count = 0;
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const maxR = Math.min(range.s.r + 50, range.e.r);
+    const maxC = Math.min(range.s.c + 25, range.e.c);
+    for(let r = range.s.r; r <= maxR; r++){
+      for(let c = range.s.c; c <= maxC; c++){
+        const cell = ws[XLSX.utils.encode_cell({r,c})];
+        if(cell && cell.v && /[가-힣]/.test(String(cell.v))) count++;
+      }
+    }
+    if(count > max){ max = count; best = name; }
+  }
+  return best || wb.SheetNames[0];
+}
+
+// 버튼 옆 ✓ 표시 업데이트
+function updateLoadIndicators(){
+  const map = {
+    'ind-roster':   state.loadCounts.roster   ? `${state.loadCounts.roster}명` : '',
+    'ind-combined': state.loadCounts.combined ? `${state.loadCounts.combined}건` : ''
+  };
+  Object.entries(map).forEach(([id, text])=>{
+    const el = document.getElementById(id);
+    if(el) el.textContent = text;
+  });
+}
+
+// 헤더 날짜 표시 갱신 — state.date가 무엇이든 토요일·일요일로 보정해 표시
+function updateDateDisplay(){
+  const el = document.getElementById('date-display');
+  if(!el) return;
+  syncDays();
+  const list = (state.dayList && state.dayList.length) ? state.dayList : [];
+  const label = list.length
+    ? `📅 ${list.map(d=>{
+        const dd = Number(d.date.split('-')[2]);
+        const mm = Number(d.date.split('-')[1]);
+        return `${mm}/${dd}(${d.key})`;
+      }).join(' · ')}`
+    : (state.date ? `📅 ${formatDateKorean(state.date)}` : '📅 날짜 선택');
+  el.classList.toggle('has-date', !!(list.length || state.date));
+  const start = list.length ? list[0].date : (state.date || '');
+  const count = list.length || 2;
+  el.innerHTML =
+    `<span class="date-pick" title="시작일을 고르고 일수를 선택하세요">`+
+      `<span class="dp-label${(list.length||state.date)?'':' empty'}">${label}</span>`+
+      `<input type="date" id="date-picker" value="${start}" onchange="onWeekendStartPicked(this.value)" title="시작일">`+
+      `<select id="day-count" onchange="onDayCountPicked(this.value)" title="며칠짜리 주말인지 선택">`+
+        [2,3,4,5].map(n=>`<option value="${n}"${n===count?' selected':''}>${n}일</option>`).join('')+
+      `</select>`+
+      ((list.length||state.date) ? `<button class="dp-clear" title="날짜 지우기" onclick="onWeekendStartPicked('')">✕</button>` : '')+
+    `</span>`;
+  const lbl = el.querySelector('.dp-label');
+  const inp = el.querySelector('#date-picker');
+  if(lbl && inp){
+    lbl.onclick = ()=>{ if(inp.showPicker){ try{ inp.showPicker(); }catch(e){ inp.focus(); } } else inp.focus(); };
+  }
+}
+
+// 시작일을 달력에서 고름 — 현재 일수만큼 dayList 재구성
+function onWeekendStartPicked(v){
+  if(!v){
+    state.date = ''; state.dayList = [];
+    syncDays(); reconcileDayMaps();
+    saveLocal(); renderDayButtons(); updateDateDisplay(); render();
+    showStatus('날짜를 지웠습니다');
+    return;
+  }
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+  const count = (state.dayList && state.dayList.length) ? state.dayList.length : 2;
+  applyDayList(buildDayList(v, count), '기준 날짜');
+}
+// 일수(2~5일) 선택 — 공휴일이 껴서 3일 이상인 주말 대응
+function onDayCountPicked(n){
+  const count = Math.max(1, Math.min(5, Number(n)||2));
+  const start = (state.dayList && state.dayList.length) ? state.dayList[0].date : state.date;
+  if(!start){
+    showStatus('먼저 시작일을 선택해주세요');
+    updateDateDisplay();
+    return;
+  }
+  applyDayList(buildDayList(start, count), '기간');
+}
+// dayList 적용 (셀 데이터는 요일 키 기준으로 최대한 보존)
+function applyDayList(list, what){
+  state.dayList = list;
+  state.date = list.length ? list[0].date : '';
+  syncDays();
+  reconcileDayMaps();
+  saveLocal();
+  renderDayButtons();
+  updateDateDisplay();
+  render();
+  if(what){
+    showStatus(`${what} 설정: ${list.map(d=>`${Number(d.date.split('-')[2])}일(${d.key})`).join(' · ')}`);
+  }
+}
+
+const SLOT_24H = {
+  "09:00":[9,0], "09:35":[9,35], "10:10":[10,10],
+  "10:45":[10,45], "11:20":[11,20], "11:55":[11,55],
+  "01:30":[13,30], "02:05":[14,5], "02:40":[14,40],
+  "03:15":[15,15], "03:50":[15,50], "04:25":[16,25],
+  "05:00":[17,0]
+};
+
+function matchToSlot(h, m){
+  // 엑셀이 오후 시간을 12시간제로 저장하는 경우 처리:
+  //   1:30 PM = 0.0625 → h=1 인데 [13,30]에 매칭되어야 함
+  //   5:00 PM = 0.208333 → h=5 인데 [17,0]에 매칭되어야 함
+  // 그래서 1~6시는 13~18시로도 시도
+  const hCandidates = [h];
+  if(h >= 1 && h <= 6) hCandidates.push(h + 12);
+
+  for(const [label, [sh, sm]] of Object.entries(SLOT_24H)){
+    for(const hVar of hCandidates){
+      if(sh === hVar && Math.abs(sm - m) <= 3) return label;
+    }
+  }
+  return null;
+}
+
+function parseTimeValue(rawVal, formattedVal){
+  if(rawVal == null && formattedVal == null) return null;
+  // formattedVal가 'HH:MM:SS' 같은 시간 문자열
+  const s = String(formattedVal != null ? formattedVal : rawVal);
+  const m1 = s.match(/^(\d{1,2}):(\d{2})/);
+  if(m1){
+    return matchToSlot(parseInt(m1[1]), parseInt(m1[2]));
+  }
+  // 엑셀 시리얼 시간 (0.375 = 09:00)
+  const n = parseFloat(rawVal);
+  if(!isNaN(n) && n > 0 && n < 1){
+    const totalMin = Math.round(n * 24 * 60);
+    return matchToSlot(Math.floor(totalMin / 60), totalMin % 60);
+  }
+  return null;
+}
+
+// 한 셀에서 환자 정보 추출 (이름 + 카테고리 오버라이드 + 제외 여부)
+// 반환: [{name, override, exclude}, ...]
+// 한 셀에서 환자 정보 추출 (이름 + 카테고리 오버라이드 + 제외 여부)
+// 반환: [{name, override, exclude}, ...]
+//
+// 처리 원칙: **줄 단위 스코프** (평일 버전과 동일)
+//   같은 셀이라도 줄(\n)이 다르면 다른 환자로 간주, 태그가 줄을 넘어 다른 이름에 섞이지 않게 함.
+//   예: "G방극열+패시브\nH정금복+슬라\n\nC조민경+리포머(외래)"
+//       → (외래) 태그는 조민경 줄에만 적용. 방극열·정금복은 영향 없음.
+//   주말 카테고리는 1층/3층/통증만 유효. (외래)·(병동)은 자동입력에서 제외
+//     - (외래): 사용자가 셀 클릭으로 직접 표시
+//     - (병동): 주말 카테고리가 아니므로 자동입력 대상 아님
+function extractPatientNames(content, nameMap){
+  if(!content) return [];
+  const text = String(content);
+  const results = [];
+  const hasRoster = nameMap && Object.keys(nameMap).length > 0;
+  const isRealName = (n) => hasRoster ? !!(nameMap[n] && nameMap[n].length > 0) : true;
+
+  const lines = text.split(/\r?\n/);
+  const namePattern = /([A-Z]+\d?)?([가-힣]{2,})(\d)?(?:\s*(\([^)]+\)))?/g;
+
+  // 1) 줄별로 이름·태그 추출
+  const perLine = lines.map(line => {
+    // 줄 전체에서 카테고리 태그 감지
+    // (외래)·(병동)은 자동입력 제외 (외래는 직접 기입, 병동은 주말 카테고리 아님)
+    let lineOverride = null;
+    let lineExclude = false;
+    if(/\(침상\)|\(HOLD\)|\(외래\)|\(병동\)/i.test(line)){ lineExclude = true; }
+    else if(/\(치료실\s*[→\->]+\s*병동\)/.test(line)){ lineOverride = '3층'; }
+    else if(/\(1층\)/.test(line)){ lineOverride = '1층'; }
+    else if(/\(3층\)/.test(line)){ lineOverride = '3층'; }
+    else if(/\(통증\)/.test(line)){ lineOverride = '통증'; }
+
+    // 줄 안의 이름 추출
+    const names = [];
+    namePattern.lastIndex = 0;
+    let m;
+    while((m = namePattern.exec(line)) !== null){
+      const name = m[2];
+      const numAfter = m[3] || '';
+      const tag = m[4] || '';
+
+      let homonymNum = null;
+      if(numAfter){
+        const rightAfterNum = line[m.index + (m[1]?m[1].length:0) + name.length + 1] || '';
+        if(!/[:분층호]/.test(rightAfterNum)){
+          homonymNum = numAfter;
+        }
+      }
+
+      // 이름 바로 뒤에 붙은 태그 (가장 강함, 줄 태그보다 우선)
+      let override = null;
+      let exclude = false;
+      if(tag){
+        if(/침상|HOLD|^\(외래\)$|^\(병동\)$/i.test(tag)){ exclude = true; }
+        else if(/치료실\s*[→\->]+\s*병동/.test(tag)){ override = '3층'; }
+        else if(/^\(1층\)$/.test(tag)){ override = '1층'; }
+        else if(/^\(3층\)$/.test(tag)){ override = '3층'; }
+        else if(/^\(통증\)$/.test(tag)){ override = '통증'; }
+        // 그 외 (평가)(인지치료)(체외)(상지운동) 등 치료 정보는 무시
+      }
+
+      const real = isRealName(name);
+      names.push({name, override, exclude, homonymNum, real});
+    }
+    return {line, names, lineOverride, lineExclude};
+  });
+
+  // 2) 부속 태그 줄(환자 이름이 없고 카테고리 태그만 있는 줄)은 직전 이름 줄에 적용
+  //    예: "H박철호\n(상지운동) (3층)" → (3층)이 박철호에 붙음
+  //    단, "C조민경+리포머(외래)" 처럼 prefix+한글 이름이 있는 줄은 부속 줄 아님
+  const PATIENT_TOKEN = /(?:[A-Z]+\d?|\d+)\s*[가-힣]{2,}/;
+  perLine.forEach((cur, idx) => {
+    if(!(cur.lineOverride || cur.lineExclude)) return;
+    if(cur.names.some(n => n.real)) return;
+    if(PATIENT_TOKEN.test(cur.line)) return;
+    for(let j = idx - 1; j >= 0; j--){
+      const realNames = perLine[j].names.filter(n => n.real);
+      if(realNames.length > 0){
+        realNames.forEach(n => {
+          if(!n.override && !n.exclude){
+            if(cur.lineOverride) n.override = cur.lineOverride;
+            if(cur.lineExclude) n.exclude = true;
+          }
+        });
+        break;
+      }
+    }
+  });
+
+  // 3) 같은 줄에 진짜 이름 정확히 1명 + 줄 태그가 있으면 그 이름에 적용
+  perLine.forEach(cur => {
+    const realNames = cur.names.filter(n => n.real);
+    if(realNames.length === 1 && (cur.lineOverride || cur.lineExclude)){
+      const n = realNames[0];
+      if(!n.override && !n.exclude){
+        if(cur.lineOverride) n.override = cur.lineOverride;
+        if(cur.lineExclude) n.exclude = true;
+      }
+    }
+  });
+
+  // 3.5) 셀 단위 라벨 — 괄호 없는 "3층기구"/"1층기구" 줄이 단독으로 있으면
+  //      그 셀 전체 환자에 적용. 환자별 override가 이미 설정된 환자는 그대로(개별 우선).
+  //      예: "H박영정+어댑핏\nH김순복+전상\n...\n3층기구" → 셀의 모든 환자 → 3층
+  //      "(3층)" 같은 괄호 태그는 직전 환자에만 적용되는 기존 부속 줄 로직(2) 그대로.
+  const CELL_LABEL_RE = /^\s*([13]층)\s*기구\s*$/;
+  let cellOverride = null;
+  for(const cur of perLine){
+    const m = cur.line.trim().match(CELL_LABEL_RE);
+    if(m){
+      cellOverride = m[1];  // '3층' 또는 '1층'
+      break;
+    }
+  }
+  if(cellOverride){
+    perLine.forEach(cur=>{
+      cur.names.forEach(n=>{
+        if(n.real && !n.override && !n.exclude){
+          n.override = cellOverride;
+        }
+      });
+    });
+  }
+
+  // 4) 평탄화 + 로그
+  perLine.forEach(cur => {
+    cur.names.forEach(n => {
+      if(n.real || cur.lineOverride || cur.lineExclude){
+        console.log(`[extract] 원본셀="${text.replace(/\n/g,'⏎').replace(/\r/g,'␍').slice(0,80)}" 줄="${cur.line.slice(0,40)}" → 이름="${n.name}" 줄태그="${cur.lineOverride||(cur.lineExclude?'제외':'-')}" 명단="${n.real?'O':'X'}" → override="${n.override||'-'}" exclude=${n.exclude}`);
+      }
+      results.push({name:n.name, override:n.override, exclude:n.exclude, homonymNum:n.homonymNum});
+    });
+  });
+
+  return results;
+}
+
+function buildNameMap(){
+  const map = {};
+  ALL_ROOMS.forEach(r=>{
+    state.rooms[r].patients.forEach((pt, p)=>{
+      const info = nameTagInfo(pt.name);
+      if(info.excluded) return;
+      // 1) 괄호 태그 제거: 김명심(1층) → 김명심
+      const cleaned = info.display.replace(/\s*\([^)]+\)/g, '').trim();
+      // 2) 순수 한글 이름 + (선택) 동명이인 번호 분리
+      //    예) '이종례2' → baseName='이종례', num='2'
+      //        '김명심'  → baseName='김명심', num=null
+      //    번호 정보를 보존해야 치료시트의 'H이종례2'와 정확히 매칭됨.
+      const m = cleaned.match(/([가-힣]+)(\d)?/);
+      const baseName = m ? m[1] : cleaned;
+      const num = (m && m[2]) ? m[2] : null;
+      if(baseName && baseName.length >= 2){
+        if(!map[baseName]) map[baseName] = [];
+        map[baseName].push({room:r, p, tag:info.tag, num});
+      }
+    });
+  });
+  return map;
+}
+
+// 워크북 내부 원본 파일을 문자열로 읽기
+function wbFileText(wb, path){
+  const f = wb.files && wb.files[path];
+  if(!f) return null;
+  if(typeof f === 'string') return f;
+  if(f.content){
+    try{
+      // content가 Uint8Array/배열인 경우 UTF-8 디코드
+      return new TextDecoder('utf-8').decode(new Uint8Array(f.content));
+    }catch(e){
+      try{ return String.fromCharCode.apply(null, f.content); }catch(e2){ return null; }
+    }
+  }
+  return null;
+}
+
+// 밑줄 서식이 적용된 셀들의 ref 집합 (액팅/완료 처리 → 이동반 제외)
+// 취소선(strike)은 대상이 아님: 이름 위 선 그어진 환자도 자동입력 대상.
+//   (예) 셀에 "(F)M정정임+슬라(GJ003)\nH김양수+리포머" 가 있고 첫 줄만 취소선 →
+//        정정임·김양수 둘 다 자동입력에 잡혀야 함. 밑줄만 제외 신호.
+function buildUnderlineSet(wb, sheetName){
+  const set = new Set();
+  try{
+    const styles = wbFileText(wb, 'xl/styles.xml');
+    if(!styles) return set;
+
+    // 폰트별 밑줄 여부 (취소선은 제외 신호 아님)
+    const fontsBlock = (styles.match(/<fonts[^>]*>([\s\S]*?)<\/fonts>/)||[])[1] || '';
+    const fonts = fontsBlock.match(/<font>[\s\S]*?<\/font>|<font\/>/g) || [];
+    const fontExclude = fonts.map(f => /<u\/>|<u /.test(f));
+
+    // 셀 스타일(cellXfs) 인덱스 → 제외 여부
+    const xfsBlock = (styles.match(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/)||[])[1] || '';
+    const xfs = xfsBlock.match(/<xf [^>]*\/>|<xf [^>]*>[\s\S]*?<\/xf>/g) || [];
+    const styleUnderline = xfs.map(xf => {
+      const m = xf.match(/fontId="(\d+)"/);
+      const fid = m ? parseInt(m[1]) : 0;
+      return !!fontExclude[fid];
+    });
+
+    // 시트 이름 → 워크시트 XML 경로
+    const wbXml = wbFileText(wb, 'xl/workbook.xml') || '';
+    const rels = wbFileText(wb, 'xl/_rels/workbook.xml.rels') || '';
+    const esc = sheetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const sheetTag = (wbXml.match(new RegExp('<sheet [^>]*name="'+esc+'"[^>]*>'))||[])[0] || '';
+    const ridM = sheetTag.match(/r:id="([^"]+)"/);
+    let sheetPath = null;
+    if(ridM){
+      const relM = rels.match(new RegExp('Id="'+ridM[1]+'"[^>]*Target="([^"]+)"'));
+      if(relM) sheetPath = 'xl/' + relM[1].replace(/^\//,'');
+    }
+    if(!sheetPath) return set;
+
+    // 워크시트 XML에서 셀ref + 스타일인덱스 → 밑줄이면 추가
+    const sheetXml = wbFileText(wb, sheetPath) || '';
+    const cellRe = /<c r="([A-Z]+\d+)"(?:[^>]*?\ss="(\d+)")?[^>]*>/g;
+    let m;
+    while((m = cellRe.exec(sheetXml)) !== null){
+      const sIdx = m[2] ? parseInt(m[2]) : 0;
+      if(styleUnderline[sIdx]) set.add(m[1]);
+    }
+  }catch(e){
+    console.warn('밑줄 감지 실패:', e);
+  }
+  return set;
+}
+
+// 컬럼 헤더 분류: CPM→1층, 시행(3층)→3층, 외래/재택→제외
+// 환자 셀의 (3층) 태그 등을 오인하지 않도록 정확한 헤더 패턴만 인식
+function classifyColHeader(text){
+  const t = String(text).trim();
+  if(t === '외래' || t === '재택/방문' || t === '재택교육' || /^재택/.test(t)) return {exclude:true};
+  if(/^CPM\b/i.test(t) || t.toUpperCase() === 'CPM') return {cat:'1층'};
+  if(/시행\s*\(?\s*3층\s*\)?/.test(t)) return {cat:'3층'};
+  return null;
+}
+// 컬럼별 카테고리 헤더 목록 수집: {c: [{row, cat?, exclude?}]}
+// 머지된 헤더 셀(예: Q38:S38='CPM')은 SheetJS에서 좌상단(Q38)에만 값이 저장되고
+// 오른쪽 셀(R38,S38)은 빈 셀로 나옴 → 머지 범위 전체 컬럼에 헤더를 등록해야
+// '다리(누워서)','다리(앉아서)' 같은 CPM 하위 컬럼도 1층으로 분류됨.
+function buildColHeaders(ws, range){
+  const colHeaders = {};
+  // 머지 좌상단 좌표 → 머지 범위 인덱스
+  const merges = ws['!merges'] || [];
+  const mergeByTopLeft = {};
+  for(const m of merges){
+    const key = XLSX.utils.encode_cell({r: m.s.r, c: m.s.c});
+    mergeByTopLeft[key] = m;
+  }
+  for(let c = range.s.c; c <= range.e.c; c++){
+    for(let r = range.s.r; r <= range.e.r; r++){
+      const ref = XLSX.utils.encode_cell({r, c});
+      const cell = ws[ref];
+      if(!cell || typeof cell.v !== 'string') continue;
+      const cls = classifyColHeader(cell.v);
+      if(cls){
+        // 머지된 헤더면 머지 범위 전체 컬럼에 등록 (예: Q38:S38 CPM → Q,R,S 모두 1층)
+        const mg = mergeByTopLeft[ref];
+        const cStart = mg ? mg.s.c : c;
+        const cEnd   = mg ? mg.e.c : c;
+        for(let cc = cStart; cc <= cEnd; cc++){
+          if(!colHeaders[cc]) colHeaders[cc] = [];
+          colHeaders[cc].push({row:r, ...cls});
+        }
+      }
+    }
+  }
+  return colHeaders;
+}
+// (r,c)에 적용되는 컬럼 오버라이드 = 같은 컬럼에서 가장 가까운 위쪽 헤더
+function getColOverride(colHeaders, r, c){
+  const list = colHeaders[c];
+  if(!list) return null;
+  let best = null;
+  for(const h of list){ if(h.row <= r && (!best || h.row > best.row)) best = h; }
+  return best;
+}
+
+// 엑셀 상단(보통 A1)에서 'YYYY년 MM월 DD일' 날짜를 추출 → 'YYYY-MM-DD'
+function extractSheetDate(ws, range){
+  const maxR = Math.min(range.s.r + 6, range.e.r);
+  const maxC = Math.min(range.s.c + 8, range.e.c);
+  // 연도 옵션: '2026년 6월 14일' 또는 '6월 14일'(연도 없으면 올해)
+  const RX = /(?:(\d{4})\s*년\s*)?(\d{1,2})\s*월\s*(\d{1,2})\s*일/;
+  for(let r = range.s.r; r <= maxR; r++){
+    for(let c = range.s.c; c <= maxC; c++){
+      const cell = ws[XLSX.utils.encode_cell({r, c})];
+      if(!cell || typeof cell.v !== 'string') continue;
+      const m = cell.v.match(RX);
+      if(m){
+        const y  = m[1] ? m[1] : String(new Date().getFullYear());
+        const mo = String(m[2]).padStart(2,'0');
+        const d  = String(m[3]).padStart(2,'0');
+        return `${y}-${mo}-${d}`;
+      }
+    }
+  }
+  return null;
+}
+
+// 프로그램 날짜와 엑셀 날짜 비교. 불일치 시 계속할지 확인.
+// 반환: true = 진행, false = 취소
+function verifySheetDate(ws, range, fileLabel){
+  const sheetDate = extractSheetDate(ws, range);
+  const appDate = state.date;
+  if(!appDate) return true;
+  if(!sheetDate){
+    console.warn(`[날짜검증] ${fileLabel}: 엑셀 상단에서 날짜를 찾지 못함`);
+    return true;
+  }
+  if(sheetDate !== appDate){
+    const fmt = s => { const [y,mo,d]=s.split('-'); return `${y}년 ${mo}월 ${d}일`; };
+    return confirm(
+      `⚠️ 날짜가 일치하지 않습니다!\n\n`+
+      `• 프로그램 설정 날짜: ${fmt(appDate)}\n`+
+      `• ${fileLabel} 파일 날짜: ${fmt(sheetDate)}\n\n`+
+      `다른 날짜의 파일일 수 있습니다. 그래도 자동입력을 진행할까요?\n`+
+      `(취소하고 올바른 파일/날짜를 확인하는 것을 권장합니다)`
+    );
+  }
+  return true;
+}
+
+// ===== 검증 기능 (주말) =====
+// 원본에 자주 나오는 장비·치료·태그 단어 (환자명이 아님 → 미매칭 목록 제외)
+const EQUIP_WORDS = new Set([
+  '슬라','런닝','코로','코','워킹','아크','경사','바로','동적','기립','체어','리포머','캐딜락',
+  '전기','안면전기','전기펜','전기장갑','전동상지','어댑핏','클라','오토','패시브','스마트','하네스',
+  '엔젤','엑소','엘봇','알봇','로봇','필라테스','진동기','등속성','저속','한발로','호흡치료','호흡훈련',
+  '외래','화목','병동','치료실','침상','재택','방문','도수중재','인지치료','음악치료','음악치료실',
+  '연하치료','식이치료','상지운동','상지압박','하지압박','상지','안면운동','체외','크라이오','견인',
+  '스트레칭','필수','최대한','평가','재활센터','시간표','점심시간','토요일','일요일','주말시간표',
+  '월요일','화요일','수요일','목요일','금요일','근골격계','신경계','전기자극','열전기치료','도수',
+  'sono','SSP','ICT','HP','IR','BI','MI','CLT','FES','taVNS','TDCS','GJ','SN','EST','complex'
+]);
+
+// '검증' 버튼: 프로그램이 만든 시간표를 원본과 대조 (토·일 모두)
+// 방식: 실제 state를 백업 → 임시로 원본을 processSheetForDay로 다시 채움 →
+//       임시 결과 vs 실제 결과 비교 → state 원상복구. (로직 복제 없이 100% 동일 대조)
+function runVerification(){
+  if(!lastImportWb){
+    alert('먼저 합산 파일(🧠💪)을 불러와 주세요.\n\n검증은 방금 불러온 원본 파일과 현재 시간표를 대조합니다.\n(새로고침하면 원본이 사라지므로 파일을 다시 불러온 뒤 검증하세요.)');
+    return;
+  }
+  const nameMap = buildNameMap();
+  if(Object.keys(nameMap).length === 0){
+    alert('환자명이 없습니다. 병실현황을 먼저 불러와 주세요.');
+    return;
+  }
+
+  const { wb, sheetMap } = lastImportWb;
+
+  // ===== 0) 사전 검사: 원본 파일이 애초에 올바른가? =====
+  // 잘못된 파일로 검증하면 그 파일 기준으로 '일치'가 나와 진짜 오류를 놓치므로,
+  // 먼저 파일을 점검하고 문제가 있으면 검증을 중단.
+  const fileIssues = [];
+  const fileChecks = [];
+  const baseDate = state.date || '';
+
+  // (1) 요일 시트가 있는지 = 주말 파일이 맞는지
+  const mappedDays = Object.keys(sheetMap);
+  if(mappedDays.length === 0){
+    fileIssues.push({
+      kind:'종류',
+      msg:'불러온 파일에서 요일 시트를 찾지 못했습니다. 주말 시간표 파일이 아닐 수 있습니다.',
+      fix:'요일별 시트가 들어있는 주말 합산 시간표 파일을 불러주세요.'
+    });
+  }else if(mappedDays.length === 1){
+    fileIssues.push({
+      kind:'종류',
+      msg:`요일 시트가 1개(${mappedDays[0]}요일)뿐입니다. 주말 시간표는 보통 2일 이상입니다.`,
+      fix:`토·일(공휴일이 있으면 그 날짜까지) 모든 요일 시트가 들어있는 파일인지 확인해주세요.`
+    });
+  }else{
+    fileChecks.push(`주말 파일 확인 — 요일 시트 ${mappedDays.length}개 (${mappedDays.join('·')}요일)`);
+  }
+
+  // (2) 날짜 검사 — 각 요일 시트의 날짜가 그 요일에 설정된 날짜와 맞는지
+  //     시트 안에 날짜가 없으면 시트 이름('07_18 토요일')에서도 찾는다.
+  if(fileIssues.length === 0){
+    const dayInfo = lastImportWb.dayInfo || {};
+    syncDays().forEach(day=>{
+      const sn = sheetMap[day];
+      if(!sn) return;
+      const ws0 = wb.Sheets[sn];
+      const rg0 = XLSX.utils.decode_range(ws0['!ref'] || 'A1:AZ300');
+
+      // 1순위: 시트 내용의 날짜
+      let fd = extractSheetDate(ws0, rg0);
+      let src = '시트 내용';
+      // 2순위: 시트 이름의 'MM_DD' / 'MM월 DD일' 패턴
+      if(!fd){
+        const m2 = sn.match(/(\d{1,2})[_\-.월\s]+(\d{1,2})/);
+        if(m2){
+          const yr = (dayInfo[day] && dayInfo[day].iso)
+            ? Number(dayInfo[day].iso.split('-')[0])
+            : (state.date ? Number(state.date.split('-')[0]) : new Date().getFullYear());
+          const cand = `${yr}-${String(m2[1]).padStart(2,'0')}-${String(m2[2]).padStart(2,'0')}`;
+          if(!isNaN(new Date(cand).getTime())){ fd = cand; src = '시트 이름'; }
+        }
+      }
+      // 3순위: 불러올 때 알아낸 날짜
+      if(!fd && dayInfo[day] && dayInfo[day].iso){
+        fd = dayInfo[day].iso; src = dayInfo[day].src || '자동 인식';
+      }
+
+      const wantISO = dateOfDay(day);   // 프로그램에 설정된 그 요일의 날짜
+      if(!fd){
+        fileIssues.push({
+          kind:'날짜',
+          msg:`${day}요일 시트에서 날짜를 찾지 못했습니다. (시트: "${sn}")`,
+          fix:`시트 위쪽에 '2026년 7월 18일'처럼 날짜를 넣거나, 시트 이름을 '07_18 토요일' 형식으로 바꿔주세요. 그래야 올바른 날짜의 파일인지 확인할 수 있습니다.`
+        });
+        return;
+      }
+      if(wantISO && fd !== wantISO){
+        fileIssues.push({
+          kind:'날짜',
+          msg:`${day}요일 시트 날짜(${formatDateKorean(fd)})가 설정된 날짜(${formatDateKorean(wantISO)})와 다릅니다.`,
+          fix:`올바른 날짜의 주말 파일을 불러오거나, 화면 위쪽 📅 날짜에서 시작일·일수를 고쳐주세요.`
+        });
+      }else if(wantISO){
+        fileChecks.push(`${day}요일 날짜 확인 — ${formatDateKorean(fd)} (${src} 기준, 설정과 일치)`);
+      }else{
+        fileChecks.push(`${day}요일 날짜 — ${formatDateKorean(fd)} (${src} 기준, 기준 날짜 미설정)`);
+      }
+    });
+  }
+
+  if(fileIssues.length > 0){
+    showFileIssueReport(fileIssues);
+    return;   // 검증 중단
+  }
+
+  // 1) 현재(사용자가 보는) 셀 상태를 깊은 복사로 백업
+  const actualCells = {};   // day -> {key: cat}
+  DAYS.forEach(day=>{
+    actualCells[day] = {};
+    ALL_ROOMS.forEach(room=>{
+      const cells = state.rooms[room].cellsByDay[day];
+      for(const k in cells){ actualCells[day][k] = cells[k]; }
+    });
+  });
+
+  // 2) 원본으로 '기대 상태' 재생성 — 임시로 빈 셀에 다시 채움
+  //    state를 직접 쓰므로, 셀/소스를 잠깐 비우고 채운 뒤 결과를 읽고 복원.
+  const backupCellsByDay = {};
+  const backupSourceByDay = {};
+  DAYS.forEach(day=>{
+    backupCellsByDay[day] = {};
+    ALL_ROOMS.forEach(room=>{ backupCellsByDay[day][room] = state.rooms[room].cellsByDay[day]; });
+    backupSourceByDay[day] = state.cellSourceByDay[day];
+  });
+  // 임시 초기화
+  DAYS.forEach(day=>{
+    ALL_ROOMS.forEach(room=>{ state.rooms[room].cellsByDay[day] = {}; });
+    state.cellSourceByDay[day] = {};
+  });
+
+  const allUnmatched = new Set();
+  try{
+    DAYS.forEach(day=>{
+      const sheetName = sheetMap[day];
+      if(!sheetName) return;
+      const result = processSheetForDay(wb, sheetName, day, nameMap);
+      if(result && result.unmatched){ result.unmatched.forEach(n=>allUnmatched.add(n)); }
+    });
+  }catch(e){
+    // 실패 시 복원하고 알림
+    DAYS.forEach(day=>{
+      ALL_ROOMS.forEach(room=>{ state.rooms[room].cellsByDay[day] = backupCellsByDay[day][room]; });
+      state.cellSourceByDay[day] = backupSourceByDay[day];
+    });
+    console.error('검증 재생성 실패:', e);
+    alert('검증 중 오류가 발생했습니다: ' + e.message);
+    return;
+  }
+
+  // 3) 기대 상태 수집
+  const expectedCells = {};
+  DAYS.forEach(day=>{
+    expectedCells[day] = {};
+    ALL_ROOMS.forEach(room=>{
+      const cells = state.rooms[room].cellsByDay[day];
+      for(const k in cells){ expectedCells[day][k] = cells[k]; }
+    });
+  });
+
+  // 4) state 원상복구
+  DAYS.forEach(day=>{
+    ALL_ROOMS.forEach(room=>{ state.rooms[room].cellsByDay[day] = backupCellsByDay[day][room]; });
+    state.cellSourceByDay[day] = backupSourceByDay[day];
+  });
+
+  // 5) 기대 vs 실제 대조
+  const problems = { missing: [], wrongFloor: [] };
+  let checkedCells = 0;
+  DAYS.forEach(day=>{
+    for(const key in expectedCells[day]){
+      checkedCells++;
+      const exp = expectedCells[day][key];
+      const act = actualCells[day][key];
+      const [room, p] = [key.split('-')[0], key.split('-')[1]];
+      const slot = key.split('-').slice(2).join('-');
+      const name = (state.rooms[room] && state.rooms[room].patients[p] && state.rooms[room].patients[p].name) || '';
+      if(act == null || act === ''){
+        problems.missing.push({ day, room, slot, name, expected: exp });
+      }else if(act !== exp){
+        problems.wrongFloor.push({ day, room, slot, name, expected: exp, actual: act });
+      }
+    }
+  });
+
+  // 미매칭 이름 정리 (장비명 제외)
+  const cleanUnmatched = [...allUnmatched].filter(n => n && n.length >= 2 && !EQUIP_WORDS.has(n));
+
+  // 점검 항목 요약
+  const catCount = {};
+  DAYS.forEach(day=>{ for(const k in expectedCells[day]){ const c=expectedCells[day][k]; catCount[c]=(catCount[c]||0)+1; } });
+  const catSummary = Object.entries(catCount).map(([c,n])=>`${c} ${n}칸`).join(' · ');
+  const perDay = syncDays().map(d=>`${d} ${Object.keys(expectedCells[d]||{}).length}`).join(' · ');
+  fileChecks.push(`대조한 칸 ${checkedCells}칸 (${perDay})`);
+  fileChecks.push(`층 분포 — ${catSummary}`);
+  fileChecks.push(`누락 검사 · 층 일치 검사 완료 (${syncDays().join('·')}요일 전체)`);
+
+  showVerificationReport(problems, { checkedCells, checks: fileChecks, unmatchedCount: cleanUnmatched.length });
+}
+
+// 파일 자체에 문제가 있을 때 — 검증 중단하고 무엇을 고쳐야 하는지 안내
+function showFileIssueReport(issues){
+  const panel = document.getElementById('verify-panel');
+  if(!panel) return;
+  let html = '';
+  html += `<div class="vf-head bad">🚫 검증 중단 — 불러온 파일을 먼저 확인해주세요 (${issues.length}건)`;
+  html += `<button class="vf-close" onclick="document.getElementById('verify-panel').style.display='none'">✕</button></div>`;
+  html += `<div class="vf-sec"><div class="vf-sec-title">문제</div>`;
+  issues.forEach(it=>{
+    html += `<div class="vf-row"><b>[${it.kind}]</b> ${it.msg}<br><span style="color:#2c6fb3">→ ${it.fix}</span></div>`;
+  });
+  html += `</div>`;
+  html += `<div class="vf-foot">※ 잘못된 파일로 검증하면 그 파일 기준으로 '일치'가 나와 진짜 오류를 놓칠 수 있어, 검증을 진행하지 않았습니다.</div>`;
+  panel.innerHTML = html;
+  panel.style.display = 'block';
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function showVerificationReport(problems, meta){
+  const panel = document.getElementById('verify-panel');
+  if(!panel) return;
+  const total = problems.missing.length + problems.wrongFloor.length;
+  const pass = total === 0;
+  let html = '';
+  html += `<div class="vf-head ${pass?'ok':'bad'}">`;
+  html += pass
+    ? `✅ 통과 — 원본과 시간표가 일치합니다 (${meta.checkedCells}칸 확인)`
+    : `⚠️ 문제 ${total}건 발견 (${meta.checkedCells}칸 확인)`;
+  html += `<button class="vf-close" onclick="document.getElementById('verify-panel').style.display='none'">✕</button></div>`;
+
+  if(problems.missing.length){
+    html += `<div class="vf-sec"><div class="vf-sec-title">🔴 누락 — 원본엔 있는데 표에 안 채워진 칸 (${problems.missing.length})</div>`;
+    problems.missing.slice(0,60).forEach(m=>{
+      html += `<div class="vf-row"><span class="vf-day">${m.day}</span><span class="vf-room">${m.room}호</span> <span class="vf-nm">${m.name||'(이름?)'}</span> <span class="vf-slot">${m.slot}</span> → 원본 <b>${m.expected}</b>인데 <b>빈칸</b></div>`;
+    });
+    if(problems.missing.length>60) html += `<div class="vf-more">…외 ${problems.missing.length-60}건</div>`;
+    html += `</div>`;
+  }
+  if(problems.wrongFloor.length){
+    html += `<div class="vf-sec"><div class="vf-sec-title">🟠 층 다름 — 원본과 다른 층으로 채워진 칸 (${problems.wrongFloor.length})</div>`;
+    problems.wrongFloor.slice(0,60).forEach(m=>{
+      html += `<div class="vf-row"><span class="vf-day">${m.day}</span><span class="vf-room">${m.room}호</span> <span class="vf-nm">${m.name||'(이름?)'}</span> <span class="vf-slot">${m.slot}</span> → 표 <b>${m.actual}</b> / 원본 <b>${m.expected}</b></div>`;
+    });
+    if(problems.wrongFloor.length>60) html += `<div class="vf-more">…외 ${problems.wrongFloor.length-60}건</div>`;
+    html += `</div>`;
+  }
+  if(meta.checks && meta.checks.length){
+    html += `<div class="vf-sec"><div class="vf-sec-title">🔎 점검한 내용 (${meta.checks.length})</div>`;
+    meta.checks.forEach(c=>{ html += `<div class="vf-row">✔ ${c}</div>`; });
+    if(meta.unmatchedCount){
+      html += `<div class="vf-row" style="color:#8a97ab">· 병실 명단에 없는 이름 ${meta.unmatchedCount}명은 외래·타병동으로 보고 검사에서 제외했습니다</div>`;
+    }
+    html += `</div>`;
+  }
+  if(pass){
+    html += `<div class="vf-sec"><div class="vf-row" style="color:#2c7a3f">모든 요일의 환자가 원본과 동일한 층으로 정확히 채워졌습니다.</div></div>`;
+  }else{
+    html += `<div class="vf-foot">※ 손으로 직접 바꾼 칸은 '층 다름/누락'으로 표시될 수 있어요. 실제 수정한 칸이면 무시하세요.</div>`;
+  }
+  panel.innerHTML = html;
+  panel.style.display = 'block';
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function autoFillDaily(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+
+  // 환자명이 입력되어 있는지 확인
+  const nameMap = buildNameMap();
+  if(Object.keys(nameMap).length === 0){
+    alert('먼저 환자명을 입력해주세요.\n방법: 병실현황 불러오기 또는 시간표에 직접 타이핑');
+    ev.target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const wb = XLSX.read(new Uint8Array(e.target.result), {
+        type:'array',
+        cellFormula:false,
+        cellStyles:false,
+        cellNF:false,
+        cellHTML:false,
+        cellText:false,
+        bookVBA:false,
+        bookSheets:false,
+        bookFiles:true  // 원본 XML 접근용 (밑줄 서식 감지)
+      });
+
+      // === 주말 시트 자동 감지 (요일 수 무관: 2일·3일·공휴일 포함) ===
+      // 각 시트에서 날짜를 뽑아 요일을 계산한다. 날짜가 없으면 시트명의 요일 단어로 판별.
+      // 데이터가 거의 없는 시트는 제외.
+      const detectedSheets = [];   // [{sheet, iso, key, cells}]
+      for(const sn of wb.SheetNames){
+        const wsx = wb.Sheets[sn];
+        if(!wsx || !wsx['!ref']) continue;
+        const rgx = XLSX.utils.decode_range(wsx['!ref']);
+        // 내용이 거의 없는 시트는 건너뜀
+        let filled = 0;
+        for(let r = rgx.s.r; r <= Math.min(rgx.e.r, rgx.s.r + 60); r++){
+          for(let c = rgx.s.c; c <= Math.min(rgx.e.c, rgx.s.c + 30); c++){
+            if(wsx[XLSX.utils.encode_cell({r,c})]) filled++;
+          }
+        }
+        if(filled < 20) continue;
+
+        // 1순위: 시트 안의 날짜
+        let iso = extractSheetDate(wsx, rgx);
+        let key = iso ? wdKeyOf(iso) : null;
+
+        // 2순위: 시트명의 요일 단어 (금요일/토요일/일요일 …)
+        if(!key){
+          const m = sn.match(/([일월화수목금토])요일/);
+          if(m) key = m[1];
+        }
+        // 3순위: 시트명의 'MM_DD' 또는 'MM월DD일' 패턴 → 올해 기준 날짜
+        if(!iso){
+          const m2 = sn.match(/(\d{1,2})[_\-.월\s]+(\d{1,2})/);
+          if(m2){
+            const yr = state.date ? Number(state.date.split('-')[0]) : new Date().getFullYear();
+            const mo = String(m2[1]).padStart(2,'0'), dd = String(m2[2]).padStart(2,'0');
+            const cand = `${yr}-${mo}-${dd}`;
+            if(!isNaN(new Date(cand).getTime())){
+              iso = cand;
+              if(!key) key = wdKeyOf(iso);
+            }
+          }
+        }
+        if(!key) continue;                       // 요일을 못 정하면 제외
+        detectedSheets.push({ sheet: sn, iso: iso || '', key, cells: filled });
+      }
+
+      // 날짜순 정렬 (날짜 없으면 요일 순서로)
+      const WD_ORDER = {'월':1,'화':2,'수':3,'목':4,'금':5,'토':6,'일':7};
+      detectedSheets.sort((a,b)=>{
+        if(a.iso && b.iso) return a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0;
+        return (WD_ORDER[a.key]||9) - (WD_ORDER[b.key]||9);
+      });
+      // 같은 요일이 여러 시트면 내용이 많은 쪽만 사용
+      const bestByKey = {};
+      detectedSheets.forEach(d=>{
+        if(!bestByKey[d.key] || d.cells > bestByKey[d.key].cells) bestByKey[d.key] = d;
+      });
+      const dayEntries = Object.values(bestByKey).sort((a,b)=>{
+        if(a.iso && b.iso) return a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0;
+        return (WD_ORDER[a.key]||9) - (WD_ORDER[b.key]||9);
+      });
+
+      const sheetMap = {};   // {'금': sheetName, '토': ..., '일': ...}
+      dayEntries.forEach(d=>{ sheetMap[d.key] = d.sheet; });
+
+      // 요일 시트를 하나도 못 찾으면 → 단일 시트 fallback
+      if(dayEntries.length === 0){
+        const sheetName = pickBestSheet(wb, state.date);
+        console.warn('[자동입력] 요일 시트를 찾지 못함. 단일 시트로 처리:', sheetName);
+        sheetMap[state.activeDay] = sheetName;
+        dayEntries.push({ sheet: sheetName, iso: state.date || '', key: state.activeDay, cells: 0 });
+      }
+
+      // === 감지한 요일 구성을 프로그램에 반영 (2일이든 3일이든) ===
+      const newDayList = dayEntries.map(d=>({
+        key: d.key,
+        date: d.iso || ''
+      }));
+      // 날짜가 비어있는 항목은 앞뒤 날짜로 보정
+      const anchorIdx = newDayList.findIndex(d=>d.date);
+      if(anchorIdx >= 0){
+        const [ay,am,ad] = newDayList[anchorIdx].date.split('-').map(Number);
+        newDayList.forEach((d,i)=>{
+          if(d.date) return;
+          const dt = new Date(ay, am-1, ad + (i - anchorIdx));
+          d.date = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+        });
+      }
+      state.dayList = newDayList;
+      state.date = newDayList[0].date || state.date;
+      syncDays();
+      reconcileDayMaps();
+
+      console.log('[자동입력] 감지한 요일:', newDayList, '/ 시트 매핑:', sheetMap);
+
+      // 대표 시트 = 첫 요일 시트 (날짜는 위 dayList 구성에서 이미 반영됨)
+      const repSheetName = dayEntries[0].sheet;
+      updateDateDisplay();
+      renderDayButtons();
+
+      // === 감지한 모든 요일 시트 처리 ===
+      // 검증용 원본 보관 (세션 메모리) — '검증' 버튼이 이 원본으로 재대조
+      // 불러올 때 알아낸 요일별 날짜(dayInfo)도 함께 보관해야
+      // 시트 안에 날짜가 없고 시트명에만 있는 파일도 검증이 날짜를 확인할 수 있다.
+      const dayInfo = {};
+      dayEntries.forEach(d=>{
+        const nd = newDayList.find(x=>x.key === d.key);
+        dayInfo[d.key] = {
+          sheet: d.sheet,
+          iso: (nd && nd.date) || d.iso || '',
+          src: d.iso ? '시트 내용' : '시트 이름'
+        };
+      });
+      lastImportWb = { wb, sheetMap: {...sheetMap}, dayInfo };
+
+      let totalFilled = 0;
+      const totalMatched = new Set();
+      const totalUnmatched = new Set();
+      const dayResults = {};  // {요일키: filledCount}
+
+      DAYS.forEach(day=>{
+        const sheetName = sheetMap[day];
+        if(!sheetName){
+          console.log(`[자동입력] ${day}요일 시트 없음 — 건너뜀`);
+          return;
+        }
+        const result = processSheetForDay(
+          wb, sheetName, day, nameMap
+        );
+        totalFilled += result.filledCount;
+        result.matched.forEach(n=>totalMatched.add(n));
+        result.unmatched.forEach(n=>totalUnmatched.add(n));
+        dayResults[day] = result.filledCount;
+      });
+
+      // 카운트 저장 + 인디케이터 업데이트
+      state.loadCounts.combined = totalFilled;
+      saveLocal();
+      render();
+      updateLoadIndicators();
+
+      const _dateNote = state.date ? ` · 📅 ${state.date}` : '';
+      const dayMsg = Object.entries(dayResults).map(([d,n])=>`${d} ${n}건`).join(' · ');
+      let msg = `자동 채움: ${totalFilled}개 셀 (${dayMsg}, ${totalMatched.size}명 매칭)${_dateNote}`;
+      if(totalUnmatched.size > 0){
+        console.log('[미매칭 환자명]', [...totalUnmatched]);
+      }
+      showStatus(msg);
+
+      // 매칭 0건이면 시트 안내
+      if(totalMatched.size === 0){
+        alert(`매칭 0건입니다.\n\n파일 시트: ${wb.SheetNames.join(', ')}\n매핑된 시트: ${JSON.stringify(sheetMap)}\n\n• 요일 시트(토/일, 공휴일 포함)가 있는 주말 파일인지 확인해주세요.\n• 또는 병실현황을 먼저 불러왔는지 확인해주세요.`);
+      }
+    }catch(err){
+      console.error('자동 채우기 에러:', err);
+      alert('자동 채우기 실패: '+err.message+'\n\n환자명을 직접 입력하시거나 다른 방식을 사용해주세요.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  ev.target.value = '';
+}
+
+// 한 시트의 데이터를 특정 요일(day)의 cellsByDay에 채움
+// 카테고리는 시트 안의 (3층)/(1층) 섹션 헤더로 자동 분기
+// 반환: { filledCount, matched: Set, unmatched: Set }
+function processSheetForDay(wb, sheetName, day, nameMap){
+  const ws = wb.Sheets[sheetName];
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:AZ300');
+
+  // 밑줄 친 셀 = 액팅 처리 → 이동반 제외 대상
+  const underlineSet = buildUnderlineSet(wb, sheetName);
+  if(underlineSet.size > 0) console.log(`[${day}] 밑줄(제외) 셀:`, underlineSet.size, '개');
+
+  // 컬럼 헤더 분석 (CPM→1층, 시행(3층)→3층, 외래/재택→제외)
+  const colHeaders = buildColHeaders(ws, range);
+
+  // === ST/언어 가로 서브섹션 사전 스캔 ===
+  const stColumns = new Set();
+  const SECTION_LABEL = /^(OT|NDT|PT|ST|MAT|FES|GAIT|RAT|로봇\s*OT|로봇|매트|회복기|통증|언어|스피치|speech)\s*$/i;
+  const ST_LABEL = /^(ST|언어|스피치|speech)\s*$/i;
+  for(let r = range.s.r; r <= range.e.r; r++){
+    const labels = [];
+    for(let c = range.s.c + 1; c <= range.e.c; c++){
+      const cell = ws[XLSX.utils.encode_cell({r, c})];
+      if(!cell || typeof cell.v !== 'string') continue;
+      const v = cell.v.trim();
+      if(!v) continue;
+      if(SECTION_LABEL.test(v)){
+        labels.push({col:c, label:v});
+      }
+    }
+    if(labels.length < 2) continue;
+    labels.forEach((lbl, idx)=>{
+      if(!ST_LABEL.test(lbl.label)) return;
+      const endCol = idx + 1 < labels.length
+        ? labels[idx+1].col - 1
+        : Math.min(lbl.col + 10, range.e.c);
+      for(let cc = lbl.col; cc <= endCol; cc++) stColumns.add(cc);
+    });
+  }
+  if(stColumns.size > 0) console.log(`[${day}] ST 컬럼:`, [...stColumns].sort((a,b)=>a-b));
+
+  // === '전기' / '통증' sub-table 사전 스캔 — 카테고리 강제 분류 ===
+  // 헤더 예: "전기(14)", "전기", "통증" 등. 둘 다 같은 패턴.
+  // 식별 조건:
+  //   ① 셀 텍스트에 "전기" 또는 "통증"이 포함
+  //   ② 같은 행 바로 다음 컬럼들에 자리 번호(1, 2, 3, ...)가 1부터 연속해서 나옴
+  // → 둘 다 만족하는 셀만 표 헤더로 인정.
+  //   "전기"/"통증"만 단독으로 있는 라벨/메모 셀은 자리 번호가 없어서 자동으로 걸러짐.
+  // 헤더 다음 행부터 시간 슬롯(헤더와 같은 컬럼) + 환자명(자리 번호 컬럼).
+  // 메인 루프와 별도 처리 — 메인 루프가 시간 컬럼을 잘못 잡거나 통증/전기 영역 환자를
+  // 일반 카테고리로 분류하는 걸 막기 위함.
+  // 카테고리: "통증" 헤더 → 통증, "전기" 헤더 → 3층 (사용자 지정).
+  const subtableEntries = [];   // [{r, timeSlot, seatCols, category}]
+  const subtableCellSet = new Set();  // 메인 루프에서 스킵할 셀 ref 집합
+  for(let r = range.s.r; r <= range.e.r; r++){
+    for(let c = range.s.c; c <= range.e.c; c++){
+      const cell = ws[XLSX.utils.encode_cell({r, c})];
+      if(!cell || typeof cell.v !== 'string') continue;
+      const trimmed = cell.v.trim();
+      const isElectric = /전기/.test(trimmed);
+      const isPain = /^통증/.test(trimmed);
+      if(!isElectric && !isPain) continue;
+
+      // 같은 행에서 자리 번호(1,2,3,...) 컬럼 수집 — 1부터 연속해야 함
+      const seatCols = [];
+      let expectSeat = 1;
+      for(let cc = c+1; cc <= range.e.c; cc++){
+        const sc = ws[XLSX.utils.encode_cell({r, c: cc})];
+        if(sc && typeof sc.v === 'number' && Number.isInteger(sc.v) && sc.v === expectSeat){
+          seatCols.push(cc);
+          expectSeat++;
+        }else if(sc && sc.v != null && sc.v !== ''){
+          break;  // 자리 번호 외 다른 값이 나오면 표 폭 종료
+        }else if(seatCols.length > 0){
+          break;  // 자리가 한 번 시작된 후 빈 셀이 나오면 종료
+        }
+      }
+      if(seatCols.length === 0) continue;  // 자리 번호가 없으면 표가 아님
+
+      const category = isPain ? '통증' : '3층';
+
+      // 헤더 다음 행부터 시간 슬롯 (시간은 헤더와 같은 컬럼)
+      //  점심시간 행 등 시간 없는 행은 건너뛰고 계속 진행.
+      //  새 섹션 헤더((1층)/(3층) 또는 PT/OT/통증 등)가 A열에 나오면 sub-table 종료.
+      //   ※ "6월 20일 토요일 주말시간표 (1층)" 같은 라벨도 잡기 위해 (N층)은 위치 무관.
+      const NEW_SECTION_RE = /\(\s*[13]\s*층\s*\)|^(PT|OT|NDT|MAT|GAIT|FES|매트|로봇|회복기|신경계|근골|기구|통증|언어|스피치|speech|ST)/i;
+      let dataRows = 0;
+      for(let rr = r+1; rr <= range.e.r; rr++){
+        // 새 섹션 헤더 만나면 sub-table 종료
+        const aCell = ws[XLSX.utils.encode_cell({r: rr, c: range.s.c})];
+        if(aCell && typeof aCell.v === 'string' && NEW_SECTION_RE.test(aCell.v.trim())) break;
+
+        // 시간이 있는 행만 데이터 entry 추가 (점심시간/빈 행은 skip 후 계속)
+        const tcell = ws[XLSX.utils.encode_cell({r: rr, c})];
+        const t = tcell ? parseTimeValue(tcell.v, tcell.w) : null;
+        if(!t) continue;
+
+        subtableEntries.push({r: rr, timeSlot: t, seatCols, category});
+        // 시간 셀 + 자리 컬럼 셀 모두 메인 루프 처리에서 제외
+        subtableCellSet.add(XLSX.utils.encode_cell({r: rr, c}));
+        seatCols.forEach(cc => subtableCellSet.add(XLSX.utils.encode_cell({r: rr, c: cc})));
+        dataRows++;
+      }
+      console.log(`[${day}] ${category} 표 감지: ${XLSX.utils.encode_cell({r,c})} "${trimmed}" 자리=${seatCols.length}열 데이터=${dataRows}행`);
+    }
+  }
+  if(subtableEntries.length > 0){
+    console.log(`[${day}] 전기/통증 표 셀 (메인 루프 제외 + 별도 처리): ${subtableCellSet.size}개`);
+  }
+
+  let filledCount = 0;
+  const unmatched = new Set();
+  const matched = new Set();
+  // 합산 파일: 시트 가장 위쪽이 보통 (3층) 섹션이므로 기본값 3층
+  // 어차피 시트 안의 (3층)/(1층) 헤더가 나오면 그에 맞게 전환됨
+  let currentCategory = '3층';
+  const sectionCounts = {};
+
+  // 이 요일의 셀 source 추적 (override vs default)
+  const cellSource = state.cellSourceByDay[day];
+
+  for(let r = range.s.r; r <= range.e.r; r++){
+    // A열 섹션 헤더 감지
+    const cellA = ws[XLSX.utils.encode_cell({r, c: range.s.c})];
+    if(cellA && cellA.v != null && typeof cellA.v === 'string'){
+      const label = String(cellA.v).trim();
+      if(label){
+        // === 합산 파일 핵심: (3층) / (1층) 섹션 헤더 자동 감지 ===
+        // 예: '6월 14일 일요일 주말시간표 (3층)', '... (1층)'
+        if(/\(\s*3\s*층\s*\)/.test(label)){
+          currentCategory = '3층';
+          sectionCounts[label] = '3층';
+          continue;
+        }else if(/\(\s*1\s*층\s*\)/.test(label)){
+          currentCategory = '1층';
+          sectionCounts[label] = '1층';
+          continue;
+        }else if(/^통증/.test(label)){
+          currentCategory = '통증';
+          sectionCounts[label] = '통증';
+          continue;
+        }else if(/^(ST|언어|스피치|speech)/i.test(label)){
+          currentCategory = '1층';
+          sectionCounts[label] = '1층';
+          continue;
+        }else if(/^(NDT|PT|OT|MAT|GAIT|FES|매트|로봇|회복기|신경계|근골|기구)/.test(label)){
+          // 일반 섹션 헤더(PT/OT 등)는 카테고리 유지 — 직전 (3층)/(1층) 결정을 이어감
+          sectionCounts[label] = currentCategory;
+          continue;
+        }
+        // 점심시간/공지 등 그 외 문자열은 그냥 건너뛰기
+        if(!/^[\d.:~ ]+$/.test(label)) continue;
+      }
+    }
+
+    // 이 행의 시간 슬롯 찾기
+    let timeSlot = null;
+    for(let c = range.s.c; c <= Math.min(range.s.c + 20, range.e.c); c++){
+      const cell = ws[XLSX.utils.encode_cell({r, c})];
+      if(!cell) continue;
+      const t = parseTimeValue(cell.v, cell.w);
+      if(t){ timeSlot = t; break; }
+    }
+    if(!timeSlot) continue;
+
+    // 시간이 있는 행 → 모든 셀에서 환자명 추출
+    for(let c = range.s.c; c <= range.e.c; c++){
+      const ref = XLSX.utils.encode_cell({r, c});
+      // 전기/통증 표 영역 → 별도 루프에서 카테고리 강제 분류하므로 메인 루프에서는 스킵
+      if(subtableCellSet.has(ref)) continue;
+      const cell = ws[ref];
+      if(!cell || cell.v == null || cell.v === '') continue;
+      // 시간 셀은 건너뜀
+      if(parseTimeValue(cell.v, cell.w)) continue;
+      // 밑줄 친 셀(액팅 처리) → 제외
+      if(underlineSet.has(ref)) continue;
+      // 컬럼 헤더 오버라이드 (외래/재택 → 제외)
+      const colOv = getColOverride(colHeaders, r, c);
+      if(colOv && colOv.exclude) continue;
+
+      const items = extractPatientNames(cell.v, nameMap);
+
+      // 바로 아래 셀에 단독 태그가 있는지 확인 (주말은 1층/3층/통증만)
+      let adjacentOverride = null;
+      let adjacentExclude = false;
+      const TAG_ONLY = /^\s*(\(침상\)|\(HOLD\)|\(1층\)|\(3층\)|\(통증\)|\(치료실\s*[→\->]+\s*병동\))\s*$/;
+      const adjCell = ws[XLSX.utils.encode_cell({r: r+1, c})];
+      if(adjCell && adjCell.v != null){
+        const sAdj = String(adjCell.v).trim();
+        const matchAdj = sAdj.match(TAG_ONLY);
+        if(matchAdj){
+          const tagAdj = matchAdj[1];
+          if(/침상|HOLD/i.test(tagAdj)){ adjacentExclude = true; }
+          else if(/^\(1층\)$/.test(tagAdj)){ adjacentOverride = '1층'; }
+          else if(/^\(3층\)$/.test(tagAdj)){ adjacentOverride = '3층'; }
+          else if(/^\(통증\)$/.test(tagAdj)){ adjacentOverride = '통증'; }
+          else if(/치료실\s*[→\->]+\s*병동/.test(tagAdj)){ adjacentOverride = '3층'; }
+        }
+      }
+
+      items.forEach(({name, override, exclude, homonymNum})=>{
+        const effOverride = override || adjacentOverride;
+        const effExclude = exclude || adjacentExclude;
+        if(effExclude) return;
+
+        const m_ = nameMap[name];
+        if(!m_ || m_.length === 0){
+          unmatched.add(name);
+          return;
+        }
+
+        // 동명이인 처리 (주말 단순 버전 — 알림/패널 없음):
+        //  ① 시트에 번호(homonymNum)가 있고 명단에 같은 번호(num)가 있으면 그 1명으로 확정
+        //  ② 시트엔 번호 없고 명단의 같은 이름이 모두 번호 붙어 있으면 → 다른 사람 → 채움 제외
+        //     (예: 명단 '이종례2'만 있고 시트 'H이종례' → 외래·타병동의 다른 이종례)
+        //  ③ 그 외는 m_ 전체를 대상 (기존 동작 유지)
+        let targets = m_;
+        if(homonymNum){
+          const exact = m_.find(x => x.num === homonymNum);
+          if(exact) targets = [exact];
+        }else{
+          const plain = m_.filter(x => x.num === null);
+          if(plain.length === 0){
+            // 명단엔 모두 번호 붙은 동명이인뿐 → 시트의 plain은 다른 사람
+            console.log(`[${day}][자동입력 skip] "${name}": 명단엔 모두 번호(${m_.map(x=>x.num).join(',')}) — 시트엔 번호 없음 → 다른 사람으로 보고 자동입력 제외`);
+            return;
+          }
+          targets = plain;
+        }
+
+        // ST 컬럼이면서 +운동기구 → 3층, 전기자극류는 1층 유지
+        let stCat = '1층';
+        if(stColumns.has(c)){
+          const cellTxt = String(cell.v);
+          const hasGear = /\+/.test(cellTxt);
+          const isEstim = /\+\s*(전기|안면전기|전기펜|전기장갑|V|taVNS|TDCS|tDCS)/i.test(cellTxt);
+          if(hasGear && !isEstim) stCat = '3층';
+        }
+        const colCategory = (colOv && colOv.cat) ? colOv.cat
+                          : stColumns.has(c) ? stCat
+                          : currentCategory;
+
+        targets.forEach(({room, p, tag})=>{
+          const finalCat = effOverride || tag || colCategory;
+          // 주말 카테고리만 허용 (외래/병동 등 흘러들면 무시)
+          if(!CATEGORIES[finalCat]){
+            console.warn(`[${day}] ${name} → ${finalCat}은 주말 카테고리가 아님. 건너뜀`);
+            return;
+          }
+          const key = makeCellKey(room, p, timeSlot);
+          const cells = state.rooms[room].cellsByDay[day];
+
+          const isOverride = !!(effOverride || tag || (colOv && colOv.cat));
+          if(isOverride){
+            cells[key] = finalCat;
+            cellSource[key] = 'override';
+            filledCount++;
+            matched.add(name);
+          }else if(cellSource[key] !== 'override'){
+            cells[key] = finalCat;
+            cellSource[key] = 'default';
+            filledCount++;
+            matched.add(name);
+          }else{
+            matched.add(name);
+          }
+        });
+      });
+    }
+  }
+
+  console.log(`[${day}] 인식한 섹션:`, sectionCounts);
+
+  // === '전기' / '통증' sub-table 환자 자동입력 — 헤더에 따라 카테고리 강제 분류 ===
+  // 메인 루프에서 제외된 sub-table 셀들을 정확한 시간 슬롯과 함께 처리.
+  // "전기" 헤더 → 3층 / "통증" 헤더 → 통증 (사용자 지정).
+  subtableEntries.forEach(({r, timeSlot, seatCols, category})=>{
+    seatCols.forEach(c => {
+      const ref = XLSX.utils.encode_cell({r, c});
+      const cell = ws[ref];
+      if(!cell || cell.v == null || cell.v === '') return;
+      if(underlineSet.has(ref)) return;
+
+      const items = extractPatientNames(cell.v, nameMap);
+      items.forEach(({name, override, exclude, homonymNum})=>{
+        if(exclude) return;
+
+        const m_ = nameMap[name];
+        if(!m_ || m_.length === 0){
+          unmatched.add(name);
+          return;
+        }
+
+        // 동명이인 처리 (메인 루프와 동일 로직)
+        let targets = m_;
+        if(homonymNum){
+          const exact = m_.find(x => x.num === homonymNum);
+          if(exact) targets = [exact];
+        }else{
+          const plain = m_.filter(x => x.num === null);
+          if(plain.length === 0){
+            console.log(`[${day}][${category} skip] "${name}": 명단엔 번호 붙은 동명이인뿐`);
+            return;
+          }
+          targets = plain;
+        }
+
+        targets.forEach(({room, p, tag})=>{
+          // 환자별 (1층)/(통증)/(3층) 줄 태그가 있으면 그대로 우선, 없으면 표 카테고리
+          const finalCat = override || tag || category;
+          if(!CATEGORIES[finalCat]){
+            console.warn(`[${day}] ${name} → ${finalCat}은 주말 카테고리 아님. 건너뜀`);
+            return;
+          }
+          const key = makeCellKey(room, p, timeSlot);
+          const cells = state.rooms[room].cellsByDay[day];
+          // sub-table은 override 우선권 — 일반 자동입력 결과를 덮어쓸 수 있음
+          cells[key] = finalCat;
+          cellSource[key] = 'override';
+          filledCount++;
+          matched.add(name);
+        });
+      });
+    });
+  });
+
+  return { filledCount, matched, unmatched };
+}
+
+// ===== RBCLR 엑셀 불러오기 (환자명만) =====
+function importXLSX(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const wb = XLSX.read(new Uint8Array(e.target.result), {
+        type:'array',
+        cellFormula:false,
+        cellStyles:false,
+        cellNF:false,
+        cellHTML:false,
+        cellText:false,
+        bookVBA:false,
+        bookSheets:false
+      });
+      let sheetName = wb.SheetNames.find(n=>n.includes('수정') && n.includes('이동반'))
+                    || wb.SheetNames.find(n=>n.includes('수정'))
+                    || wb.SheetNames.find(n=>n.includes('이동반'))
+                    || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows = readSheetAsRows(ws);
+
+      let imported = 0;
+      let currentRoom = null;
+      let patientIdx = 0;
+
+      rows.forEach(row=>{
+        // 첫 컬럼: 호실 번호 또는 빈칸
+        const c0 = String(row[0]||'').trim();
+        const c1 = String(row[1]||'').trim();
+        if(/^[45]\d{2}$/.test(c0)){
+          const r = parseInt(c0);
+          if(ALL_ROOMS.includes(r)){
+            currentRoom = r;
+            patientIdx = 0;
+          }else{
+            currentRoom = null;
+            return;
+          }
+        }
+        if(currentRoom && patientIdx < PATIENTS_PER_ROOM){
+          // 두 번째 컬럼이 환자 이름
+          if(c1){
+            state.rooms[currentRoom].patients[patientIdx].name = c1;
+            imported++;
+          }
+          patientIdx++;
+        }
+      });
+
+      saveLocal();
+      render();
+      showStatus(`환자명 ${imported}개 불러옴`);
+    }catch(err){
+      alert('엑셀 읽기 실패: '+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  ev.target.value = '';
+}
+
+// ===== 초기화 =====
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>setView(t.dataset.floor));
+});
+
+// 날짜는 사용자가 입력하지 않음 — 병실현황/합산 파일을 import할 때 자동 인식됨
+initState();
+loadLocal();
+
+// === 지난 주말 데이터 자동 초기화 ===
+// 설정된 주말 기간의 '마지막 날'이 이미 지났으면 시간표를 비운다.
+// (금·토·일처럼 공휴일이 낀 3일 주말도 올바르게 판단)
+(function clearIfStale(){
+  const todayISO = (()=>{ const d=new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
+  let lastISO = '';
+  if(state.dayList && state.dayList.length){
+    lastISO = state.dayList[state.dayList.length-1].date || '';
+  }else if(state.date){
+    // 구버전 호환: 첫날 + 1일(=일요일)까지로 간주
+    const [y,m,d] = state.date.split('-').map(Number);
+    const dt = new Date(y, m-1, d+1);
+    lastISO = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  }
+  if(lastISO && lastISO < todayISO){
+    ALL_ROOMS.forEach(r=>{ state.rooms[r].cellsByDay = makeEmptyDayMap(); });
+    state.cellSourceByDay = makeEmptyDayMap();
+    if(state.loadCounts){ state.loadCounts.combined = 0; }
+    state.date = '';
+    state.dayList = [];
+    syncDays();
+    reconcileDayMaps();
+    saveLocal();
+  }
+})();
+
+// 탭 동기화
+document.querySelectorAll('.tab').forEach(t=>{
+  t.classList.toggle('active', t.dataset.floor === state.view);
+});
+// 요일 버튼 생성 (2일·3일 등 dayList에 맞춰 동적으로)
+renderDayButtons();
+// 인디케이터/날짜 표시 복원
+updateLoadIndicators();
+updateDateDisplay();
+render();
+</script>
+</body>
+</html>

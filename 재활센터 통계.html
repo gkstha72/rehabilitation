@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>광주365재활병원 EMR-시간표 교차 마감 마스터 시스템</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 body{font-family:"Malgun Gothic",sans-serif;padding:20px;background:#f4f7f6;}
 .container{max-width:100%;margin:0 auto;background:white;padding:25px;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.1);}
@@ -67,6 +66,12 @@ table.eval-table th{background:#8e44ad;color:white;padding:8px 10px;text-align:c
 table.eval-table td{border:1px solid #aaa;padding:6px 10px;}
 table.eval-table td:nth-child(2){text-align:center;font-weight:bold;}
 
+.bulk-paste-section{background:#fff8e1;border:2px solid #f39c12;border-radius:10px;padding:20px 25px;margin-bottom:25px;}
+.bulk-paste-section h3{color:#e67e22;border-left:5px solid #f39c12;padding-left:10px;margin:0 0 10px 0;font-size:15px;}
+.bulk-paste-section p{margin:0 0 12px 0;font-size:13px;color:#7f6000;}
+#bulkPasteArea{width:100%;min-height:90px;font-size:13px;font-family:"Malgun Gothic",sans-serif;border:2px dashed #f39c12;border-radius:6px;padding:12px;box-sizing:border-box;background:#fffde7;color:#555;resize:vertical;}
+#bulkPasteArea:focus{outline:2px solid #e67e22;background:#fff;}
+#bulkPasteStatus{margin-top:8px;font-size:13px;font-weight:bold;min-height:20px;}
 .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center; }
 .modal-overlay.active { display:flex; }
 .modal-box { background:white; border-radius:12px; padding:25px; max-width:900px; width:96%; max-height:80vh; overflow-y:auto; box-shadow:0 8px 30px rgba(0,0,0,0.3); }
@@ -91,6 +96,13 @@ td.clickable:hover { opacity:0.75; }
 <strong>STEP 1. EMR 전산 데이터 엑셀 파일 선택: </strong>
 <input type="file" id="emrInput" accept=".xlsx, .xls" style="font-size:16px;margin-left:10px;" onclick="this.value='';" />
 <span id="emrStatus" style="color:#2980b9;font-weight:bold;margin-left:15px;">(엑셀 미등록 상태)</span>
+</div>
+<div class="bulk-paste-section">
+  <h3>📋 STEP 1.5. 전체 시간표 한 번에 붙여넣기 (선택)</h3>
+  <p>엑셀에서 <b>Ctrl+A → Ctrl+C</b> 후, 아래 입력창을 클릭하고 <b>Ctrl+V</b> 하면 6개 시간표가 자동으로 분리됩니다.<br>
+  ※ 각 시간표 왼쪽의 <b>TIME 열</b>을 기준으로 자동 구분합니다. (물리→작업→언어→전기→메디페인→통증 순서)</p>
+  <textarea id="bulkPasteArea" placeholder="여기를 클릭한 후 Ctrl+V 로 전체 시트를 붙여넣으세요..."></textarea>
+  <div id="bulkPasteStatus"></div>
 </div>
 <p>※ 상단의 파일 선택창으로 EMR 엑셀을 먼저 연동해 주신 후, 아래 치료실별 시간표를 붙여넣고 실적 집계를 누르시면 오차 대조표까지 한 번에 도출됩니다.</p>
 <div class="action-area">
@@ -130,12 +142,7 @@ td.clickable:hover { opacity:0.75; }
 </div>
 <h2 class="result-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">&#128202; [7] 최종 청구 실적 교차 대조 결과창<div style="display:flex;gap:6px;align-items:center;"><button class="btn-calc" style="background:#2c3e50;font-size:13px;padding:8px 20px;margin:0;" onclick="analyzeAllInOne()">&#9889; 전체 한 번에 집계</button><button class="btn-reset" style="font-size:13px;padding:8px 15px;margin:0;" onclick="resetAllGrids()">&#128465; 전체 그리드 지우기</button></div></h2>
 <div style="margin-bottom:15px;">
-<button class="btn-calc" style="background:#8e44ad;font-size:14px;padding:10px 25px;margin-right:8px;" onclick="copyMismatchList()">&#128242; 액팅 틀린 치료사 명단 복사</button><button class="btn-calc" style="background:#e67e22;font-size:14px;padding:10px 25px;" onclick="saveResultAsHtml()">&#128190; 결과 파일로 저장하기 (직원 공유용)</button>
-<button class="btn-calc" style="background:#27ae60;font-size:14px;padding:10px 25px;margin-left:8px;" onclick="saveResultAsImage()">&#128247; 이미지로 저장하기 (PNG)</button>
-<button class="btn-calc" style="background:#4285f4;font-size:14px;padding:10px 25px;margin-left:8px;" onclick="uploadToGoogleSheet('3f')">&#9729;&#65039; 3층 구글 시트 업로드</button>
-<a id="sheetLinkBtn" href="https://docs.google.com/spreadsheets/d/1Gu9l6rxqbo6mh2vd6NgF18jfXwtifC5zQuw9QCgKcoA/edit?usp=sharing" target="_blank" style="display:none;background:#34a853;color:white;padding:8px 18px;border-radius:6px;font-weight:bold;font-size:14px;margin-left:8px;vertical-align:middle;text-decoration:none;">&#128196; 3층 시트 바로가기</a>
-<button class="btn-calc" style="background:#e67e22;font-size:14px;padding:10px 25px;margin-left:12px;" onclick="uploadToGoogleSheet('1f')">&#9729;&#65039; 1층 구글 시트 업로드</button>
-<a id="sheetLinkBtn1F" href="#" target="_blank" style="display:none;background:#d35400;color:white;padding:8px 18px;border-radius:6px;font-weight:bold;font-size:14px;margin-left:8px;vertical-align:middle;text-decoration:none;">&#128196; 1층 시트 바로가기</a>
+<button class="btn-calc" style="background:#8e44ad;font-size:14px;padding:10px 25px;margin-right:8px;" onclick="copyMismatchList()">&#128242; 액팅 틀린 치료사 명단 복사</button>
 <span id="errorCountBadge" style="display:none;"></span>
 </div>
 <div id="ptTripleArea"></div>
@@ -160,7 +167,7 @@ td.clickable:hover { opacity:0.75; }
 <script>
 
 var ROW_COUNT = 16;
-var COL_COUNT = 70;
+var COL_COUNT = 150;
 var globalEmrRows = [];
 var globalEmrCodeIdx = -1;
 var globalEmrNameIdx = -1;
@@ -390,6 +397,313 @@ function forceRenderAllInputGrids() {
 }
 if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", forceRenderAllInputGrids); }
 else { forceRenderAllInputGrids(); }
+
+// ── 전체 시트 한 번에 붙여넣기 자동 분리 v4 ────────────────────────────
+(function() {
+
+    var TIME_PATTERN = /^\d{1,2}:\d{2}$/;
+
+    // ── 치료실 판별 규칙 ──
+    var ROOM_RULES = [
+        {
+            name: "물리치료", id: "ptGridTable",
+            matchFn: function(v) {
+                return /^(NDT|MAT|로봇PT|근골격계$|PT[\(\s]|PT$)/.test(v) || v === "근골격계";
+            }
+        },
+        {
+            name: "작업치료", id: "otGridTable",
+            matchFn: function(v) {
+                return /^(로봇OT|근골격계OT|OT실|OT[\(\s]|OT$)/.test(v);
+            }
+        },
+        {
+            name: "언어치료", id: "stGridTable",
+            matchFn: function(v) {
+                return v === "ST" || /^ST[\(\s]/.test(v);
+            }
+        },
+        {
+            name: "전기치료", id: "etGridTable",
+            matchFn: function(v) {
+                return v === "전기" || v === "열전기" || v === "SSP" ||
+                       /^전기[\(\s\d]/.test(v) || /^열전기/.test(v) ||
+                       /FES/.test(v);
+            }
+        },
+        {
+            name: "통증치료", id: "painGridTable",
+            matchFn: function(v) {
+                return v === "통증" || /^통증[\(\s\d]/.test(v);
+            }
+        }
+    ];
+
+    var MEDIPAIN_GRID = "mtGridTable";
+
+    // firstRow-1 행의 col 셀로 치료실 판별
+    function identifyRoom(matrix, col, firstRow) {
+        if (firstRow <= 0) return null;
+        var raw = String((matrix[firstRow - 1] || [])[col] || "").trim();
+        if (!raw) return null;
+        var v = raw.split(/[\n\r]/)[0].trim().toUpperCase();
+
+        // 전기치료 자동 분리 제외 대상
+        // 1) 열전기 시간표는 방문/재택 시간표와 함께 있는 별도 구역이므로 제외
+        // 2) 1층 FES 시간표와 그 안의 SSP 시간 열도 전기치료 구역에서 제외
+        if (/^열전기/.test(v) || /^1층\s*FES/.test(v)) return null;
+        if (v === "SSP") {
+            var headerRow = matrix[firstRow - 1] || [];
+            for (var hc = Math.max(0, col - 5); hc <= col; hc++) {
+                var hv = String(headerRow[hc] || "").split(/[\n\r]/)[0].trim().toUpperCase();
+                if (/^1층\s*FES/.test(hv)) return null;
+            }
+        }
+
+        for (var ri = 0; ri < ROOM_RULES.length; ri++) {
+            if (ROOM_RULES[ri].matchFn(v)) return ROOM_RULES[ri];
+        }
+        return { name: null, id: null, rawTitle: raw };
+    }
+
+    // 오후 섹션 제목 판별 (점심/오후 구분자 — 독립 섹션 아님)
+    function isAfternoonLabel(title) {
+        var t = String(title||"").trim().toUpperCase();
+        return t === "" || t.indexOf("점심") !== -1 || t.indexOf("1:30") !== -1 ||
+               t.indexOf("12:30") !== -1 || t.indexOf("오후") !== -1 || t === "NONE";
+    }
+
+    // 같은 열에서 HH:MM 값이 3개 이상 연속되는 그룹을 탐지
+    // 오전/오후가 점심 텍스트 행으로 끊겨도 같은 섹션으로 병합
+    // 반환: [{col, firstRow, endRow, title}]
+    function findAllSections(matrix, totalCols) {
+        var sections = [];
+        for (var c = 0; c < totalCols; c++) {
+            var prevWasTime = false;
+            var groupStart = -1;
+            var groupCount = 0;
+            for (var r = 0; r <= matrix.length; r++) {
+                var v = r < matrix.length ? String((matrix[r] || [])[c] || "").trim() : "";
+                var isTime = TIME_PATTERN.test(v);
+                if (isTime && !prevWasTime) {
+                    groupStart = r; groupCount = 1;
+                } else if (isTime && prevWasTime) {
+                    groupCount++;
+                } else if (!isTime && prevWasTime) {
+                    if (groupCount >= 3) {
+                        var titleV = (matrix[groupStart-1]||[])[c];
+                        var titleStr = String(titleV||"").trim();
+                        // 오후 섹션(점심/1:30 등)이면 직전 섹션에 병합
+                        if (isAfternoonLabel(titleStr) && sections.length > 0 &&
+                            sections[sections.length-1].col === c) {
+                            sections[sections.length-1].endRow = r - 1;
+                        } else {
+                            sections.push({ col: c, firstRow: groupStart, endRow: r - 1, title: titleStr });
+                        }
+                    }
+                    groupStart = -1; groupCount = 0;
+                }
+                prevWasTime = isTime;
+            }
+        }
+        sections.sort(function(a, b) {
+            return a.col !== b.col ? a.col - b.col : a.firstRow - b.firstRow;
+        });
+        return sections;
+    }
+
+    // 섹션의 끝 열: 제목행(firstRow-1)에서 제목셀 오른쪽으로
+    // 빈 셀이 처음 나오는 직전 열 = 실제 치료사 데이터 끝 열
+    function calcEndCol(sections, idx, totalCols, matrix) {
+        var seg = sections[idx];
+        var headerRowIdx = seg.firstRow - 1;
+        if (headerRowIdx < 0) return seg.col;
+        var hrow = matrix[headerRowIdx] || [];
+        var end = seg.col;
+
+        // 전기치료와 통증치료는 TIME 바로 오른쪽의 빈 제목 열을 1개 허용
+        var rawTitle = String(hrow[seg.col] !== undefined ? hrow[seg.col] : "").trim();
+        var title = rawTitle.split(/[\n\r]/)[0].trim().toUpperCase();
+        var allowFirstBlank = ROOM_RULES[3].matchFn(title);
+        var isPainSection = ROOM_RULES[4].matchFn(title);
+
+        for (var c = seg.col + 1; c < totalCols; c++) {
+            var v = String(hrow[c] !== undefined ? hrow[c] : "").trim();
+
+            // 통증치료는 "다리(앉아서)" 열 뒤의 2개 열까지 함께 가져온다.
+            if (isPainSection && v.replace(/\s/g, "").indexOf("다리(앉아서)") !== -1) {
+                end = Math.min(c + 2, totalCols - 1);
+                break;
+            }
+
+            if (v === "") {
+                if ((allowFirstBlank || isPainSection) && c === seg.col + 1) {
+                    end = c;
+                    continue;
+                }
+
+                // 통증치료는 SSP와 어깨 사이의 빈 구분 열 1개를 허용한다.
+                // 단, 빈 열이 연속되면 실제 시간표가 끝난 것으로 처리한다.
+                if (isPainSection) {
+                    var nextV = String(hrow[c + 1] !== undefined ? hrow[c + 1] : "").trim();
+                    if (nextV !== "") {
+                        end = c;
+                        continue;
+                    }
+                }
+                break;
+            }
+
+            // 전기치료는 1~26 열까지만 가져오고,
+            // 뒤의 통계용 24 열과 메디페인 3개 열은 포함하지 않음
+            if (allowFirstBlank &&
+                (v.indexOf("통계위해형식상") !== -1 ||
+                 v.indexOf("채우지말기") !== -1 ||
+                 v.indexOf("페인블럭") !== -1 ||
+                 v.indexOf("메디페인") !== -1 ||
+                 v.toUpperCase().indexOf("FOOT") !== -1)) {
+                break;
+            }
+            end = c;
+        }
+        // 치료사가 아예 없으면(end==col) 해당 섹션은 빈 섹션으로 처리
+        return end;
+    }
+
+    // 메디페인 탐지: 전기치료 오른쪽의
+    // [통계용 24 열]은 제외하고 [페인블럭, 메디페인, FOOT센서] 3개 열만 가져옴
+    function findMedipainRegion(matrix, sections, totalCols) {
+        for (var r = 0; r < matrix.length; r++) {
+            var row = matrix[r] || [];
+            for (var c = 0; c < row.length; c++) {
+                var v1 = String(row[c] || "").trim().toUpperCase();
+                if (v1.indexOf("페인블럭") === -1) continue;
+
+                var v2 = String(row[c + 1] || "").trim().toUpperCase();
+                var v3 = String(row[c + 2] || "").trim().toUpperCase();
+                if (v2.indexOf("메디페인") === -1 || v3.indexOf("FOOT") === -1) continue;
+
+                // 같은 제목행에 있는 전기치료 시간 섹션의 세로 범위를 그대로 사용
+                var electricSeg = null;
+                for (var si = 0; si < sections.length; si++) {
+                    var seg = sections[si];
+                    if (seg.firstRow - 1 !== r) continue;
+                    var room = identifyRoom(matrix, seg.col, seg.firstRow);
+                    if (room && room.id === "etGridTable") {
+                        electricSeg = seg;
+                        break;
+                    }
+                }
+
+                var rowEnd = electricSeg
+                    ? Math.min(electricSeg.endRow + 3, matrix.length - 1)
+                    : matrix.length - 1;
+                return { start: c, end: c + 2, headerRow: r, rowEnd: rowEnd };
+            }
+        }
+        return null;
+    }
+
+    window.addEventListener("DOMContentLoaded", function() {
+        var area = document.getElementById("bulkPasteArea");
+        if (!area) return;
+
+        area.addEventListener("paste", function(e) {
+            e.preventDefault();
+            var raw = (e.clipboardData || window.clipboardData).getData("Text");
+            var matrix = parsePastedText(raw);
+            if (!matrix || matrix.length === 0) { setStatus("⚠️ 붙여넣기 데이터가 없습니다.", "#e74c3c"); return; }
+
+            var totalCols = 0;
+            matrix.forEach(function(row){ if ((row||[]).length > totalCols) totalCols = row.length; });
+
+            // ① 섹션 탐지 (같은 열에 09:00이 여러 번 = 각각 별도 섹션)
+            var sections = findAllSections(matrix, totalCols);
+            if (sections.length === 0) {
+                setStatus("⚠️ 시간(09:00~) 섹션을 찾지 못했습니다.", "#e74c3c");
+                area.value = ""; return;
+            }
+
+            var allTimeCols = [];
+            sections.forEach(function(s){ if (allTimeCols.indexOf(s.col) === -1) allTimeCols.push(s.col); });
+
+            var gridBuffers = {};
+            var unmatchedTitles = [];
+
+            // ② 각 섹션 처리
+            sections.forEach(function(seg, idx) {
+                var sc = seg.col;
+                var ec = calcEndCol(sections, idx, totalCols, matrix);
+                // 치료사가 없는 빈 섹션(오후시간/점심 등) 스킵
+                if (ec <= seg.col) return;
+                var fr = seg.firstRow;
+                var headerRow = Math.max(fr - 1, 0);
+
+                var room = identifyRoom(matrix, sc, fr);
+                if (!room || !room.id) {
+                    unmatchedTitles.push('"' + ((room && room.rawTitle) || ("열" + sc + "행" + fr)) + '"');
+                    return;
+                }
+
+                var gid = room.id;
+                if (!gridBuffers[gid]) gridBuffers[gid] = { name: room.name, cols: [] };
+
+                var subRows = [];
+                var rowEnd = Math.min(seg.endRow + 3, matrix.length - 1);
+                for (var r = headerRow; r <= rowEnd; r++) {
+                    var subRow = [];
+                    for (var col = sc; col <= ec; col++) {
+                        subRow.push((matrix[r]||[])[col] !== undefined ? (matrix[r]||[])[col] : "");
+                    }
+                    subRows.push(subRow);
+                }
+                gridBuffers[gid].cols.push(subRows);
+            });
+
+            // ③ 메디페인 별도 탐지
+            var mpSeg = findMedipainRegion(matrix, sections, totalCols);
+            if (mpSeg) {
+                var mpRows = [];
+                for (var r = mpSeg.headerRow; r <= mpSeg.rowEnd; r++) {
+                    var mpRow = [];
+                    for (var col = mpSeg.start; col <= mpSeg.end; col++) {
+                        mpRow.push((matrix[r]||[])[col] !== undefined ? (matrix[r]||[])[col] : "");
+                    }
+                    mpRows.push(mpRow);
+                }
+                if (!gridBuffers[MEDIPAIN_GRID]) gridBuffers[MEDIPAIN_GRID] = { name:"메디페인", cols:[] };
+                gridBuffers[MEDIPAIN_GRID].cols.push(mpRows);
+            }
+
+            // ④ 각 그리드에 배분
+            var resultMsgs = [];
+            Object.keys(gridBuffers).forEach(function(gid) {
+                var buf = gridBuffers[gid];
+                var colOffset = 0;
+                buf.cols.forEach(function(subRows) {
+                    if (!subRows.length) return;
+                    var fakeTarget = (function(off) {
+                        return { getAttribute: function(attr) { return attr === "data-row" ? 0 : off; } };
+                    })(colOffset);
+                    distributeMatrix(subRows, gid, fakeTarget);
+                    colOffset += (subRows[0]||[]).length;
+                });
+                resultMsgs.push(buf.name + "(×" + buf.cols.length + ") ✓");
+            });
+
+            var statusMsg = resultMsgs.length > 0 ? "✅ 분리 완료: " + resultMsgs.join(" | ") : "";
+            if (unmatchedTitles.length > 0) statusMsg += "  ⚠️ 미인식: " + unmatchedTitles.join(", ");
+            setStatus(statusMsg || "처리 완료", resultMsgs.length > 0 ? "#27ae60" : "#e74c3c");
+            area.value = "";
+        });
+
+        function setStatus(msg, color) {
+            var el = document.getElementById("bulkPasteStatus");
+            if (el) { el.innerText = msg; el.style.color = color || "#333"; }
+        }
+    });
+})();
+// ─────────────────────────────────────────────────────────────────────────
 
 window.addEventListener("DOMContentLoaded", function() {
     var emrFileInput = document.getElementById("emrInput");
@@ -1114,328 +1428,6 @@ var prescriptionDesc = {
 
 
 
-// ── 결과 이미지 저장 함수 ─────────────────────────────────────────────────
-function saveResultAsImage() {
-    var areas = ['ptTripleArea','otTripleArea','stTripleArea','painTripleArea','evalArea'];
-    var hasResult = false;
-    areas.forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el && el.innerHTML.trim() !== '') hasResult = true;
-    });
-    if (!hasResult) return alert("저장할 결과가 없습니다. 먼저 교차 검증 집계를 실행해 주세요.");
-    if (typeof html2canvas === 'undefined') return alert("이미지 저장 라이브러리를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.");
-
-    var now = new Date();
-    var fileDate = now.getFullYear() + ("0"+(now.getMonth()+1)).slice(-2) + ("0"+now.getDate()).slice(-2);
-
-    // 결과 영역만 담는 임시 div 생성
-    var wrapper = document.createElement('div');
-    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;background:white;padding:20px;font-family:"Malgun Gothic",sans-serif;width:auto;';
-
-    // 제목 추가
-    var titleEl = document.createElement('h2');
-    titleEl.style.cssText = 'color:#2c3e50;border-bottom:3px solid #2c3e50;padding-bottom:10px;margin-top:0;font-size:18px;';
-    titleEl.innerText = '🏥 EMR ↔ 시간표 실적 교차 대조 결과  (' + now.getFullYear() + '년 ' + (now.getMonth()+1) + '월 ' + now.getDate() + '일)';
-    wrapper.appendChild(titleEl);
-
-    // 각 결과 영역 복사
-    areas.forEach(function(id) {
-        var el = document.getElementById(id);
-        if (!el || el.innerHTML.trim() === '') return;
-        var clone = el.cloneNode(true);
-        // 버튼 제거
-        clone.querySelectorAll('button').forEach(function(btn){ btn.remove(); });
-        wrapper.appendChild(clone);
-    });
-
-    document.body.appendChild(wrapper);
-
-    alert("이미지 생성 중입니다. 결과표가 길면 시간이 걸릴 수 있습니다.");
-
-    html2canvas(wrapper, {
-        scale: 1.5,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: wrapper.scrollWidth + 40,
-        width: wrapper.scrollWidth + 40
-    }).then(function(canvas) {
-        document.body.removeChild(wrapper);
-        var link = document.createElement('a');
-        link.download = '교차대조결과_' + fileDate + '.png';
-        link.href = canvas.toDataURL('image/png');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        alert("이미지 파일이 저장되었습니다!\n카카오톡, 이메일 등으로 바로 공유할 수 있습니다.");
-    }).catch(function(err) {
-        document.body.removeChild(wrapper);
-        alert("이미지 저장 중 오류가 발생했습니다: " + err.message);
-    });
-}
-// ── 결과 HTML 저장 함수 ─────────────────────────────────────────────────
-function saveResultAsHtml() {
-    var areas = ['ptTripleArea','otTripleArea','stTripleArea','painTripleArea','evalArea'];
-    var hasResult = false;
-    areas.forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el && el.innerHTML.trim() !== '') hasResult = true;
-    });
-    if (!hasResult) return alert("저장할 결과가 없습니다. 먼저 교차 검증 집계를 실행해 주세요.");
-
-    var now = new Date();
-    var dateStr = now.getFullYear() + "년 " + (now.getMonth()+1) + "월 " + now.getDate() + "일";
-    var fileDate = now.getFullYear() + ("0"+(now.getMonth()+1)).slice(-2) + ("0"+now.getDate()).slice(-2);
-
-    // EMR 데이터 직렬화 (팝업용)
-    var savedEmrRows = globalEmrRows || [];
-    var savedEmrCodeIdx = globalEmrCodeIdx;
-    var savedEmrNameIdx = globalEmrNameIdx;
-    var savedEmrSlipNameIdx = globalEmrSlipNameIdx;
-    var savedEmrPatientIdx = globalEmrPatientIdx;
-
-    // 결과 HTML 내용 추출 (버튼 제거)
-    var resultBodyHtml = '';
-    areas.forEach(function(id) {
-        var el = document.getElementById(id);
-        if (!el || el.innerHTML.trim() === '') return;
-        var clone = el.cloneNode(true);
-        var btns = clone.querySelectorAll('.btn-copy');
-        btns.forEach(function(btn){ btn.remove(); });
-        resultBodyHtml += clone.innerHTML + '\n';
-    });
-
-    var html = '<!DOCTYPE html>\n<html lang="ko">\n<head>\n';
-    html += '<meta charset="UTF-8">\n';
-    html += '<title>EMR 교차 대조 결과 - ' + dateStr + '</title>\n';
-    html += '<style>\n';
-    html += 'body{font-family:"Malgun Gothic",sans-serif;padding:20px;background:#f4f7f6;}\n';
-    html += '.container{max-width:100%;margin:0 auto;background:white;padding:25px;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.1);}\n';
-    html += 'h1{color:#2c3e50;border-bottom:3px solid #2c3e50;padding-bottom:10px;font-size:20px;}\n';
-    html += '.date-info{color:#7f8c8d;font-size:13px;margin-bottom:20px;}\n';
-    html += 'h2{color:#2c3e50;border-bottom:3px solid #1abc9c;padding-bottom:8px;margin-top:40px;font-size:16px;}\n';
-    html += 'h3{border-left:5px solid #1abc9c;padding-left:10px;color:#2c3e50;margin-top:20px;font-size:14px;}\n';
-    html += '.section-box{background:#fafafa;border:1px solid #ddd;padding:20px;border-radius:8px;margin-bottom:25px;}\n';
-    html += 'table.result-table{border-collapse:collapse;width:100%;margin-bottom:20px;font-size:12px;background:white;}\n';
-    html += 'table.result-table th,table.result-table td{border:1px solid #aaa;padding:5px 4px;text-align:center;overflow:hidden;}\n';
-    html += '.th-main{background-color:#2c3e50;color:white;min-width:120px;}\n';
-    html += '.th-sub-label{background-color:#f2f4f4;font-size:10px;font-weight:bold;}\n';
-    html += '.summary-col{background-color:#eaeded;font-weight:bold;min-width:45px;}\n';
-    html += '.error-cell{background-color:#fce4d6!important;font-weight:bold;color:#c0392b!important;}\n';
-    html += '.blue-cell{background-color:#daecf8!important;font-weight:bold;color:#2980b9!important;}\n';
-    html += 'table.eval-table{border-collapse:collapse;width:100%;max-width:700px;margin-bottom:20px;font-size:13px;background:white;}\n';
-    html += 'table.eval-table th{background:#8e44ad;color:white;padding:8px 10px;text-align:center;border:1px solid #aaa;}\n';
-    html += 'table.eval-table td{border:1px solid #aaa;padding:6px 10px;}\n';
-    html += 'table.eval-table td:nth-child(2){text-align:center;font-weight:bold;}\n';
-    html += '.clickable{cursor:pointer;}\n';
-    html += '.clickable:hover{opacity:0.75;}\n';
-    html += '.notice{background:#fff8e1;border:1px solid #f39c12;padding:12px 16px;border-radius:6px;font-size:12px;color:#7f8c8d;margin-bottom:20px;}\n';
-    html += '.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;}\n';
-    html += '.modal-overlay.active{display:flex;}\n';
-    html += '.modal-box{background:white;border-radius:12px;padding:25px;max-width:900px;width:96%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,0.3);}\n';
-    html += '.modal-title{font-size:15px;font-weight:bold;color:#2c3e50;margin-bottom:15px;border-bottom:2px solid #1abc9c;padding-bottom:8px;}\n';
-    html += '.modal-columns{display:flex;gap:16px;}\n';
-    html += '.modal-col{flex:1;min-width:0;}\n';
-    html += '.modal-col-title{font-weight:bold;font-size:13px;padding-bottom:6px;margin-bottom:8px;}\n';
-    html += '.modal-col-title.emr{color:#2980b9;border-bottom:2px solid #2980b9;}\n';
-    html += '.modal-col-title.sched{color:#1abc9c;border-bottom:2px solid #1abc9c;}\n';
-    html += '.modal-item{background:#f8f9fa;border-left:4px solid #1abc9c;padding:8px 12px;margin-bottom:6px;border-radius:4px;font-size:13px;line-height:1.6;word-break:break-all;}\n';
-    html += '.modal-item.emr-item{border-left-color:#2980b9;background:#eaf4fb;}\n';
-    html += '.modal-empty{color:#999;font-size:13px;text-align:center;padding:20px;}\n';
-    html += '.modal-close{display:block;margin-top:15px;padding:8px 20px;background:#e74c3c;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;float:right;}\n';
-    html += '</style>\n</head>\n<body>\n<div class="container">\n';
-    html += '<h1>&#127973; EMR &#8596; 시간표 실적 교차 대조 결과</h1>\n';
-    html += '<div class="date-info">&#128197; 집계일: ' + dateStr + ' &nbsp;|&nbsp; ';
-    html += '<span style="color:#e74c3c;font-weight:bold;">빨강</span> = 시간표 > EMR &nbsp;|&nbsp; ';
-    html += '<span style="color:#2980b9;font-weight:bold;">파랑</span> = EMR > 시간표 &nbsp;|&nbsp; ';
-    html += '숫자 클릭 시 상세 내역 팝업</div>\n';
-    html += '<div class="notice">&#128204; 읽기 전용 결과 파일입니다. 처방명 클릭 → 집계 조건 / 건수 클릭 → 상세 내역을 확인할 수 있습니다.</div>\n';
-    html += resultBodyHtml;
-    html += '</div>\n';
-
-    // 모달 DOM
-    html += '<div class="modal-overlay" id="detailModal" onclick="closeModal(event)">\n';
-    html += '<div class="modal-box">\n';
-    html += '<div class="modal-title" id="detailModalTitle"></div>\n';
-    html += '<div id="detailModalBody"></div>\n';
-    html += '<button class="modal-close" onclick="document.getElementById(\'detailModal\').classList.remove(\'active\')">닫기</button>\n';
-    html += '<div style="clear:both;"></div>\n</div>\n</div>\n';
-
-    // 데이터 + 스크립트
-    html += '<script>\n';
-
-    // debugLogs 직렬화
-    html += 'var savedDebugLogs=' + JSON.stringify(debugLogs) + ';\n';
-
-    // EMR 데이터 직렬화 (슬립코드, 완료자, 슬립명칭, 수진자명만 추출)
-    var emrData = [];
-    savedEmrRows.forEach(function(row) {
-        if (!row) return;
-        var code = String(row[savedEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
-        var name = String(row[savedEmrNameIdx]||"").trim();
-        var slip = savedEmrSlipNameIdx !== -1 ? String(row[savedEmrSlipNameIdx]||"").trim() : "";
-        var patient = savedEmrPatientIdx !== -1 ? String(row[savedEmrPatientIdx]||"").trim() : "";
-        if (code && name) emrData.push({code:code, name:name, slip:slip, patient:patient});
-    });
-    html += 'var savedEmrData=' + JSON.stringify(emrData) + ';\n';
-
-    // 코드맵 직렬화
-    html += 'var savedPtMap=' + JSON.stringify(ptMap) + ';\n';
-    html += 'var savedOtMap=' + JSON.stringify(otMap) + ';\n';
-    html += 'var savedStMap=' + JSON.stringify(stMap) + ';\n';
-    html += 'var savedPainMap=' + JSON.stringify(painMap) + ';\n';
-    html += 'var savedEvalCodeMap=' + JSON.stringify(evalCodeMap) + ';\n';
-    html += 'var savedPrescriptionDesc=' + JSON.stringify(prescriptionDesc) + ';\n';
-
-    // 저장 파일용 showDetail 함수
-    html += '\nfunction closeModal(e){if(e.target===document.getElementById("detailModal"))document.getElementById("detailModal").classList.remove("active");}\n';
-
-    html += '\nfunction showDetail(therapist,label,count,room){\n';
-    html += '  if(count===0)return;\n';
-    html += '  var key=therapist+"||"+label;\n';
-    html += '  var schedItems=[];\n';
-    html += '  if(room==="pt"){\n';
-    html += '    ["pt","et","mt"].forEach(function(r){var rLog=savedDebugLogs[r]||{};if(rLog[key])rLog[key].forEach(function(item){if(!schedItems.includes(item))schedItems.push(item);});});\n';
-    html += '  } else { var lg=savedDebugLogs[room]||{}; schedItems=lg[key]||[]; }\n';
-    // 토큰 분리 로직
-    html += '  var painLabels=["표층열치료(HP)","표층열치료(IR)","표층열치료(심층열동시-HP)","표층열치료(심층열동시-IR)","심층열치료(microwave)","심층열치료(ultra sound)","심층열치료(sonor)","심층열치료[1일당]","한냉치료(ICE)","경피적전기신경자극치료[TENS]","전기자극치료[EST]","간섭파전류치료[ICT]","저주파자극치료[SSP]","레이저치료[1일당]","한냉치료(콜드팩)","비침습적 무통증 신호요법(2ch/30분)","압박치료[1일당]","이온도입기(ION)","운동치료-단순운동치료[간단]"];\n';
-    html += '  function getTokenLbl(token){\n';
-    html += '    var base=token.split("+")[0].toUpperCase().trim();\n';
-    html += '    var u=token.toUpperCase();\n';
-    html += '    if(base.startsWith("GR"))return "AR+MW+RBOT";\n';
-    html += '    if(token.includes("(F)"))return "보행로봇F";\n';
-    html += '    if(base.startsWith("H1"))return "H1";\n';
-    html += '    if(base.startsWith("H2"))return "H2";\n';
-    html += '    if(base.startsWith("H3"))return "H3";\n';
-    html += '    if(base.startsWith("H")&&!base.startsWith("H1")&&!base.startsWith("H2")&&!base.startsWith("H3"))return "H";\n';
-    html += '    if(base.startsWith("NDT"))return "NDT";\n';
-    html += '    if(base.startsWith("MAT"))return "MAT";\n';
-    html += '    if(base.startsWith("GAIT"))return "GAIT";\n';
-    html += '    if(base.startsWith("COMPLEX"))return "COMPLEX";\n';
-    html += '    if(base==="FES")return null;\n';
-    html += '    if(base.startsWith("FES"))return "FES";\n';
-    html += '    if(base.includes("ES3"))return "ESWT3";\n';
-    html += '    if(base.includes("ES4"))return "ESWT4";\n';
-    html += '    if(base.includes("ES6"))return "ESWT6";\n';
-    html += '    if(u.includes("CR6(F)")||u.includes("CR7(F)")||u.includes("CR6(필")||u.includes("CR7(필"))return "CR6(F),CR7(F)";\n';
-    html += '    if(u.includes("CR6(비)")||u.includes("CR6"))return "CR6(비)";\n';
-    html += '    if(u.includes("CR7(비)")||u.includes("CR7"))return "CR7(비)";\n';
-    html += '    if(u.includes("H2"))return "H2";\n';
-    html += '    if(u.includes("경두개"))return "경두개직류";\n';
-    html += '    if(u.includes("RS"))return "RS";\n';
-    html += '    if(u.startsWith("D"))return "DYSPHAGIA";\n';
-    html += '    if(u.startsWith("S"))return "SPECIAL";\n';
-    html += '    if(u.startsWith("A"))return "ADL";\n';
-    html += '    var fc=token[0];var isK=fc>="가"&&fc<="힣";\n';
-    html += '    if(isK&&u.endsWith("V")&&!token.includes("+"))return "VITAL STIM";\n';
-    html += '    if(base.length>=1){var ch=base[0];if(ch==="M")return "MAT";if(ch==="G")return "GAIT";if(ch==="C")return "COMPLEX";if(ch==="N")return "NDT";if(ch==="T")return "기립경사";if(ch==="B")return "호흡";if(ch==="R")return "R";if(ch==="F")return base.length===1?null:"FES";}\n';
-    html += '    return null;\n';
-    html += '  }\n';
-    html += '  function extractTokens(cellText,lbl){\n';
-    html += '    if(painLabels.indexOf(lbl)!==-1)return [cellText];\n';
-    html += '    var toks=cellText.replace(/\\r?\\n|\\r/g," ").split(/[\\s,]+/).map(function(t){return t.trim();}).filter(function(t){return t.length>0;});\n';
-    html += '    if(lbl==="H2"||lbl==="H3"){var h=toks.filter(function(t){return getTokenLbl(t)==="H";});return h.length>0?h:[cellText];}\n';
-    html += '    if(lbl==="AR+MW+RBOT"){var g=toks.filter(function(t){return getTokenLbl(t)==="AR+MW+RBOT";});return g.length>0?g:[cellText];}\n';
-    html += '    var m=toks.filter(function(t){return getTokenLbl(t)===lbl;});return m.length>0?m:[cellText];\n';
-    html += '  }\n';
-    html += '  var filteredSched=[];\n';
-    html += '  schedItems.forEach(function(cell){extractTokens(cell,label).forEach(function(t){filteredSched.push(t);});});\n';
-    html += '  var allMaps=[savedPtMap,savedOtMap,savedStMap,savedPainMap];\n';
-    html += '  var matchCodes=[];\n';
-    html += '  allMaps.forEach(function(m){Object.keys(m).forEach(function(c){if(m[c]===label&&!matchCodes.includes(c))matchCodes.push(c);});});\n';
-    html += '  Object.keys(savedEvalCodeMap).forEach(function(c){if(savedEvalCodeMap[c]===label&&!matchCodes.includes(c))matchCodes.push(c);});\n';
-    html += '  var emrItems=savedEmrData.filter(function(r){return r.name===therapist&&matchCodes.includes(r.code);});\n';
-    html += '  document.getElementById("detailModalTitle").innerText="["+therapist+"] "+label+" (시간표 "+filteredSched.length+"건 / EMR "+emrItems.length+"건)";\n';
-    html += '  var body=document.getElementById("detailModalBody"); body.innerHTML="";\n';
-    html += '  var legend=document.createElement("div"); legend.style.cssText="display:flex;gap:8px;margin-bottom:12px;font-size:11px;flex-wrap:wrap;";\n';
-    html += '  legend.innerHTML="<span style=\'background:#d6eaf8;border:1px solid #2980b9;padding:2px 8px;border-radius:4px;\'>&#9646; 양쪽 일치</span><span style=\'background:#fadbd8;border:1px solid #e74c3c;padding:2px 8px;border-radius:4px;\'>&#9646; EMR에만 있음</span><span style=\'background:#fef9e7;border:1px solid #f39c12;padding:2px 8px;border-radius:4px;\'>&#9646; 시간표에만 있음</span>";\n';
-    html += '  body.appendChild(legend);\n';
-    html += '  var cols=document.createElement("div"); cols.style.cssText="display:flex;gap:16px;";\n';
-    html += '  var eCol=document.createElement("div"); eCol.style.cssText="flex:1;min-width:0;";\n';
-    html += '  var eTitle=document.createElement("div"); eTitle.className="modal-col-title emr"; eTitle.innerText="🏥 EMR 청구 내역 ("+emrItems.length+"건)"; eCol.appendChild(eTitle);\n';
-    html += '  var sCol=document.createElement("div"); sCol.style.cssText="flex:1;min-width:0;";\n';
-    html += '  var sTitle=document.createElement("div"); sTitle.className="modal-col-title sched"; sTitle.innerText="📋 시간표 내역 ("+filteredSched.length+"건)"; sCol.appendChild(sTitle);\n';
-    // EMR 1:1 매칭 색상
-    html += '  var emrMatched=emrItems.map(function(){return false;});\n';
-    html += '  var schedMatched=filteredSched.map(function(){return false;});\n';
-    html += '  filteredSched.forEach(function(st,si){\n';
-    html += '    var sn=st.replace(/^[A-Za-z]+/,"").split("+")[0].split("(")[0].split(" ")[0].trim();\n';
-    html += '    if(sn.toUpperCase().endsWith("V")&&sn.length>1)sn=sn.slice(0,-1);\n';
-    html += '    if(sn.length<1)return;\n';
-    html += '    for(var ei=0;ei<emrItems.length;ei++){if(emrMatched[ei])continue;var en=emrItems[ei].patient;if(en.includes(sn)||sn.includes(en)){emrMatched[ei]=true;schedMatched[si]=true;break;}}\n';
-    html += '  });\n';
-    html += '  if(emrItems.length===0){var e2=document.createElement("div");e2.className="modal-empty";e2.innerText="EMR 데이터 없음";eCol.appendChild(e2);}else{\n';
-    html += '    emrItems.forEach(function(item,i){var d=document.createElement("div");d.className="modal-item";d.style.cssText=emrMatched[i]?"background:#d6eaf8;border-left:4px solid #2980b9;padding:8px 12px;margin-bottom:6px;border-radius:4px;font-size:13px;":"background:#fadbd8;border-left:4px solid #e74c3c;padding:8px 12px;margin-bottom:6px;border-radius:4px;font-size:13px;";d.innerText=(i+1)+". ["+item.slip+"] "+item.patient;eCol.appendChild(d);});}\n';
-    html += '  if(filteredSched.length===0){var emp=document.createElement("div");emp.className="modal-empty";emp.innerText="시간표 데이터 없음";sCol.appendChild(emp);}else{\n';
-    html += '    filteredSched.forEach(function(text,i){var d=document.createElement("div");d.className="modal-item";d.style.cssText=schedMatched[i]?"background:#d6eaf8;border-left:4px solid #2980b9;padding:8px 12px;margin-bottom:6px;border-radius:4px;font-size:13px;":"background:#fef9e7;border-left:4px solid #f39c12;padding:8px 12px;margin-bottom:6px;border-radius:4px;font-size:13px;";d.innerText=(i+1)+". "+text;sCol.appendChild(d);});}\n';
-    html += '  cols.appendChild(eCol);cols.appendChild(sCol);body.appendChild(cols);\n';
-    html += '  document.getElementById("detailModal").classList.add("active");\n';
-    html += '}\n';
-
-    // 처방별 설명 팝업
-    html += '\nfunction showPrescriptionDesc(label){\n';
-    html += '  var desc=savedPrescriptionDesc[label];\n';
-    html += '  document.getElementById("detailModalTitle").innerText="📌 ["+label+"] 집계 조건 안내";\n';
-    html += '  var b=document.getElementById("detailModalBody"); b.innerHTML="";\n';
-    html += '  var e=document.createElement("div"); e.style.marginBottom="14px";\n';
-    html += '  e.innerHTML="<div style=\'font-weight:bold;color:#2980b9;border-bottom:2px solid #2980b9;padding-bottom:5px;margin-bottom:8px;\'>🏥 EMR 집계 조건</div><div style=\'background:#eaf4fb;border-left:4px solid #2980b9;padding:10px;border-radius:4px;white-space:pre-wrap;font-size:13px;\'>"+(desc?desc.emr:"설명 없음")+"</div>";\n';
-    html += '  b.appendChild(e);\n';
-    html += '  var s=document.createElement("div");\n';
-    html += '  s.innerHTML="<div style=\'font-weight:bold;color:#1abc9c;border-bottom:2px solid #1abc9c;padding-bottom:5px;margin-bottom:8px;\'>📋 시간표 집계 조건</div><div style=\'background:#e8f8f5;border-left:4px solid #1abc9c;padding:10px;border-radius:4px;white-space:pre-wrap;font-size:13px;\'>"+(desc?desc.sched:"설명 없음")+"</div>";\n';
-    html += '  b.appendChild(s);\n';
-    html += '  document.getElementById("detailModal").classList.add("active");\n';
-    html += '}\n';
-
-    // 사파리 호환: onclick 속성 대신 addEventListener로 이벤트 부착
-    html += '\ndocument.addEventListener("DOMContentLoaded",function(){\n';
-    html += '  // 처방명 td 클릭 이벤트 (집계 조건 팝업)\n';
-    html += '  document.querySelectorAll("td[data-label]").forEach(function(td){\n';
-    html += '    td.style.cursor="pointer";\n';
-    html += '    td.addEventListener("click",function(){showPrescriptionDesc(this.dataset.label);});\n';
-    html += '  });\n';
-    html += '  // 건수 td 클릭 이벤트\n';
-    html += '  document.querySelectorAll("table.result-table tbody tr").forEach(function(tr){\n';
-    html += '    var cells=tr.querySelectorAll("td");\n';
-    html += '    if(cells.length<4)return;\n';
-    html += '    var table=tr.closest("table");\n';
-    html += '    var hRow=table.querySelector("thead tr:first-child");\n';
-    html += '    var hCells=hRow?hRow.querySelectorAll("th"):[];\n';
-    html += '    var therapists=[];\n';
-    html += '    for(var i=2;i<hCells.length;i++)therapists.push(hCells[i].innerText.trim());\n';
-    html += '    var pName=cells[0].dataset.label||cells[0].innerText.trim();\n';
-    html += '    var tid=table.id||"";\n';
-    html += '    var room="pt";\n';
-    html += '    if(tid.indexOf("otTriple")!==-1)room="ot";\n';
-    html += '    else if(tid.indexOf("stTriple")!==-1)room="st";\n';
-    html += '    else if(tid.indexOf("painTriple")!==-1)room="pain";\n';
-    html += '    for(var ti=0;ti<therapists.length;ti++){\n';
-    html += '      var eTd=cells[3+ti*2];var tTd=cells[3+ti*2+1];\n';
-    html += '      (function(th,eEl,tEl,pn,rm){\n';
-    html += '        var ev=parseInt(eEl?eEl.innerText:"0")||0;\n';
-    html += '        var tv=parseInt(tEl?tEl.innerText:"0")||0;\n';
-    html += '        if(ev>0&&eEl){eEl.style.cursor="pointer";eEl.addEventListener("click",function(){showDetail(th,pn,ev,rm);});}\n';
-    html += '        if(tv>0&&tEl){tEl.style.cursor="pointer";tEl.addEventListener("click",function(){showDetail(th,pn,tv,rm);});}\n';
-    html += '      })(therapists[ti],eTd,tTd,pName,room);\n';
-    html += '    }\n';
-    html += '  });\n';
-    html += '  // 모달 오버레이 클릭 닫기\n';
-    html += '  document.getElementById("detailModal").addEventListener("click",function(e){if(e.target===this)this.classList.remove("active");});\n';
-    html += '});\n';
-    html += '<\/script>\n</body>\n</html>';
-
-    var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = '교차대조결과_' + fileDate + '.html';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    alert("결과 파일이 저장되었습니다!\n직원들에게 파일을 공유해 주세요.\n(파일을 더블클릭하면 브라우저에서 열립니다)");
-}
 
 function showPrescriptionDesc(label) {
     var desc = prescriptionDesc[label];
@@ -1770,269 +1762,9 @@ function analyzeAllInOne() {
     alert("✅ 전체 교차 검증 집계가 완료되었습니다!");
 }
 
-// ── 구글 시트 업로드 함수 ─────────────────────────────────────────────────
 var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwrdeLZBebSkMwMhu7F0hnWhLTuYQZ6X9y7mXXv-xZwAcBjGSW0JAIxdNWnGOFTyhNZ-g/exec";
-var GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1Gu9l6rxqbo6mh2vd6NgF18jfXwtifC5zQuw9QCgKcoA/edit?usp=sharing"; // 3층 구글 시트
 var APPS_SCRIPT_URL_1F = "https://script.google.com/macros/s/AKfycbx29641Sj24xeUBybD9Y9v3GFhGBjICv7zs1fY1IEJ-j3hYAviugoXOu8VINhY0sDgbAQ/exec";
-var GOOGLE_SHEET_URL_1F = "https://docs.google.com/spreadsheets/d/1_8hleGJXJgj3H8PXROFrtAK8B8qltmXMLJnkFnzOjIg/edit?gid=0#gid=0";
 
-function uploadToGoogleSheet(floor) {
-    floor = floor || "3f";
-    var targetUrl = floor === "1f" ? APPS_SCRIPT_URL_1F : APPS_SCRIPT_URL;
-    if (!targetUrl) { alert("⚠️ " + (floor === "1f" ? "1층" : "3층") + " Apps Script URL이 설정되지 않았습니다."); return; }
-
-    var areas = ['ptTripleArea','otTripleArea','stTripleArea','painTripleArea'];
-    var hasResult = false;
-    areas.forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el && el.innerHTML.trim() !== '') hasResult = true;
-    });
-    if (!hasResult) return alert("업로드할 결과가 없습니다. 먼저 교차 검증 집계를 실행해 주세요.");
-
-    if (!confirm("현재 집계 결과를 구글 시트에 업로드합니다.\n계속하시겠습니까?")) return;
-
-    // 업로드할 데이터 구성
-    var now = new Date();
-    var dateStr = now.getFullYear() + "년 " + (now.getMonth()+1) + "월 " + now.getDate() + "일";
-
-    var roomDefs = [
-        { id: "ptTripleArea", label: "물리+전기+메디페인", orders: ptOrder, members: ptPartMembers.length > 0 ? ptPartMembers : [] },
-        { id: "otTripleArea", label: "작업치료", orders: otOrder, members: [] },
-        { id: "stTripleArea", label: "언어치료", orders: stOrder, members: [] },
-        { id: "painTripleArea", label: "통증치료", orders: painOrder, members: [] }
-    ];
-
-    // 각 결과 영역에서 치료사 이름 추출 (테이블 헤더에서)
-    roomDefs.forEach(function(room) {
-        var area = document.getElementById(room.id);
-        if (!area) return;
-        var table = area.querySelector("table.result-table");
-        if (!table) return;
-        var hRow = table.querySelector("thead tr:first-child");
-        if (!hRow) return;
-        var hCells = hRow.querySelectorAll("th");
-        var members = [];
-        for (var i = 2; i < hCells.length; i++) {
-            members.push(hCells[i].innerText.trim());
-        }
-        room.members = members;
-    });
-
-    // 현재 stats 데이터 수집
-    var uploadData = {
-        date: dateStr,
-        rooms: []
-    };
-
-    // 모든 결과 영역을 DOM 테이블에서 직접 추출 (통합/단독 집계 방식 무관하게 동작)
-    var allAreaIds = ["ptTripleArea","otTripleArea","stTripleArea","painTripleArea"];
-    var labelMap = { "ptTripleArea":"물리+전기+메디페인", "otTripleArea":"작업치료", "stTripleArea":"언어치료", "painTripleArea":"통증치료" };
-    allAreaIds.forEach(function(areaId) {
-        var area = document.getElementById(areaId);
-        if (!area || area.innerHTML.trim() === '') return;
-        var table = area.querySelector("table.result-table");
-        if (!table) return;
-        var hRow = table.querySelector("thead tr:first-child");
-        if (!hRow) return;
-        var hCells = hRow.querySelectorAll("th");
-        var members = [];
-        for (var i = 2; i < hCells.length; i++) members.push(hCells[i].innerText.trim());
-
-        var orders = [];
-        var timeStats = {};
-        var emrStats = {};
-        members.forEach(function(m){ timeStats[m]={}; emrStats[m]={}; });
-
-        var rows = table.querySelectorAll("tbody tr");
-        rows.forEach(function(tr) {
-            var cells = tr.querySelectorAll("td");
-            if (cells.length < 3) return;
-            var pName = cells[0].dataset.label || cells[0].innerText.trim();
-            orders.push(pName);
-            members.forEach(function(m, mi) {
-                var eVal = parseInt(cells[3 + mi*2] ? cells[3 + mi*2].innerText : "0") || 0;
-                var tVal = parseInt(cells[3 + mi*2+1] ? cells[3 + mi*2+1].innerText : "0") || 0;
-                emrStats[m][pName] = eVal;
-                timeStats[m][pName] = tVal;
-            });
-        });
-
-        uploadData.rooms.push({ label:labelMap[areaId]||areaId, orders:orders, members:members, timeStats:timeStats, emrStats:emrStats });
-    });
-
-    // 불일치 항목 + 시간표/EMR 내역 추가
-    var mismatchDetails = countMismatches().details;
-    var allCodeMaps = [ptMap, otMap, stMap, painMap];
-
-    mismatchDetails.forEach(function(item) {
-        var key = item.therapist + "||" + item.prescription;
-        // 치료실 → room 키 매핑
-        var roomKey = "pt";
-        if (item.roomLabel === "작업치료") roomKey = "ot";
-        else if (item.roomLabel === "언어치료") roomKey = "st";
-        else if (item.roomLabel === "통증치료") roomKey = "pain";
-
-        // 시간표 내역 (debugLogs에서 → 처방별 토큰 분리)
-        var schedCells = [];
-        if (roomKey === "pt") {
-            ["pt","et","mt"].forEach(function(r) {
-                var rLog = debugLogs[r] || {};
-                if (rLog[key]) rLog[key].forEach(function(c){ schedCells.push(c); });
-            });
-        } else {
-            var lg = debugLogs[roomKey] || {};
-            schedCells = lg[key] || [];
-        }
-        // 처방에 맞는 토큰만 분리
-        var painLabelList = ["표층열치료(HP)","표층열치료(IR)","표층열치료(심층열동시-HP)","표층열치료(심층열동시-IR)","심층열치료(microwave)","심층열치료(ultra sound)","심층열치료(sonor)","심층열치료[1일당]","한냉치료(ICE)","경피적전기신경자극치료[TENS]","전기자극치료[EST]","간섭파전류치료[ICT]","저주파자극치료[SSP]","레이저치료[1일당]","한냉치료(콜드팩)","비침습적 무통증 신호요법(2ch/30분)","압박치료[1일당]","이온도입기(ION)","운동치료-단순운동치료[간단]"];
-        function getUploadTokenLabel(token) {
-            var base = token.split("+")[0].toUpperCase().trim();
-            var u = token.toUpperCase();
-            if (base.startsWith("GR")) return "AR+MW+RBOT";
-            if (token.includes("(F)")) return "보행로봇F";
-            if (base.startsWith("H1")) return "H1";
-            if (base.startsWith("H2")) return "H2";
-            if (base.startsWith("H3")) return "H3";
-            if (base.startsWith("H") && !base.startsWith("H1") && !base.startsWith("H2") && !base.startsWith("H3")) return "H";
-            if (base.startsWith("NDT")) return "NDT";
-            if (base.startsWith("MAT")) return "MAT";
-            if (base.startsWith("GAIT")) return "GAIT";
-    // 신장분사치료 - 시간표 집계 미정
-    // if (base.startsWith("신장6S") || base.startsWith("신장6s")) return "신장분사치료[special]";
-    // if (base.startsWith("신장6")) return "신장분사치료[단순]";
-    // 비침습적무통증신호요법[10.0][special] - 시간표 집계 미정
-    // if (base.startsWith("페인10") || base.startsWith("PAIN10")) return "비침습적무통증신호요법[10.0][special]";
-    if (base.startsWith("도수")) {
-        // "도수" 단독 또는 "도수+한글이름" 형태만 집계
-        // "도수중재", "도수치료" 등 처방 설명어는 제외
-        var dosuAfter = base.substring(2);
-        var dosuExclude = ["중재","치료","운동","관절","마사지","재활"];
-        var dosuOk = dosuAfter === "" || !dosuExclude.some(function(ex){ return dosuAfter.startsWith(ex); });
-        if (dosuOk) return "도수치료[1일당]";
-    }
-            if (base.startsWith("COMPLEX")) return "COMPLEX";
-            if (base === "FES") return null;
-            if (base.startsWith("FES")) return "FES";
-            if (base.includes("ES3")) return "ESWT3";
-            if (base.includes("ES4")) return "ESWT4";
-            if (base.includes("ES6")) return "ESWT6";
-            if (u.includes("CR6(F)") || u.includes("CR7(F)") || u.includes("CR6(필") || u.includes("CR7(필")) return "CR6(F),CR7(F)";
-            if (u.includes("CR6(비)") || u.includes("CR6")) return "CR6(비)";
-            if (u.includes("CR7(비)") || u.includes("CR7")) return "CR7(비)";
-            if (u.includes("H2")) return "H2";
-            if (u.includes("경두개")) return "경두개직류";
-            if (u.includes("RS")) return "RS";
-            if (u.startsWith("D")) return "DYSPHAGIA";
-            if (u.startsWith("S")) return "SPECIAL";
-            if (u.startsWith("A")) return "ADL";
-            var fc = token[0]; var isK = fc >= "가" && fc <= "힣";
-            if (isK && u.endsWith("V") && !token.includes("+")) return "VITAL STIM";
-            if (base.length >= 1) {
-                var ch = base[0];
-                if (ch === "M") return "MAT";
-                if (ch === "G") return "GAIT";
-                if (ch === "C") return "COMPLEX";
-                if (ch === "N") return "NDT";
-                if (ch === "T") return "기립경사";
-                if (ch === "B") return "호흡";
-                if (ch === "R") return "R";
-                if (ch === "F") return base.length === 1 ? null : "FES";
-            }
-            return null;
-        }
-        var pres = item.prescription;
-        var schedRaw = [];
-        schedCells.forEach(function(cellText) {
-            if (painLabelList.indexOf(pres) !== -1) {
-                schedRaw.push(cellText); // 통증: 셀 전체
-            } else if (pres === "H2" || pres === "H3") {
-                var toks = cellText.replace(/\r?\n|\r/g," ").split(/[\s,]+/).map(function(t){ return t.trim(); }).filter(function(t){ return t.length>0; });
-                var hToks = toks.filter(function(t){ return getUploadTokenLabel(t) === "H"; });
-                hToks.forEach(function(t){ schedRaw.push(t); });
-            } else if (pres === "AR+MW+RBOT") {
-                var toks = cellText.replace(/\r?\n|\r/g," ").split(/[\s,]+/).map(function(t){ return t.trim(); }).filter(function(t){ return t.length>0; });
-                var grToks = toks.filter(function(t){ return getUploadTokenLabel(t) === "AR+MW+RBOT"; });
-                grToks.forEach(function(t){ schedRaw.push(t); });
-            } else {
-                var toks = cellText.replace(/\r?\n|\r/g," ").split(/[\s,]+/).map(function(t){ return t.trim(); }).filter(function(t){ return t.length>0; });
-                var matched = toks.filter(function(t){ return getUploadTokenLabel(t) === pres; });
-                if (matched.length > 0) matched.forEach(function(t){ schedRaw.push(t); });
-                else schedRaw.push(cellText);
-            }
-        });
-
-        // EMR 내역 (globalEmrRows에서)
-        var matchCodes = [];
-        allCodeMaps.forEach(function(cmap) {
-            Object.keys(cmap).forEach(function(code) {
-                if (cmap[code] === item.prescription && !matchCodes.includes(code)) matchCodes.push(code);
-            });
-        });
-        var emrNames = [];
-        if (globalEmrRows && globalEmrCodeIdx !== -1) {
-            globalEmrRows.forEach(function(row) {
-                if (!row) return;
-                var rowCode = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
-                var rowName = String(row[globalEmrNameIdx]||"").trim();
-                var patient = globalEmrPatientIdx !== -1 ? String(row[globalEmrPatientIdx]||"").trim() : "";
-                if (rowName === item.therapist && matchCodes.includes(rowCode)) emrNames.push(patient);
-            });
-        }
-
-        // 1:1 매칭으로 불일치 항목만 추출
-        var emrMatched = emrNames.map(function(){ return false; });
-        var schedMatched = schedRaw.map(function(){ return false; });
-        schedRaw.forEach(function(cell, si) {
-            // 시간표 셀에서 이름 추출
-            var t = cell.replace(/^[A-Za-z]+/,"").split("+")[0].split("(")[0].split(" ")[0].trim();
-            if (t.toUpperCase().endsWith("V") && t.length > 1) t = t.slice(0,-1);
-            if (t.length < 1) return;
-            for (var ei = 0; ei < emrNames.length; ei++) {
-                if (emrMatched[ei]) continue;
-                if (emrNames[ei].includes(t) || t.includes(emrNames[ei])) {
-                    emrMatched[ei] = true; schedMatched[si] = true; break;
-                }
-            }
-        });
-
-        // 불일치만 추출
-        item.onlyInEmr = emrNames.filter(function(n, i){ return !emrMatched[i]; });   // EMR에만
-        item.onlyInSched = schedRaw.filter(function(c, i){ return !schedMatched[i]; }); // 시간표에만
-    });
-
-    uploadData.mismatches = mismatchDetails;
-
-    // 업로드 실행
-    var btn = document.querySelector('[onclick="uploadToGoogleSheet()"]');
-    if (btn) { btn.innerText = "⏳ 업로드 중..."; btn.disabled = true; }
-    var floorLabel = floor === "1f" ? "1층" : "3층";
-
-    // Apps Script URL을 GET 파라미터 방식으로 전송 (CORS 우회)
-    var formData = new FormData();
-    formData.append("data", JSON.stringify(uploadData));
-
-    fetch(targetUrl, {
-        method: "POST",
-        body: formData
-    }).then(function(response) {
-        return response.json();
-    }).then(function(result) {
-        if (btn) { btn.innerText = (floor==="1f"?"☁️ 1층 구글 시트 업로드":"☁️ 3층 구글 시트 업로드"); btn.disabled = false; }
-        if (result.success) {
-            alert("✅ " + floorLabel + " 구글 시트 업로드 완료!\n" + result.message);
-            // 1층 시트 링크 버튼 표시
-            if (floor === "1f" && GOOGLE_SHEET_URL_1F) {
-                var btn1f = document.getElementById("sheetLinkBtn1F");
-                if (btn1f) { btn1f.href = GOOGLE_SHEET_URL_1F; btn1f.style.display = "inline-block"; }
-            }
-        } else {
-            alert("❌ 업로드 실패: " + result.message);
-        }
-    }).catch(function(err) {
-        if (btn) { btn.innerText = (floor==="1f"?"☁️ 1층 구글 시트 업로드":"☁️ 3층 구글 시트 업로드"); btn.disabled = false; }
-        alert("❌ 업로드 실패: " + err.message + "\n\n구글 시트 Apps Script URL을 확인해 주세요.");
-    });
-}
 
 // ── 오류 횟수 계산 및 표시 ─────────────────────────────────────────────────
 function countMismatches() {
@@ -2076,13 +1808,6 @@ function updateErrorCount() {
     var result = countMismatches();
     var badge = document.getElementById('errorCountBadge');
     if (!badge) return;
-    // 구글 시트 링크 버튼 업데이트
-    // 3층 시트 링크
-    var sheetBtn = document.getElementById('sheetLinkBtn');
-    if (sheetBtn) { sheetBtn.style.display = GOOGLE_SHEET_URL ? "inline-block" : "none"; }
-    // 1층 시트 링크
-    var sheetBtn1F = document.getElementById('sheetLinkBtn1F');
-    if (sheetBtn1F) { sheetBtn1F.style.display = GOOGLE_SHEET_URL_1F ? "inline-block" : "none"; if(GOOGLE_SHEET_URL_1F) sheetBtn1F.href = GOOGLE_SHEET_URL_1F; }
     if (result.total === 0) {
         badge.innerHTML = '✅ 오류 0건 (전체 일치)';
         badge.style.cssText = 'display:inline-block;background:#27ae60;color:white;padding:8px 18px;border-radius:6px;font-weight:bold;font-size:14px;margin-left:12px;vertical-align:middle;';

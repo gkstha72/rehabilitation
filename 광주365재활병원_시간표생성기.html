@@ -6,44 +6,279 @@
 <title>광주365재활병원 주말 및 공휴일 시간표 생성기</title>
 
 <style>
-body{
-  font-family:Arial,"Malgun Gothic",sans-serif;
-  margin:20px;
-  background:#f5f5f5;
+:root{
+  --paper:#f1f2ef;
+  --card:#ffffff;
+  --ink:#17211d;
+  --muted:#6d7671;
+  --line:#e3e6e2;
+  --accent:#16584a;
+  --accent-soft:#e8f0ed;
+  --warn:#a8701a;
+  --warn-soft:#fdf3e2;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","맑은 고딕","Noto Sans KR",sans-serif;
+  --mono:"Consolas","D2Coding","Menlo","Courier New",monospace;
 }
 
-.box{
-  background:white;
-  border:1px solid #ccc;
-  border-radius:10px;
-  padding:15px;
-  margin-bottom:15px;
+*{box-sizing:border-box;}
+
+body{
+  font-family:var(--sans);
+  font-size:14px;
+  line-height:1.6;
+  color:var(--ink);
+  background:var(--paper);
+  margin:0;
+  padding:28px 24px 60px;
+  -webkit-font-smoothing:antialiased;
 }
+
+main{
+  max-width:1180px;
+  margin:0 auto;
+}
+
+.masthead{
+  max-width:1180px;
+  margin:0 auto 22px;
+}
+
+.eyebrow{
+  margin:0;
+  font-size:11px;
+  letter-spacing:.18em;
+  color:var(--muted);
+}
+
+h1{
+  margin:4px 0 0;
+  font-size:23px;
+  font-weight:700;
+  letter-spacing:-.02em;
+}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+/* 순서가 있는 작업이라 번호를 답니다 */
+.steps{
+  list-style:none;
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin:0 0 18px;
+  padding:0;
+  counter-reset:step;
+}
+
+.steps li{
+  counter-increment:step;
+  flex:1 1 240px;
+  padding:10px 12px 10px 38px;
+  position:relative;
+  background:var(--accent-soft);
+  border-radius:10px;
+  font-size:13px;
+  line-height:1.5;
+}
+
+.steps li::before{
+  content:counter(step);
+  position:absolute;
+  left:12px;
+  top:10px;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:var(--accent);
+  color:#fff;
+  font-family:var(--mono);
+  font-size:11px;
+  line-height:18px;
+  text-align:center;
+}
+
+.steps b{font-weight:600;}
+
+.steps kbd{
+  font-family:var(--mono);
+  font-size:11.5px;
+  background:#fff;
+  border:1px solid var(--line);
+  border-bottom-width:2px;
+  border-radius:4px;
+  padding:0 4px;
+}
+
+.toolbar{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+}
+
+.toolbar .spacer{flex:1;}
+
+input,select{
+  font-family:inherit;
+  font-size:14px;
+  color:var(--ink);
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:#fff;
+}
+
+input::placeholder{color:#a7aeaa;}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible,
+.cell:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:1px;
+}
+
+.date-field{width:64px;text-align:center;-moz-appearance:textfield;}
+.date-field::-webkit-outer-spin-button,
+.date-field::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 
 button{
-  padding:10px 14px;
-  border-radius:8px;
-  border:1px solid #999;
+  font-family:inherit;
+  font-size:13px;
+  color:var(--ink);
+  padding:8px 13px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:#fff;
   cursor:pointer;
-  margin:4px;
+  transition:background .12s ease,border-color .12s ease;
 }
 
-table.result .edit-button button{
-  padding:4px 8px;
-  margin:2px;
+button:hover{background:#f6f7f5;border-color:#cfd5d0;}
+
+button.primary{
+  background:var(--accent);
+  border-color:var(--accent);
+  color:#fff;
+  font-weight:600;
 }
 
-input, select{
-  padding:10px;
-  border-radius:8px;
-  border:1px solid #999;
+button.primary:hover{background:#124a3e;border-color:#124a3e;}
+
+.status{
+  margin:16px 0 0;
+  font-size:12.5px;
+  color:var(--muted);
 }
 
+/* 인식된 시트 목록 */
+.layout-box{
+  border:1px solid var(--line);
+  border-radius:11px;
+  padding:10px 12px;
+  margin-top:10px;
+  background:#fbfcfb;
+}
+
+.layout-box summary{
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:13.5px;
+  font-weight:600;
+  list-style-position:outside;
+}
+
+.layout-box summary::marker{content:"";}
+.layout-box summary::-webkit-details-marker{display:none;}
+
+.layout-box summary::before{
+  content:"▸";
+  color:var(--muted);
+  font-size:11px;
+  flex:none;
+}
+
+.layout-box[open] summary::before{content:"▾";}
+
+button.delete-sheet{
+  margin-left:auto;
+  padding:3px 9px;
+  font-size:12px;
+  color:var(--muted);
+}
+
+button.delete-sheet:hover{color:#a5342a;border-color:#e0bab5;background:#fdf4f3;}
+
+.layout-box table{
+  border-collapse:collapse;
+  margin-top:10px;
+}
+
+.layout-box td{
+  padding:3px 10px 3px 0;
+  font-size:12.5px;
+  vertical-align:middle;
+}
+
+.layout-box td:last-child{
+  font-family:var(--mono);
+  font-size:11.5px;
+  color:var(--muted);
+}
+
+.layout-box select{
+  padding:2px 4px;
+  font-size:12px;
+  border-radius:7px;
+}
+
+.floor-guess{
+  background:var(--warn-soft);
+  border-color:var(--warn);
+  color:var(--warn);
+}
+
+.color-title{
+  margin-top:12px;
+  padding-top:10px;
+  border-top:1px solid var(--line);
+  font-size:12.5px;
+  color:var(--muted);
+}
+
+.color-line{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  font-size:12.5px;
+  margin-top:5px;
+}
+
+.color-chip{
+  display:inline-block;
+  width:24px;
+  height:14px;
+  border:1px solid #c9cec9;
+  border-radius:3px;
+  flex:none;
+}
+
+/* 붙여넣기 판 */
 #sheetWrap{
+  margin-top:16px;
   overflow:auto;
-  max-height:500px;
-  border:1px solid #aaa;
-  background:white;
+  max-height:460px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  background:#fff;
 }
 
 .sheet-table{
@@ -53,198 +288,283 @@ input, select{
 
 .sheet-table th,
 .sheet-table td{
-  border:1px solid #ddd;
-  min-width:80px;
-  height:28px;
+  border:1px solid #eceeeb;
+  min-width:84px;
+  height:26px;
   padding:0;
-  font-size:12px;
+  font-size:11.5px;
 }
 
 .sheet-table th{
-  background:#eee;
+  background:#f4f6f3;
+  color:var(--muted);
+  font-family:var(--mono);
+  font-weight:500;
   position:sticky;
   top:0;
   z-index:2;
 }
 
 .row-header{
-  background:#eee;
+  background:#f4f6f3;
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:11px;
   position:sticky;
   left:0;
   z-index:1;
-  min-width:40px!important;
+  min-width:34px!important;
   text-align:center;
 }
 
 .cell{
   width:100%;
   height:100%;
-  padding:4px;
+  padding:3px 5px;
   box-sizing:border-box;
   outline:none;
   overflow:hidden;
   white-space:nowrap;
 }
 
-.cell:focus{
-  box-shadow:inset 0 0 0 2px #111;
+.cell:focus{box-shadow:inset 0 0 0 2px var(--accent);}
+
+/* 개인 시간표 */
+#result{max-width:1180px;margin:0 auto;}
+
+#result h2{
+  margin:26px 0 0;
+  font-size:20px;
+  font-weight:700;
+  letter-spacing:-.01em;
+}
+
+#result h3{
+  margin:18px 0 0;
+  font-size:12px;
+  font-weight:600;
+  letter-spacing:.06em;
+  color:var(--accent);
 }
 
 table.result{
   width:100%;
-  border-collapse:collapse;
-  margin-top:15px;
-  background:white;
+  border-collapse:separate;
+  border-spacing:0;
+  margin-top:8px;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:12px;
+  print-color-adjust:exact;
+  -webkit-print-color-adjust:exact;
 }
 
-table.result th,
+table.result thead th:first-child{border-top-left-radius:11px;}
+table.result thead th:last-child{border-top-right-radius:11px;}
+table.result tbody tr:last-child td:first-child{border-bottom-left-radius:11px;}
+table.result tbody tr:last-child td:last-child{border-bottom-right-radius:11px;}
+
+table.result th{
+  background:#f4f6f3;
+  color:var(--muted);
+  font-size:11.5px;
+  font-weight:600;
+  letter-spacing:.04em;
+  text-align:left;
+  padding:9px 14px;
+  border-bottom:1px solid var(--line);
+}
+
 table.result td{
-  border:1px solid #aaa;
-  padding:8px;
+  padding:11px 14px;
+  border-bottom:1px solid #eef0ed;
+  font-size:14px;
+}
+
+table.result tbody tr:last-child td{border-bottom:none;}
+
+/* 시간 레일 — 치료가 하루에 어떻게 배치되는지 한눈에 */
+table.result tbody tr:not([data-row-type="lunch"]) td:first-child{
+  width:96px;
+  font-family:var(--mono);
+  font-size:13px;
+  font-variant-numeric:tabular-nums;
+  color:var(--muted);
+  text-align:right;
+  padding-right:18px;
+  border-right:2px solid var(--accent-soft);
+  position:relative;
+}
+
+table.result tbody tr:not([data-row-type="lunch"]) td:first-child::after{
+  content:"";
+  position:absolute;
+  right:-5px;
+  top:50%;
+  width:8px;
+  height:8px;
+  margin-top:-4px;
+  border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 0 3px var(--card);
+}
+
+table.result tr[data-row-type="lunch"] td{
+  padding:7px 14px;
+  text-align:center;
+  font-size:12px;
+  letter-spacing:.08em;
+  color:var(--muted);
+  background:#f8f9f7;
+  border-top:1px dashed var(--line);
+  border-bottom:1px dashed var(--line);
+}
+
+table.result .edit-button{
+  width:186px;
+  text-align:right;
+  white-space:nowrap;
+}
+
+table.result .edit-button button{
+  padding:3px 7px;
+  font-size:12px;
+  color:var(--muted);
+}
+
+button.sort-button{margin-top:8px;font-size:12px;}
+
+#result .schedule-note{
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px solid var(--line);
+  font-size:12.5px;
+  color:var(--muted);
   text-align:center;
 }
 
-table.result th{
-  background:#eee;
+@media (max-width:640px){
+  body{padding:20px 14px 48px;}
+  .card{padding:15px;}
+  table.result tbody tr:not([data-row-type="lunch"]) td:first-child{width:74px;padding-right:12px;}
 }
 
-.notice{
-  background:#fff8dc;
-  border:1px solid #e0c97f;
-  border-radius:8px;
-  padding:10px;
-  margin-top:10px;
-  line-height:1.7;
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;}
 }
 
 @media print{
-  .edit-button{
-    display:none;
-  }
-
-  .box{
-    display:none;
-  }
-
-  h1{
-    display:none;
-  }
-
-  body{
-    background:white;
-    margin:0;
-  }
+  body{background:#fff;padding:0;color:#000;}
+  .masthead,.card,.edit-button{display:none;}
+  #result h2{margin:0 0 6px;font-size:17px;}
+  #result h3{margin:14px 0 0;color:#000;}
+  table.result{border:1px solid #999;border-radius:0;}
+  table.result th{background:#f2f2f2;color:#000;}
+  table.result td{padding:8px 12px;}
+  table.result tbody tr:not([data-row-type="lunch"]) td:first-child{border-right:1.5px solid #999;color:#000;}
+  table.result tbody tr:not([data-row-type="lunch"]) td:first-child::after{background:#000;box-shadow:0 0 0 3px #fff;}
+  #result .schedule-note{color:#333;}
 }
+
 </style>
 </head>
 
 <body>
 
-<h1>광주365재활병원 주말 및 공휴일 시간표 생성기</h1>
+<header class="masthead">
+  <p class="eyebrow">광주365재활병원 재활치료실</p>
+  <h1>주말 · 공휴일 개인 시간표</h1>
+</header>
 
-<div class="box">
+<main>
 
-<h3>사용 방법</h3>
+<section class="card">
 
-<ol style="line-height:1.8;">
-  <li>시놀로지에서 <b>신경계일일업무보고</b> 시트를 엽니다.</li>
+  <ol class="steps">
+    <li>
+      시놀로지에서 <b>신경계 일일업무보고</b> 시트를 열고
+      <kbd>Ctrl</kbd>+<kbd>A</kbd> <kbd>Ctrl</kbd>+<kbd>C</kbd> 로 전체 복사합니다.
+    </li>
+    <li>
+      아래 표의 아무 칸이나 클릭해 <kbd>Ctrl</kbd>+<kbd>V</kbd> 로 붙여넣고,
+      날짜를 입력한 뒤 <b>시트 추가</b>를 누릅니다.
+    </li>
+    <li>
+      토요일 · 일요일 시트는 각각 추가한 뒤,
+      환자 이름을 넣고 <b>시간표 만들기</b>를 누릅니다.
+    </li>
+  </ol>
 
-  <li><b>Ctrl + A</b> 를 눌러 시트 전체 선택 후 <b>Ctrl + C</b> 를 눌러 복사합니다.</li>
+  <div class="toolbar">
+    <input id="monthInput" class="date-field" type="number" placeholder="월">
+    <input id="dayInput" class="date-field" type="number" placeholder="일">
 
-  <li>
-    아래 큰 표의 아무 칸이나 클릭한 뒤
-    <b>Ctrl + V</b> 로 붙여넣습니다.
-  </li>
+    <select id="weekdayInput">
+      <option value="">요일</option>
+      <option value="월">월</option>
+      <option value="화">화</option>
+      <option value="수">수</option>
+      <option value="목">목</option>
+      <option value="금">금</option>
+      <option value="토">토</option>
+      <option value="일">일</option>
+    </select>
 
-  <li>
-    월 / 일 / 요일 입력 후
-    <b>[현재 표를 주말 시트에 추가]</b>
-    버튼을 누릅니다.
-  </li>
+    <button class="primary" onclick="addCurrentSheet()">시트 추가</button>
 
-  <li>
-    토요일 / 일요일 시트가 따로 있으면
-    각각 같은 방식으로 추가합니다.
-  </li>
+    <span class="spacer"></span>
 
-  <li>
-    환자 이름을 입력한 뒤
-    <b>[개인 시간표 보기]</b> 버튼을 누릅니다.
-  </li>
-</ol>
+    <button onclick="clearGrid()">붙여넣은 표 지우기</button>
+    <button onclick="clearSheets()">시트 전체 삭제</button>
+  </div>
 
-<div style="margin:10px 0;">
-  <input id="monthInput" type="number" placeholder="월" style="width:70px;">
-  <input id="dayInput" type="number" placeholder="일" style="width:70px;">
+  <p id="sheetStatus" class="status">아직 추가한 시트가 없습니다.</p>
 
-  <select id="weekdayInput">
-    <option value="">요일</option>
-    <option value="월">월</option>
-    <option value="화">화</option>
-    <option value="수">수</option>
-    <option value="목">목</option>
-    <option value="금">금</option>
-    <option value="토">토</option>
-    <option value="일">일</option>
-  </select>
-</div>
+  <div id="sheetLayout"></div>
 
-<button onclick="addCurrentSheet()">
-현재 표를 주말 시트에 추가
-</button>
+  <div id="sheetWrap">
+    <table id="sheetGrid" class="sheet-table"></table>
+  </div>
 
-<button onclick="clearGrid()">
-현재 표 지우기
-</button>
+</section>
 
-<button onclick="clearSheets()">
-추가한 시트 전체 초기화
-</button>
-
-<p id="sheetStatus">
-아직 추가한 시트가 없습니다.
-</p>
-
-<div id="sheetWrap">
-  <table id="sheetGrid" class="sheet-table"></table>
-</div>
-
-</div>
-
-<div class="box">
-
-<input
-  type="text"
-  id="patientInput"
-  placeholder="환자명 입력 예: 김아무개"
-/>
-
-<button onclick="makeSchedule()">
-개인 시간표 보기
-</button>
-
-<button onclick="findPatientPositions()">
-환자명 위치 확인
-</button>
-
-<button onclick="window.print()">
-출력
-</button>
-
-</div>
+<section class="card">
+  <div class="toolbar">
+    <input type="text" id="patientInput" placeholder="환자 이름 (예: 김아무개)">
+    <button class="primary" onclick="makeSchedule()">시간표 만들기</button>
+    <button onclick="findPatientPositions()">이름 위치 찾기</button>
+    <span class="spacer"></span>
+    <button onclick="window.print()">인쇄</button>
+  </div>
+</section>
 
 <div id="result"></div>
 
+</main>
+
 <script>
 
-const ROWS = 60;
-const COLS = 93;
+const ROWS = 70;
+const COLS = 110;
+
+let cellRefs = [];
 
 let pastedSheets = [];
+
+/* 층 표기는 뒤에 괄호로 붙입니다. 예) 회복기재활치료-임희정 (1층)
+   3층은 기본이라 표시하지 않습니다. */
+function withFloor(floor, treatment){
+
+  if(!floor) return treatment;
+  if(floor === "3층") return treatment;
+
+  return treatment + " (" + floor + ")";
+}
 
 const sections = [
   {
     label:"PT",
+    floor:"3층",
     therapistRow:3,
     startRow:4,
     endRow:18,
@@ -253,6 +573,7 @@ const sections = [
   },
   {
     label:"작업치료",
+    floor:"3층",
     therapistRow:22,
     startRow:23,
     endRow:38,
@@ -260,7 +581,8 @@ const sections = [
     endCol:25
   },
   {
-    label:"1층 근골격계",
+    label:"근골격계",
+    floor:"1층",
     therapistRow:42,
     startRow:43,
     endRow:60,
@@ -281,6 +603,563 @@ const specialCodes = {
   "16":"도수"
 };
 
+/* 로봇치료 코드표
+   시간표 칸에 "GR환자명코드" 형태로 적힌 경우 로봇치료로 인식합니다.
+   예) H오태인 / GR오태인MW  →  회복기재활치료(로봇-모닝워크)
+   새 로봇이 생기면 아래에 "코드":"로봇이름" 한 줄만 추가하면 됩니다. */
+const robotCodes = {
+  "RBOT":"알봇",
+  "MW":"모닝워크",
+  "AR":"엔젤렉스"
+};
+
+function robotPattern(){
+
+  const codes =
+    Object.keys(robotCodes)
+      .sort((a,b) => b.length - a.length)
+      .join("|");
+
+  return new RegExp(
+    "GR([가-힣A-Za-z0-9()·.]*?)(" + codes + ")",
+    "gi"
+  );
+}
+
+function findRobotName(cellCompact, targetName){
+
+  const pattern = robotPattern();
+
+  let match;
+
+  while((match = pattern.exec(cellCompact)) !== null){
+
+    const name = compact(match[1]);
+
+    if(name.includes(targetName) || targetName.includes(name)){
+
+      return robotCodes[match[2].toUpperCase()] || "";
+    }
+  }
+
+  return "";
+}
+
+function stripRobotSegments(cellCompact, targetName){
+
+  return cellCompact.replace(
+    robotPattern(),
+    (whole, name) => {
+
+      const compactName = compact(name);
+
+      const isTarget =
+        compactName.includes(targetName) ||
+        targetName.includes(compactName);
+
+      return isTarget ? "" : whole;
+    }
+  );
+}
+
+/* ===== 시간표 구조 자동 인식 =====
+   시트의 머리글(PT(토), OT(일), 기구, 전기(14), 통증, CPM)을 찾아서
+   행·열 위치를 그때그때 계산합니다.
+   치료사가 늘거나 줄어도, 표가 위아래/좌우로 옮겨져도 따라갑니다.
+   인식에 실패하면 아래 sections 고정값으로 자동 전환됩니다. */
+
+const anchorTypes = [
+  {
+    kind:"therapist",
+    label:"PT",
+    test:text => /^PT(\(|$)/.test(text)
+  },
+  {
+    kind:"therapist",
+    label:"작업치료",
+    test:text => /^OT(\(|$)/.test(text)
+  },
+  {
+    kind:"machine",
+    label:"기구",
+    test:text => text === "기구"
+  },
+  {
+    kind:"machine",
+    label:"CPM",
+    fixedName:"CPM",
+    test:text => text === "CPM"
+  },
+  {
+    kind:"electric",
+    label:"전기치료",
+    test:text => /^전기(\(|$)/.test(text)
+  },
+  {
+    kind:"electric",
+    label:"물리치료",
+    test:text => text === "통증"
+  }
+];
+
+/* 머리글 앞에 붙은 층 표시를 읽습니다.
+   "근골PT(일)" → 1층 / "1층기구" → 1층 / "3층OT(토)" → 3층
+   이렇게 적어두면 추측 없이 층이 확정됩니다. */
+/* 하늘색으로 칠한 치료사 이름 = 근골(1층)
+   색은 병원마다/파일마다 조금씩 달라서 정확한 색 하나를 찍지 않고
+   "파란 계열의 밝은 색"이면 하늘색으로 봅니다. */
+function toRgb(color){
+
+  const text =
+    String(color).trim().toLowerCase();
+
+  const hex =
+    text.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/);
+
+  if(hex){
+
+    let value = hex[1];
+
+    if(value.length === 3)
+      value = value[0]+value[0]+value[1]+value[1]+value[2]+value[2];
+
+    return [
+      parseInt(value.slice(0,2),16),
+      parseInt(value.slice(2,4),16),
+      parseInt(value.slice(4,6),16)
+    ];
+  }
+
+  const rgb =
+    text.match(/rgba?\(([^)]+)\)/);
+
+  if(rgb){
+
+    const parts =
+      rgb[1].split(",").map(v => parseFloat(v));
+
+    if(parts.length >= 3)
+      return [parts[0], parts[1], parts[2]];
+  }
+
+  return null;
+}
+
+/* 근골(1층) 표시 색.
+   여기 적힌 색으로 칠해진 치료사 이름칸만 1층으로 봅니다.
+   색이 추가되면 아래 목록에 한 줄만 더 넣으면 됩니다. */
+const firstFloorColors = ["#cce6ff"];
+
+function isFirstFloorColor(color){
+
+  const rgb = toRgb(color);
+
+  if(!rgb) return false;
+
+  return firstFloorColors.some(target=>{
+
+    const want = toRgb(target);
+
+    if(!want) return false;
+
+    return Math.abs(rgb[0] - want[0]) <= 8 &&
+      Math.abs(rgb[1] - want[1]) <= 8 &&
+      Math.abs(rgb[2] - want[2]) <= 8;
+  });
+}
+
+function splitFloorPrefix(text){
+
+  const match =
+    text.match(/^(근골|(\d)층)/);
+
+  if(!match)
+    return { floor:"", rest:text };
+
+  return {
+    floor: match[2] ? match[2] + "층" : "1층",
+    rest: text.slice(match[0].length)
+  };
+}
+
+function isTimeText(value){
+
+  return /^\d{1,2}\s*[:시]\s*\d{2}/
+    .test(normalize(value));
+}
+
+function hasTimeBelow(rows, r, c){
+
+  for(let rr=r+1; rr<=r+3; rr++){
+
+    const row = rows[rr];
+
+    if(!row) continue;
+
+    if(isTimeText(row[c]))
+      return true;
+  }
+
+  return false;
+}
+
+function findRowTime(row, fromCol){
+
+  for(
+    let c = fromCol - 1;
+    c >= 0 && c >= fromCol - 20;
+    c--
+  ){
+
+    if(isTimeText(row[c]))
+      return normalize(row[c]);
+  }
+
+  return "";
+}
+
+function detectLayout(rows, colors){
+
+  const anchors = [];
+
+  for(let r=0; r<rows.length; r++){
+
+    const row = rows[r] || [];
+
+    for(let c=0; c<row.length; c++){
+
+      const text = compact(row[c]);
+
+      if(!text) continue;
+
+      const parsed = splitFloorPrefix(text);
+
+      const type =
+        anchorTypes.find(item => item.test(parsed.rest));
+
+      if(!type) continue;
+
+      if(!hasTimeBelow(rows, r, c))
+        continue;
+
+      anchors.push({
+        row:r,
+        col:c,
+        kind:type.kind,
+        label:type.label,
+        fixedName:type.fixedName || "",
+        prefixFloor:parsed.floor
+      });
+    }
+  }
+
+  if(anchors.length === 0)
+    return [];
+
+  const anchorKeys =
+    new Set(anchors.map(a => a.row + "," + a.col));
+
+  const floors =
+    detectFloors(rows);
+
+  const colorGrid = colors || [];
+
+
+
+  anchors.forEach(anchor=>{
+
+    anchor.endRow =
+      findBlockEndRow(rows, anchors, anchor);
+
+    anchor.cols =
+      collectBlockCols(rows, anchor, anchorKeys);
+
+    if(anchor.kind === "therapist"){
+
+      anchor.cols.forEach(col=>{
+
+        col.color =
+          (colorGrid[anchor.row] || [])[col.col] || "";
+
+        if(isFirstFloorColor(col.color))
+          col.floor = "1층";
+      });
+    }
+  });
+
+  anchors.forEach(anchor=>{
+
+    const colored =
+      anchor.cols.filter(col => col.floor === "1층").length;
+
+    if(colored > 0 && colored === anchor.cols.length){
+
+      anchor.floor = "1층";
+      anchor.floorKnown = true;
+      anchor.skyBlue = true;
+
+      return;
+    }
+
+    const resolved =
+      resolveFloor(rows, anchors, anchor, floors);
+
+    anchor.floor = resolved.floor;
+    anchor.floorKnown = resolved.known;
+    anchor.skyBlue = colored > 0;
+  });
+
+  return anchors.filter(a => a.cols.length > 0);
+}
+
+/* 같은 시간열을 쓰는 다음 머리글 전까지,
+   그리고 시간이 실제로 적혀 있는 마지막 줄까지를 한 덩어리로 봅니다. */
+function findBlockEndRow(rows, anchors, anchor){
+
+  const nextSameCol =
+    anchors
+      .filter(other =>
+        other.col === anchor.col &&
+        other.row > anchor.row
+      )
+      .map(other => other.row)
+      .sort((a,b) => a - b)[0];
+
+  const limit =
+    (nextSameCol === undefined
+      ? rows.length
+      : nextSameCol) - 1;
+
+  let lastTimeRow = anchor.row;
+  let gap = 0;
+
+  for(let r = anchor.row + 1; r <= limit; r++){
+
+    const row = rows[r] || [];
+
+    if(isTimeText(row[anchor.col])){
+
+      lastTimeRow = r;
+      gap = 0;
+
+    }else{
+
+      gap++;
+
+      if(gap > 6) break;
+    }
+  }
+
+  return lastTimeRow;
+}
+
+/* 1층 판별
+   제목줄("...주말시간표 (1층)")이 없거나, 표를 위로 올려 3층 옆에 붙여도
+   알 수 있도록 블록 단위로 따집니다.
+
+   1) 기구 블록  : 그 블록 열에 1층 전용 기구(리포머·캐포머·슬라이드·
+                   오토사이클)가 2개 이상 있으면 1층
+   2) CPM 블록   : CPM은 1층에만 있으므로 무조건 1층
+   3) PT/OT/통증 : 같은 줄에서 오른쪽으로 가장 먼저 나오는 기구·CPM
+                   블록을 따라감 (한 표는 치료사 → 기구 순서로 붙어 있음)
+   4) 그래도 모르면 제목줄을 봅니다. */
+const firstFloorHeaders =
+  /^(리포머|캐포머|케포머|슬라이드|오토사이클)(\(\d+\))?$/;
+
+function floorFromMachines(rows, anchors, anchor){
+
+  if(anchor.kind === "machine"){
+
+    if(anchor.prefixFloor)
+      return anchor.prefixFloor;
+
+    if(anchor.fixedName === "CPM")
+      return "1층";
+
+    const header = rows[anchor.row] || [];
+
+    let count = 0;
+
+    anchor.cols.forEach(col=>{
+
+      if(firstFloorHeaders.test(compact(header[col.col])))
+        count++;
+    });
+
+    return count >= 2 ? "1층" : "";
+  }
+
+  const rightMachine =
+    anchors
+      .filter(other =>
+        other.row === anchor.row &&
+        other.kind === "machine" &&
+        other.col > anchor.col &&
+        other.cols.length > 0
+      )
+      .sort((a,b) => a.col - b.col)[0];
+
+  return rightMachine
+    ? floorFromMachines(rows, anchors, rightMachine)
+    : "";
+}
+
+/* 같은 줄 왼쪽에 "근골..." 같은 층 표시가 있으면 물려받습니다.
+   층 표시 없는 PT/OT를 만나면 다른 표로 보고 멈춥니다. */
+function floorFromLeft(anchors, anchor){
+
+  const leftBlocks =
+    anchors
+      .filter(other =>
+        other.row === anchor.row &&
+        other.col < anchor.col &&
+        other.cols.length > 0
+      )
+      .sort((a,b) => b.col - a.col);
+
+  for(const other of leftBlocks){
+
+    if(other.prefixFloor)
+      return other.prefixFloor;
+
+    if(other.kind === "therapist")
+      return "";
+  }
+
+  return "";
+}
+
+function resolveFloor(rows, anchors, anchor, floors){
+
+  const candidates = [
+    anchor.prefixFloor,
+    floorFromMachines(rows, anchors, anchor),
+    floorFromLeft(anchors, anchor),
+    floorOfRow(floors, anchor.row)
+  ];
+
+  const floor =
+    candidates.find(value => value);
+
+  return floor
+    ? { floor, known:true }
+    : { floor:"3층", known:false };
+}
+
+function detectFloors(rows){
+
+  const found = [];
+
+  rows.forEach((row,r)=>{
+
+    (row || []).forEach(value=>{
+
+      const text = normalize(value);
+
+      if(!text.includes("시간표")) return;
+
+      const match =
+        text.match(/\((\d)층\)/);
+
+      if(match){
+        found.push({ row:r, floor:match[1] + "층" });
+      }
+    });
+  });
+
+  return found;
+}
+
+function floorOfRow(floors, r){
+
+  let floor = "";
+
+  floors.forEach(item=>{
+
+    if(item.row <= r)
+      floor = item.floor;
+  });
+
+  return floor;
+}
+
+function collectBlockCols(rows, anchor, anchorKeys){
+
+  const header = rows[anchor.row] || [];
+  const cols = [];
+
+  if(anchor.kind === "electric"){
+
+    let start = -1;
+
+    for(
+      let c = anchor.col + 1;
+      c <= anchor.col + 4 && c < header.length;
+      c++
+    ){
+
+      if(/^\d+$/.test(compact(header[c]))){
+        start = c;
+        break;
+      }
+    }
+
+    if(start < 0) return [];
+
+    for(let c=start; c<header.length; c++){
+
+      if(!/^\d+$/.test(compact(header[c])))
+        break;
+
+      cols.push({ col:c, name:anchor.label });
+    }
+
+    return cols;
+  }
+
+  for(
+    let c = anchor.col + 1;
+    c < header.length;
+    c++
+  ){
+
+    if(anchorKeys.has(anchor.row + "," + c))
+      break;
+
+    const name = normalize(header[c]);
+
+    if(!name) break;
+
+    cols.push({
+      col:c,
+      name:anchor.fixedName || name
+    });
+  }
+
+  return cols;
+}
+
+function layoutSummary(layout){
+
+  if(layout.length === 0)
+    return "구조 자동 인식 실패 → 기본 설정으로 처리합니다.";
+
+  return layout.map(block=>{
+
+    const first = block.cols[0].col;
+    const last = block.cols[block.cols.length-1].col;
+
+    return "· " +
+      block.floor +
+      (block.floorKnown ? " " : "(추정) ") +
+      block.label +
+      " : " + (block.row + 1) + "행 / " +
+      columnName(first) + "~" + columnName(last) +
+      "열";
+
+  }).join("\n");
+}
+
 window.addEventListener("DOMContentLoaded", () => {
 
   createGrid();
@@ -295,12 +1174,342 @@ window.addEventListener("DOMContentLoaded", () => {
     });
 });
 
+function renderSheetLayout(){
+
+  const wrap =
+    document.getElementById("sheetLayout");
+
+  wrap.innerHTML = "";
+
+  pastedSheets.forEach((sheet, sheetIndex)=>{
+
+    const box =
+      document.createElement("details");
+
+    box.className = "layout-box";
+
+    const summary =
+      document.createElement("summary");
+
+    summary.appendChild(
+      document.createTextNode(
+        sheet.sheetName + " — " + sheetSummaryText(sheet)
+      )
+    );
+
+    const removeButton =
+      document.createElement("button");
+
+    removeButton.type = "button";
+    removeButton.className = "delete-sheet";
+    removeButton.textContent = "이 시트 삭제";
+
+    removeButton.onclick = event => {
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      removeSheet(sheetIndex);
+    };
+
+    summary.appendChild(removeButton);
+
+    box.appendChild(summary);
+
+    if(!sheet.layout || sheet.layout.length === 0){
+
+      const note =
+        document.createElement("p");
+
+      note.textContent =
+        "머리글을 찾지 못해 기본 설정(PT 4행 / OT 23행 / 1층 43행)으로 처리합니다.";
+
+      box.appendChild(note);
+      wrap.appendChild(box);
+
+      return;
+    }
+
+    box.open =
+      sheet.layout.some(block => !block.floorKnown);
+
+    const table =
+      document.createElement("table");
+
+    sheet.layout.forEach((block, blockIndex)=>{
+
+      const first = block.cols[0].col;
+      const last = block.cols[block.cols.length-1].col;
+
+      const tr =
+        document.createElement("tr");
+
+      const floorCell =
+        document.createElement("td");
+
+      const select =
+        document.createElement("select");
+
+      ["1층","2층","3층"].forEach(floor=>{
+
+        const option =
+          document.createElement("option");
+
+        option.value = floor;
+        option.textContent = floor;
+        option.selected = (floor === block.floor);
+
+        select.appendChild(option);
+      });
+
+      if(!block.floorKnown)
+        select.className = "floor-guess";
+
+      select.onchange = () => {
+
+        block.floor = select.value;
+        block.floorKnown = true;
+
+        block.cols.forEach(col => { delete col.floor; });
+
+        renderSheetLayout();
+        refreshScheduleIfShown();
+      };
+
+      floorCell.appendChild(select);
+
+      tr.appendChild(floorCell);
+
+      const nameCell =
+        document.createElement("td");
+
+      const colored =
+        block.cols
+          .filter(col => col.floor === "1층")
+          .map(col => col.name);
+
+      nameCell.textContent =
+        block.label +
+        (colored.length
+          ? " — 하늘색 1층 : " + colored.join(", ")
+          : "") +
+        (block.floorKnown ? "" : " (추정 — 확인해주세요)");
+
+      tr.appendChild(nameCell);
+
+      const placeCell =
+        document.createElement("td");
+
+      placeCell.style.color = "#666";
+
+      placeCell.textContent =
+        (block.row + 1) + "행 / " +
+        columnName(first) + "~" + columnName(last) + "열";
+
+      tr.appendChild(placeCell);
+
+      table.appendChild(tr);
+    });
+
+    box.appendChild(table);
+
+    renderColorPicker(box, sheet);
+
+    wrap.appendChild(box);
+  });
+}
+
+/* 치료사 이름칸에 쓰인 색을 모아 보여주고, 어떤 색이 1층인지 직접 고르게 합니다. */
+function collectColorGroups(layout){
+
+  const groups = [];
+
+  layout.forEach(block=>{
+
+    if(block.kind !== "therapist") return;
+
+    block.cols.forEach(col=>{
+
+      if(!col.color) return;
+
+      const key = compact(col.color).toLowerCase();
+
+      let group =
+        groups.find(item => item.key === key);
+
+      if(!group){
+
+        group = {
+          key,
+          color: col.color,
+          names: [],
+          cols: []
+        };
+
+        groups.push(group);
+      }
+
+      group.cols.push(col);
+
+      if(!group.names.includes(col.name))
+        group.names.push(col.name);
+    });
+  });
+
+  return groups;
+}
+
+function renderColorPicker(box, sheet){
+
+  const groups =
+    collectColorGroups(sheet.layout);
+
+  if(groups.length === 0) return;
+
+  const title =
+    document.createElement("div");
+
+  title.className = "color-title";
+  title.textContent =
+    "치료사 이름칸 색 — 1층(근골) 색에만 체크해주세요";
+
+  box.appendChild(title);
+
+  groups.forEach(group=>{
+
+    const line =
+      document.createElement("label");
+
+    line.className = "color-line";
+
+    const check =
+      document.createElement("input");
+
+    check.type = "checkbox";
+
+    check.checked =
+      group.cols.every(col => col.floor === "1층");
+
+    check.onchange = () => {
+
+      group.cols.forEach(col=>{
+
+        if(check.checked)
+          col.floor = "1층";
+        else
+          delete col.floor;
+      });
+
+      renderSheetLayout();
+      refreshScheduleIfShown();
+    };
+
+    const swatch =
+      document.createElement("span");
+
+    swatch.className = "color-chip";
+    swatch.style.background = group.color;
+
+    const names =
+      document.createElement("span");
+
+    names.textContent =
+      group.names.join(", ");
+
+    line.appendChild(check);
+    line.appendChild(swatch);
+    line.appendChild(names);
+
+    box.appendChild(line);
+  });
+}
+
+function sheetSummaryText(sheet){
+
+  if(!sheet.layout || sheet.layout.length === 0)
+    return "머리글 인식 실패";
+
+  const colored =
+    sheet.layout.reduce((sum, block)=>
+      sum + block.cols.filter(col => col.floor === "1층").length
+    , 0);
+
+  const unknown =
+    sheet.layout.filter(block => !block.floorKnown).length;
+
+  return "표 " + sheet.layout.length + "개" +
+    (colored ? " · 근골 " + colored + "명" : "") +
+    (unknown ? " · 확인 필요 " + unknown + "개" : "");
+}
+
+function removeSheet(index){
+
+  const sheet = pastedSheets[index];
+
+  if(!sheet) return;
+
+  if(!confirm(sheet.sheetName + " 을(를) 삭제할까요?"))
+    return;
+
+  pastedSheets.splice(index, 1);
+
+  updateSheetStatus();
+  renderSheetLayout();
+
+  if(pastedSheets.length === 0){
+
+    document.getElementById("result").innerHTML = "";
+    return;
+  }
+
+  refreshScheduleIfShown();
+}
+
+function updateSheetStatus(){
+
+  const status =
+    document.getElementById("sheetStatus");
+
+  if(pastedSheets.length === 0){
+
+    status.textContent =
+      "아직 추가한 시트가 없습니다.";
+
+    return;
+  }
+
+  status.textContent =
+    "추가한 시트 수 : " +
+    pastedSheets.length +
+    " / " +
+    pastedSheets.map(sheet => sheet.sheetName).join(", ");
+}
+
+function refreshScheduleIfShown(){
+
+  const patientName =
+    normalize(
+      document.getElementById("patientInput").value
+    );
+
+  const result =
+    document.getElementById("result");
+
+  if(!patientName) return;
+
+  if(!result.innerHTML) return;
+
+  makeSchedule();
+}
+
 function createGrid(){
 
   const table =
     document.getElementById("sheetGrid");
 
   table.innerHTML = "";
+
+  cellRefs = [];
 
   const thead =
     document.createElement("thead");
@@ -364,6 +1573,9 @@ function createGrid(){
         handlePaste
       );
 
+      if(!cellRefs[r]) cellRefs[r] = [];
+      cellRefs[r][c] = div;
+
       td.appendChild(div);
 
       row.appendChild(td);
@@ -385,15 +1597,16 @@ function handlePaste(event){
   const text =
     event.clipboardData.getData("text/plain");
 
-  const startRow = 0;
-  const startCol = 0;
-
   let rows = [];
+  let colors = [];
 
   if(html && html.includes("<table")){
 
-    rows =
+    const parsed =
       parseHtmlTableWithMergedCells(html);
+
+    rows = parsed.values;
+    colors = parsed.colors;
 
   }else{
 
@@ -409,23 +1622,24 @@ function handlePaste(event){
 
   clearGrid();
 
-  rows.forEach((row,rOffset)=>{
+  rows.forEach((row,r)=>{
 
-    row.forEach((value,cOffset)=>{
-
-      const r = startRow + rOffset;
-      const c = startCol + cOffset;
+    row.forEach((value,c)=>{
 
       if(r >= ROWS || c >= COLS) return;
 
       const cell =
-        document.querySelector(
-          `.cell[data-row="${r}"][data-col="${c}"]`
-        );
+        (cellRefs[r] || [])[c];
 
-      if(cell){
-        cell.innerText = normalize(value);
-      }
+      if(!cell) return;
+
+      cell.innerText = normalize(value);
+
+      const color =
+        (colors[r] || [])[c] || "";
+
+      if(color)
+        cell.style.background = color;
     });
   });
 }
@@ -441,9 +1655,14 @@ function parseHtmlTableWithMergedCells(html){
   const table =
     doc.querySelector("table");
 
-  if(!table) return [];
+  if(!table)
+    return { values:[], colors:[] };
 
-  const result = [];
+  const classColors =
+    buildClassColors(doc);
+
+  const values = [];
+  const colors = [];
   const occupied = {};
 
   const trList =
@@ -451,7 +1670,8 @@ function parseHtmlTableWithMergedCells(html){
 
   trList.forEach((tr,r)=>{
 
-    if(!result[r]) result[r] = [];
+    if(!values[r]) values[r] = [];
+    if(!colors[r]) colors[r] = [];
 
     let c = 0;
 
@@ -465,7 +1685,10 @@ function parseHtmlTableWithMergedCells(html){
       }
 
       const value =
-        normalize(cell.innerText);
+        normalize(cell.innerText || cell.textContent);
+
+      const color =
+        cellBackground(cell, classColors);
 
       const rowspan =
         parseInt(
@@ -486,11 +1709,11 @@ function parseHtmlTableWithMergedCells(html){
           const targetR = r + rr;
           const targetC = c + cc;
 
-          if(!result[targetR]){
-            result[targetR] = [];
-          }
+          if(!values[targetR]) values[targetR] = [];
+          if(!colors[targetR]) colors[targetR] = [];
 
-          result[targetR][targetC] = value;
+          values[targetR][targetC] = value;
+          colors[targetR][targetC] = color;
 
           occupied[
             `${targetR},${targetC}`
@@ -502,7 +1725,73 @@ function parseHtmlTableWithMergedCells(html){
     });
   });
 
-  return result;
+  return { values, colors };
+}
+
+/* 엑셀은 배경색을 칸에 직접 쓰기도 하고
+   <style> 안에 .xl65 { background:#00B0F0 } 식으로 쓰기도 해서 둘 다 봅니다. */
+function buildClassColors(doc){
+
+  const map = {};
+
+  Array.from(doc.querySelectorAll("style")).forEach(styleTag=>{
+
+    styleTag.textContent.split("}").forEach(chunk=>{
+
+      const parts = chunk.split("{");
+
+      if(parts.length < 2) return;
+
+      const match =
+        parts[1].match(
+          /background(?:-color)?\s*:\s*([^;]+)/i
+        );
+
+      if(!match) return;
+
+      parts[0].split(",").forEach(selector=>{
+
+        const name =
+          selector.trim().replace(/^\./,"");
+
+        if(name)
+          map[name] = match[1].trim();
+      });
+    });
+  });
+
+  return map;
+}
+
+function cellBackground(cell, classColors){
+
+  const inline =
+    cell.getAttribute("style") || "";
+
+  const match =
+    inline.match(
+      /background(?:-color)?\s*:\s*([^;"']+)/i
+    );
+
+  if(match)
+    return match[1].trim();
+
+  const bgcolor =
+    cell.getAttribute("bgcolor");
+
+  if(bgcolor)
+    return bgcolor.trim();
+
+  const classList =
+    (cell.getAttribute("class") || "").split(/\s+/);
+
+  for(const name of classList){
+
+    if(classColors[name])
+      return classColors[name];
+  }
+
+  return "";
 }
 
 function addCurrentSheet(){
@@ -555,18 +1844,20 @@ function addCurrentSheet(){
       (pastedSheets.length + 1);
   }
 
+  const colors =
+    getGridColors();
+
+  const layout =
+    detectLayout(rows, colors);
+
   pastedSheets.push({
     sheetName,
-    rows
+    rows,
+    colors,
+    layout
   });
 
-  document.getElementById(
-    "sheetStatus"
-  ).innerText =
-    "추가한 시트 수 : " +
-    pastedSheets.length +
-    " / " +
-    pastedSheets.map(sheet => sheet.sheetName).join(", ");
+  updateSheetStatus();
 
   clearGrid();
 
@@ -574,7 +1865,20 @@ function addCurrentSheet(){
   document.getElementById("dayInput").value = "";
   document.getElementById("weekdayInput").value = "";
 
-  alert(sheetName + " 추가 완료");
+  renderSheetLayout();
+
+  const unknown =
+    layout.filter(block => !block.floorKnown).length;
+
+  alert(
+    sheetName + " 추가 완료\n\n" +
+    "[인식된 표 구조]\n" +
+    layoutSummary(layout) +
+    (unknown
+      ? "\n\n※ 층을 확정하지 못한 표가 " + unknown +
+        "개 있습니다.\n아래 목록에서 노란색으로 표시된 곳의 층을 확인해주세요."
+      : "")
+  );
 }
 
 function getGridRows(){
@@ -588,9 +1892,7 @@ function getGridRows(){
     for(let c=0;c<COLS;c++){
 
       const cell =
-        document.querySelector(
-          `.cell[data-row="${r}"][data-col="${c}"]`
-        );
+        (cellRefs[r] || [])[c];
 
       row.push(
         cell
@@ -605,6 +1907,32 @@ function getGridRows(){
   return rows;
 }
 
+function getGridColors(){
+
+  const colors = [];
+
+  for(let r=0;r<ROWS;r++){
+
+    const row = [];
+
+    for(let c=0;c<COLS;c++){
+
+      const cell =
+        (cellRefs[r] || [])[c];
+
+      row.push(
+        cell
+          ? (cell.style.background || "")
+          : ""
+      );
+    }
+
+    colors.push(row);
+  }
+
+  return colors;
+}
+
 function clearGrid(){
 
   document
@@ -612,6 +1940,7 @@ function clearGrid(){
     .forEach(cell => {
 
       cell.innerText = "";
+      cell.style.background = "";
     });
 }
 
@@ -619,14 +1948,13 @@ function clearSheets(){
 
   pastedSheets = [];
 
-  document.getElementById(
-    "sheetStatus"
-  ).innerText =
-    "아직 추가한 시트가 없습니다.";
+  updateSheetStatus();
 
   document.getElementById(
     "result"
   ).innerHTML = "";
+
+  renderSheetLayout();
 }
 
 function findPatientPositions(){
@@ -731,6 +2059,25 @@ function parseSchedule(patientName){
 
     const rows = sheet.rows;
 
+    const layout =
+      sheet.layout && sheet.layout.length
+        ? sheet.layout
+        : detectLayout(rows, sheet.colors || []);
+
+    if(layout.length > 0){
+
+      parseWithLayout(
+        rows,
+        layout,
+        results,
+        sheetIndex,
+        sheet.sheetName,
+        targetName
+      );
+
+      return;
+    }
+
     parseMainTherapies(
       rows,
       results,
@@ -787,6 +2134,83 @@ function parseSchedule(patientName){
   });
 
   return filteredResults;
+}
+
+function parseWithLayout(
+  rows,
+  layout,
+  results,
+  sheetIndex,
+  dayTitle,
+  targetName
+){
+
+  layout.forEach(block=>{
+
+    const firstCol = block.cols[0].col;
+
+    for(
+      let r = block.row + 1;
+      r <= Math.min(block.endRow, rows.length - 1);
+      r++
+    ){
+
+      const row = rows[r] || [];
+
+      const time =
+        isTimeText(row[block.col])
+          ? normalize(row[block.col])
+          : findRowTime(row, firstCol);
+
+      if(!time) continue;
+
+      if(time.includes("12:30"))
+        continue;
+
+      block.cols.forEach(col=>{
+
+        const cellText =
+          normalize(row[col.col]);
+
+        if(!cellText) return;
+
+        const cellCompact =
+          compact(cellText);
+
+        if(!cellCompact.includes(targetName))
+          return;
+
+        let treatment;
+
+        if(block.kind === "therapist"){
+
+          treatment =
+            makeTreatmentName(
+              cellCompact,
+              targetName,
+              block.label,
+              col.name
+            );
+
+        }else if(block.kind === "machine"){
+
+          treatment = "기구-" + col.name;
+
+        }else{
+
+          treatment = col.name;
+        }
+
+        results.push({
+          sheetIndex,
+          dayTitle,
+          time,
+          sortTime: timeOrder(time),
+          treatment: withFloor(col.floor || block.floor, treatment)
+        });
+      });
+    }
+  });
 }
 
 function parseMainTherapies(
@@ -852,7 +2276,7 @@ function parseMainTherapies(
           dayTitle,
           time,
           sortTime: timeOrder(time),
-          treatment
+          treatment: withFloor(section.floor, treatment)
         });
       }
     }
@@ -894,7 +2318,7 @@ function parseFirstFloorPT(
         dayTitle,
         time,
         sortTime: timeOrder(time),
-        treatment:"물리치료"
+        treatment:"1층 물리치료"
       });
     }
   }
@@ -945,7 +2369,7 @@ function parseFirstFloorMachines(
         dayTitle,
         time,
         sortTime: timeOrder(time),
-        treatment:"기구-" + machineName
+        treatment:"1층 기구-" + machineName
       });
     }
   }
@@ -992,7 +2416,7 @@ function parseMachines(
         dayTitle,
         time,
         sortTime: timeOrder(time),
-        treatment:"기구-" + machineName
+        treatment:"3층 기구-" + machineName
       });
     }
   }
@@ -1033,10 +2457,16 @@ function parseElectric(
         dayTitle,
         time,
         sortTime: timeOrder(time),
-        treatment:"전기치료"
+        treatment:"3층 전기치료"
       });
     }
   }
+}
+
+function isMachineOrElectricName(treatment){
+
+  return /(^|\s)기구-/.test(treatment) ||
+    /(^|\s)전기치료$/.test(treatment);
 }
 
 function removeTherapistScheduleDuplicates(items){
@@ -1044,8 +2474,7 @@ function removeTherapistScheduleDuplicates(items){
   return items.filter(item=>{
 
     const isMachineOrElectric =
-      item.treatment.startsWith("기구-") ||
-      item.treatment === "전기치료";
+      isMachineOrElectricName(item.treatment);
 
     if(isMachineOrElectric){
       return true;
@@ -1058,10 +2487,7 @@ function removeTherapistScheduleDuplicates(items){
           other.sheetIndex === item.sheetIndex &&
           other.dayTitle === item.dayTitle &&
           other.time === item.time &&
-          (
-            other.treatment.startsWith("기구-") ||
-            other.treatment === "전기치료"
-          )
+          isMachineOrElectricName(other.treatment)
         );
       });
 
@@ -1080,9 +2506,21 @@ function makeTreatmentName(
   therapist
 ){
 
+  const robotName =
+    findRobotName(
+      cellCompact,
+      targetName
+    );
+
+  const cellForCode =
+    stripRobotSegments(
+      cellCompact,
+      targetName
+    );
+
   const code =
     getCodeBeforeName(
-      cellCompact,
+      cellForCode,
       targetName
     );
 
@@ -1091,8 +2529,16 @@ function makeTreatmentName(
     if(specialCodes[code] === "도수")
       return "도수-" + therapist;
 
+    if(robotName)
+      return specialCodes[code] +
+        "(로봇-" + robotName + ")";
+
     return specialCodes[code];
   }
+
+  if(robotName)
+    return "회복기재활치료(로봇-" +
+      robotName + ")-" + therapist;
 
   if(code === "H" || code === "h")
     return "회복기재활치료-" + therapist;
@@ -1224,7 +2670,7 @@ function renderSchedule(patientName, items){
     const sortBtn =
       document.createElement("button");
 
-    sortBtn.className = "edit-button";
+    sortBtn.className = "edit-button sort-button";
     sortBtn.innerText = "시간순 정렬";
     sortBtn.style.marginTop = "8px";
 
@@ -1240,10 +2686,9 @@ function renderSchedule(patientName, items){
   const note =
     document.createElement("p");
 
-  note.style.textAlign = "center";
-  note.style.fontWeight = "bold";
+  note.className = "schedule-note";
 
-  note.innerText =
+  note.textContent =
     "스케줄 상황에 따라 치료시간 및 1:1 회복기재활치료 갯수(2~3개)가 변경될 수 있습니다.";
 
   result.appendChild(note);

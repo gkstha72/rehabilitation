@@ -254,6 +254,16 @@ button.delete-sheet:hover{color:#a5342a;border-color:#e0bab5;background:#fdf4f3;
   color:var(--muted);
 }
 
+.same-name-note{
+  margin:0 0 14px;
+  padding:9px 12px;
+  background:var(--warn-soft);
+  border:1px solid var(--warn);
+  border-radius:9px;
+  font-size:13px;
+  color:var(--warn);
+}
+
 .color-line{
   display:flex;
   align-items:center;
@@ -453,17 +463,65 @@ button.sort-button{margin-top:8px;font-size:12px;}
   *{transition:none!important;}
 }
 
+@page{
+  size:A4;
+  margin:20mm 16mm;
+}
+
 @media print{
-  body{background:#fff;padding:0;color:#000;}
-  .masthead,.card,.edit-button{display:none;}
-  #result h2{margin:0 0 6px;font-size:17px;}
-  #result h3{margin:14px 0 0;color:#000;}
-  table.result{border:1px solid #999;border-radius:0;}
-  table.result th{background:#f2f2f2;color:#000;}
-  table.result td{padding:8px 12px;}
-  table.result tbody tr:not([data-row-type="lunch"]) td:first-child{border-right:1.5px solid #999;color:#000;}
-  table.result tbody tr:not([data-row-type="lunch"]) td:first-child::after{background:#000;box-shadow:0 0 0 3px #fff;}
-  #result .schedule-note{color:#333;}
+  body{background:#fff;padding:0;color:#000;font-size:16px;}
+  .masthead,.card,.edit-button,.same-name-note{display:none;}
+
+  /* A4 너비를 살짝만 남기고 씁니다.
+     숫자(160mm)를 키우면 표가 넓어지고, 줄이면 좁아집니다. */
+  main{max-width:none;margin:0;}
+  #result{
+    width:160mm;
+    max-width:100%;
+    margin:0 auto;
+  }
+
+  #result h2{margin:0 0 8px;font-size:23px;}
+  #result h3{margin:16px 0 0;color:#000;font-size:17px;}
+
+  table.result{border:1px solid #999;border-radius:0;margin-top:10px;}
+
+  table.result th{
+    background:#f2f2f2;
+    color:#000;
+    font-size:13px;
+    padding:9px 18px;
+  }
+
+  table.result td{
+    padding:11px 18px;
+    font-size:17px;
+  }
+
+  table.result tbody tr:not([data-row-type="lunch"]) td:first-child{
+    width:112px;
+    font-size:16px;
+    padding-right:20px;
+    border-right:1.5px solid #999;
+    color:#000;
+  }
+
+  table.result tbody tr:not([data-row-type="lunch"]) td:first-child::after{
+    background:#000;
+    box-shadow:0 0 0 3px #fff;
+  }
+
+  table.result tr[data-row-type="lunch"] td{
+    font-size:14px;
+    padding:9px 14px;
+  }
+
+  /* 표가 페이지 사이에서 잘리지 않게 합니다. */
+  table.result{page-break-inside:avoid;break-inside:avoid;}
+  table.result tr{page-break-inside:avoid;break-inside:avoid;}
+  #result h3{page-break-after:avoid;break-after:avoid;}
+
+  #result .schedule-note{color:#333;font-size:13px;}
 }
 
 </style>
@@ -636,7 +694,7 @@ function findRobotName(cellCompact, targetName){
 
     const name = compact(match[1]);
 
-    if(name.includes(targetName) || targetName.includes(name)){
+    if(robotNameMatches(name, targetName)){
 
       return robotCodes[match[2].toUpperCase()] || "";
     }
@@ -654,8 +712,7 @@ function stripRobotSegments(cellCompact, targetName){
       const compactName = compact(name);
 
       const isTarget =
-        compactName.includes(targetName) ||
-        targetName.includes(compactName);
+        robotNameMatches(compactName, targetName);
 
       return isTarget ? "" : whole;
     }
@@ -1989,7 +2046,7 @@ function findPatientPositions(){
 
       row.forEach((cell,c)=>{
 
-        if(compact(cell).includes(targetName)){
+        if(nameMatches(compact(cell), targetName)){
 
           found.push({
             sheet: sheetIndex + 1,
@@ -2177,7 +2234,7 @@ function parseWithLayout(
         const cellCompact =
           compact(cellText);
 
-        if(!cellCompact.includes(targetName))
+        if(!nameMatches(cellCompact, targetName))
           return;
 
         let treatment;
@@ -2256,7 +2313,7 @@ function parseMainTherapies(
         const cellCompact =
           compact(cellText);
 
-        if(!cellCompact.includes(targetName))
+        if(!nameMatches(cellCompact, targetName))
           continue;
 
         const therapist =
@@ -2310,7 +2367,7 @@ function parseFirstFloorPT(
 
       if(!cellText) continue;
 
-      if(!compact(cellText).includes(targetName))
+      if(!nameMatches(compact(cellText), targetName))
         continue;
 
       results.push({
@@ -2356,7 +2413,7 @@ function parseFirstFloorMachines(
 
       if(!cellText) continue;
 
-      if(!compact(cellText).includes(targetName))
+      if(!nameMatches(compact(cellText), targetName))
         continue;
 
       const machineName =
@@ -2405,7 +2462,7 @@ function parseMachines(
 
       if(!cellText) continue;
 
-      if(!compact(cellText).includes(targetName))
+      if(!nameMatches(compact(cellText), targetName))
         continue;
 
       const machineName =
@@ -2449,7 +2506,7 @@ function parseElectric(
 
       if(!cellText) continue;
 
-      if(!compact(cellText).includes(targetName))
+      if(!nameMatches(compact(cellText), targetName))
         continue;
 
       results.push({
@@ -2552,7 +2609,7 @@ function getCodeBeforeName(
 ){
 
   const index =
-    cellCompact.indexOf(targetName);
+    findNameIndex(cellCompact, targetName);
 
   if(index <= 0)
     return "";
@@ -2614,6 +2671,28 @@ function renderSchedule(patientName, items){
     patientName + "님 개인 시간표";
 
   result.appendChild(h2);
+
+  const sameNames =
+    findSameNameVariants(
+      compact(patientName)
+    );
+
+  if(sameNames.length > 0){
+
+    const note =
+      document.createElement("p");
+
+    note.className = "same-name-note";
+
+    note.innerText =
+      "동명이인 확인: 표 안에 " +
+      sameNames.join(", ") +
+      " 도 있습니다. 이 시간표에는 \"" +
+      compact(patientName) +
+      "\" 칸만 들어갔습니다.";
+
+    result.appendChild(note);
+  }
 
   if(items.length === 0){
 
@@ -2920,6 +2999,134 @@ function compact(value){
 
   return normalize(value)
     .replace(/\s+/g,"");
+}
+
+/* ===== 동명이인(이름+숫자) 구분 =====
+   동명이인은 두 번째 환자 이름 뒤에 숫자를 붙여서 씁니다. (예: 김부영 / 김부영2)
+   그냥 includes()로 찾으면 "김부영"으로 검색할 때 "김부영2"까지 걸립니다.
+   그래서 찾은 이름 바로 뒤에 숫자가 붙어 있으면 다른 사람으로 보고 건너뜁니다.
+   - "김부영"  검색 → H김부영   O  /  H김부영2  X
+   - "김부영2" 검색 → H김부영2  O  /  H김부영   X
+   이름 앞의 숫자(H1, H2, 신장8 등)는 코드이므로 앞쪽은 검사하지 않습니다. */
+
+function isDigitChar(ch){
+
+  return ch >= "0" && ch <= "9";
+}
+
+function findNameIndex(haystack, needle, fromIndex){
+
+  const text = haystack || "";
+  const name = needle || "";
+
+  if(!name) return -1;
+
+  let from = fromIndex || 0;
+
+  while(true){
+
+    const index =
+      text.indexOf(name, from);
+
+    if(index === -1)
+      return -1;
+
+    const nextChar =
+      text.charAt(index + name.length);
+
+    if(!isDigitChar(nextChar))
+      return index;
+
+    from = index + 1;
+  }
+}
+
+function nameMatches(haystack, needle){
+
+  return findNameIndex(haystack, needle) !== -1;
+}
+
+/* 검색한 이름과 동명이인이 표에 함께 있는지 찾아서 알려줍니다.
+   "김부영" 검색 → 표에 김부영2 가 있으면 알려주고,
+   "김부영2" 검색 → 표에 김부영 이 있으면 알려줍니다. */
+function findSameNameVariants(targetName){
+
+  const list = [];
+
+  if(!targetName)
+    return list;
+
+  const baseName =
+    targetName.replace(/[0-9]+$/,"");
+
+  const wantBase =
+    baseName.length > 0 &&
+    baseName !== targetName;
+
+  pastedSheets.forEach(sheet=>{
+
+    (sheet.rows || []).forEach(row=>{
+
+      (row || []).forEach(cell=>{
+
+        const text = compact(cell);
+
+        if(!text) return;
+
+        let from = 0;
+
+        while(true){
+
+          const index =
+            text.indexOf(baseName || targetName, from);
+
+          if(index === -1) break;
+
+          let end =
+            index + (baseName || targetName).length;
+
+          let digits = "";
+
+          while(isDigitChar(text.charAt(end))){
+
+            digits += text.charAt(end);
+            end++;
+          }
+
+          const fullName =
+            (baseName || targetName) + digits;
+
+          if(
+            fullName !== targetName &&
+            (digits !== "" || wantBase) &&
+            list.indexOf(fullName) === -1
+          ){
+            list.push(fullName);
+          }
+
+          from = index + 1;
+        }
+      });
+    });
+  });
+
+  return list;
+}
+
+/* 로봇 표기(GR환자명코드)의 이름 비교용.
+   표기가 조금 달라도 인정하되, 동명이인 숫자는 구분합니다. */
+function robotNameMatches(name, targetName){
+
+  if(!name || !targetName)
+    return false;
+
+  if(name === targetName)
+    return true;
+
+  return (
+    nameMatches(name, targetName) ||
+    nameMatches(targetName, name)
+  );
 }
 
 function escapeHtml(str){

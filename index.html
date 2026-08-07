@@ -20,6 +20,7 @@
 
   --cat-work:#5b9cd6;      --cat-work-soft:#e8f1fb;
   --cat-schedule:#e67e22;  --cat-schedule-soft:#fdf1e6;
+  --cat-eval:#d63384;      --cat-eval-soft:#fce4ec;
   --cat-check:#16a085;     --cat-check-soft:#d5efea;
   --cat-mgmt:#8e44ad;      --cat-mgmt-soft:#f0e6f7;
 
@@ -123,6 +124,7 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
 .section-home .dot{background:var(--ink)}
 .section-work .dot{background:var(--cat-work)}
 .section-schedule .dot{background:var(--cat-schedule)}
+.section-eval .dot{background:var(--cat-eval)}
 .section-check .dot{background:var(--cat-check)}
 .section-mgmt .dot{background:var(--cat-mgmt)}
 
@@ -164,6 +166,7 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
 .section-home .nav-item.active{border-left-color:var(--ink)}
 .section-work .nav-item.active{border-left-color:var(--cat-work)}
 .section-schedule .nav-item.active{border-left-color:var(--cat-schedule)}
+.section-eval .nav-item.active{border-left-color:var(--cat-eval)}
 .section-check .nav-item.active{border-left-color:var(--cat-check)}
 .section-mgmt .nav-item.active{border-left-color:var(--cat-mgmt)}
 
@@ -177,6 +180,7 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
 .section-home .nav-item .icon{background:#eee; color:var(--ink)}
 .section-work .nav-item .icon{background:var(--cat-work-soft); color:var(--cat-work)}
 .section-schedule .nav-item .icon{background:var(--cat-schedule-soft); color:var(--cat-schedule)}
+.section-eval .nav-item .icon{background:var(--cat-eval-soft); color:var(--cat-eval)}
 .section-check .nav-item .icon{background:var(--cat-check-soft); color:var(--cat-check)}
 .section-mgmt .nav-item .icon{background:var(--cat-mgmt-soft); color:var(--cat-mgmt)}
 .nav-item .label{flex:1}
@@ -671,6 +675,12 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
       <button class="nav-item" data-tool="gen"><span class="icon">📅</span><span class="label">주말·공휴일 생성기</span></button>
     </div>
 
+    <div class="sidebar-section section-eval">
+      <div class="sidebar-title"><span class="dot"></span>평가</div>
+      <button class="nav-item" data-tool="spasticity"><span class="icon">🔬</span><span class="label">경직진자검사</span></button>
+      <button class="nav-item" data-tool="mbi"><span class="icon">📋</span><span class="label">MBI/SCIM</span></button>
+    </div>
+
     <div class="sidebar-section section-check">
       <div class="sidebar-title"><span class="dot"></span>확인 · 점검</div>
       <button class="nav-item" data-tool="opd"><span class="icon">🩺</span><span class="label">외래치료 확인</span></button>
@@ -798,6 +808,8 @@ const TOOLS = {
   work3: { title: '3과 근무안', url: 'https://script.google.com/macros/s/AKfycbxGe-JbxQJqTgvkpbv7bIgzzryJFxNqCcfuuAvoXRApqHmsV2FdPdAQ0zS5UW0hjbNO/exec' },
   leave: { title: '연차달력', url: 'https://script.google.com/macros/s/AKfycbxsQ2Zs8Qab0MTNmZUdDcDW-OoaaEnKdpqEVlX9t2uC9lOEM_jo0oKeUnqS5Suoh2zX/exec' },
   gen: { title: '주말·공휴일 시간표 생성기', url: '광주365재활병원_시간표생성기.html' },
+  spasticity: { title: '경직진자검사', url: '경직진자검사.html' },
+  mbi: { title: 'MBI/SCIM', url: 'MBI_SCIM.html' },
   opd: { title: '외래치료 확인', url: 'https://script.google.com/macros/s/AKfycbyTHcYeheArs7nSSseSQGUAwQbO4GCAGnN__vZngvi4grjy9VZw6ozJd_ylGZEzWHg-/exec' },
   equip: { title: '기구점검', url: 'https://script.google.com/macros/s/AKfycbywpy4d71ZV7YVlFDaEvWfI2W8c-7dYwnrUNECMVxxIcGGym-wE3VdiwS32m1ORqlKN/exec', openInNewTab: true },
   mwd: { title: '이동반 시간표 · 평일', url: '이동반_시간표_평일.html' },
@@ -940,6 +952,8 @@ function renderUrlEditList() {
     work3: {label: '근무안', color: 'var(--cat-work)'},
     leave: {label: '근무안', color: 'var(--cat-work)'},
     gen: {label: '시간표', color: 'var(--cat-schedule)'},
+    spasticity: {label: '평가', color: 'var(--cat-eval)'},
+    mbi: {label: '평가', color: 'var(--cat-eval)'},
     opd: {label: '확인·점검', color: 'var(--cat-check)'},
     equip: {label: '확인·점검', color: 'var(--cat-check)'},
     mwd: {label: '간부용', color: 'var(--cat-mgmt)'},

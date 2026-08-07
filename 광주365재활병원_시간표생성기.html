@@ -2177,7 +2177,9 @@ function parseSchedule(patientName){
   });
 
   const filteredResults =
-    removeTherapistScheduleDuplicates(results)
+    removeTherapistScheduleDuplicates(
+      removeInlineMachineDuplicates(results)
+    )
       .filter(item => !isHiddenScheduleTime(item.time));
 
   filteredResults.sort((a,b)=>{
@@ -2248,6 +2250,25 @@ function parseWithLayout(
               block.label,
               col.name
             );
+
+          findInlineMachines(
+            cellCompact,
+            targetName
+          ).forEach(machineName=>{
+
+            results.push({
+              sheetIndex,
+              dayTitle,
+              time,
+              sortTime: timeOrder(time),
+              treatment:
+                withFloor(
+                  col.floor || block.floor,
+                  "기구-" + machineName
+                ),
+              fromTherapistCell: true
+            });
+          });
 
         }else if(block.kind === "machine"){
 
@@ -2526,6 +2547,46 @@ function isMachineOrElectricName(treatment){
     /(^|\s)전기치료$/.test(treatment);
 }
 
+/* 기구 시간표에서 제대로 찾은 기구가 있으면
+   치료사 칸에서 읽은 기구는 버립니다. (중복 방지) */
+function removeInlineMachineDuplicates(items){
+
+  const seen = [];
+
+  return items.filter(item=>{
+
+    if(!item.fromTherapistCell)
+      return true;
+
+    const hasRealMachine =
+      items.some(other=>{
+
+        return (
+          !other.fromTherapistCell &&
+          other.sheetIndex === item.sheetIndex &&
+          other.dayTitle === item.dayTitle &&
+          other.time === item.time &&
+          isMachineOrElectricName(other.treatment)
+        );
+      });
+
+    if(hasRealMachine)
+      return false;
+
+    const key =
+      item.sheetIndex + "|" +
+      item.time + "|" +
+      item.treatment;
+
+    if(seen.indexOf(key) !== -1)
+      return false;
+
+    seen.push(key);
+
+    return true;
+  });
+}
+
 function removeTherapistScheduleDuplicates(items){
 
   return items.filter(item=>{
@@ -2554,6 +2615,93 @@ function removeTherapistScheduleDuplicates(items){
 
     return true;
   });
+}
+
+/* 치료사 칸 안에 "+장비" 로 적힌 기구를 읽습니다.
+   예) G박종기+런닝 / H김민남+PWB+런닝 / M김태석(q케인)+워킹
+
+   기구 시간표(오른쪽 표)에 이름이 빠져 있어도,
+   치료사 칸에 기구가 적혀 있으면 그걸로 기구치료를 찾아냅니다.
+   기구 시간표에 제대로 들어가 있으면 그쪽이 우선이라 중복되지 않습니다.
+
+   새 장비가 생기면 "줄임말":"표시할이름" 한 줄만 추가하면 됩니다. */
+const inlineMachineWords = {
+  "경사":"경사",
+  "슬라":"슬라이드",
+  "슬라이드":"슬라이드",
+  "워킹":"워킹",
+  "런닝":"런닝",
+  "러닝":"런닝",
+  "기립":"기립",
+  "코끼리":"코끼리",
+  "스마트":"스마트",
+  "코로":"코로",
+  "바로":"바로",
+  "동적":"동적",
+  "어댑핏":"어댑핏",
+  "전상":"전동상지",
+  "전동상지":"전동상지",
+  "에르":"등속성에르고미터",
+  "아크":"아크트레이너",
+  "클라":"클라이밋",
+  "진동":"진동기",
+  "리포머":"리포머",
+  "캐포머":"캐포머",
+  "체어":"체어",
+  "오토":"오토사이클",
+  "오토사이클":"오토사이클",
+  "CPM":"CPM"
+};
+
+/* 한 칸에 여러 명이 붙어 있을 때 사람 단위로 잘라 줍니다.
+   코드문자(H, G, M, N, S, A, D, V, F, X) 바로 뒤에 한글이 오면
+   거기서부터 새로운 사람으로 봅니다. */
+function splitPersonChunks(text){
+
+  return text
+    .replace(
+      /([HGMNSADVFXhgmnsadvfx])(?=[가-힣])/g,
+      "\u0001$1"
+    )
+    .split("\u0001");
+}
+
+function findInlineMachines(cellCompact, targetName){
+
+  const list = [];
+
+  const text =
+    stripRobotSegments(cellCompact, targetName);
+
+  splitPersonChunks(text).forEach(chunk=>{
+
+    const index =
+      findNameIndex(chunk, targetName);
+
+    if(index === -1) return;
+
+    const after =
+      chunk.slice(index + targetName.length);
+
+    /* "+" 로 이어 붙인 것만 기구로 봅니다.
+       이름 바로 뒤 괄호((1:1), (토) 등)는 기구가 아닙니다. */
+    after.split("+").slice(1).forEach(token=>{
+
+      const word =
+        token.replace(/[(].*$/,"").trim();
+
+      const machineName =
+        inlineMachineWords[word] ||
+        inlineMachineWords[word.toUpperCase()];
+
+      if(!machineName) return;
+
+      if(list.indexOf(machineName) === -1)
+        list.push(machineName);
+    });
+  });
+
+  return list;
 }
 
 function makeTreatmentName(

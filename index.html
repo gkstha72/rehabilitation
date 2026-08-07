@@ -320,6 +320,10 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   gap:12px;
   letter-spacing:-0.2px;
 }
+.dash-banner.holiday{
+  background:linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  box-shadow:0 4px 16px rgba(192, 57, 43, 0.25);
+}
 .dash-banner .banner-icon{
   font-size:22px;
   flex-shrink:0;
@@ -713,10 +717,7 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
         <div class="dash-greeting" id="dashGreeting"></div>
       </div>
 
-      <div id="dashBanner" class="dash-banner" style="display:none">
-        <span class="banner-icon"></span>
-        <span id="dashBannerText"></span>
-      </div>
+      <div id="dashBannerContainer" style="display:none"></div>
 
       <div class="dash-card">
         <h3><span class="dot"></span>공지사항</h3>
@@ -836,6 +837,23 @@ const DAY_NAMES = ['일요일','월요일','화요일','수요일','목요일','
 const DAY_BANNERS = {
   5: { icon: '📋', text: '오늘은 금요일! 주말시간표 배부하기 !!!' }
 };
+
+// 한국 공휴일 목록 (평일 공휴일 전날에 자동으로 "휴일 시간표 배부" 알림 뜹니다)
+// yyyy-mm-dd 형식. 매년 연말에 다음 해 공휴일 추가하세요.
+const KOREAN_HOLIDAYS = [
+  // 2026
+  '2026-01-01', // 신정
+  '2026-02-16', '2026-02-17', '2026-02-18', // 설날 연휴
+  '2026-03-02', // 3.1절 대체공휴일
+  '2026-05-05', // 어린이날
+  '2026-05-25', // 부처님오신날 대체공휴일
+  '2026-08-17', // 광복절 대체공휴일
+  '2026-09-24', '2026-09-25', // 추석 연휴 (평일)
+  '2026-10-05', // 개천절 대체공휴일
+  '2026-10-09', // 한글날
+  '2026-12-25', // 성탄절
+  // 2027 (확정 시 업데이트)
+];
 
 let currentNotices = [];        // 서버에서 로드한 공지 (대시보드 표시용)
 let editingNotices = [];        // 편집 중인 공지 (임시)
@@ -1148,15 +1166,37 @@ function renderDashboard() {
   else greeting = '오늘도 수고 많으셨어요';
   document.getElementById('dashGreeting').textContent = greeting;
 
-  // 요일별 배너
-  const banner = document.getElementById('dashBanner');
-  const bannerData = DAY_BANNERS[dow];
-  if (bannerData) {
-    banner.querySelector('.banner-icon').textContent = bannerData.icon || '📌';
-    document.getElementById('dashBannerText').textContent = bannerData.text;
-    banner.style.display = 'flex';
+  // 배너 (요일별 + 공휴일 전날)
+  const banners = [];
+
+  // 1. 요일별 배너
+  if (DAY_BANNERS[dow]) {
+    banners.push({ ...DAY_BANNERS[dow], type: 'day' });
+  }
+
+  // 2. 내일이 평일 공휴일이면 배너 추가
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowDow = tomorrow.getDay();
+  if (tomorrowDow >= 1 && tomorrowDow <= 5 && isKoreanHoliday(tomorrow)) {
+    banners.push({
+      icon: '🏥',
+      text: '내일은 공휴일! 휴일 시간표 배부하기 !!!',
+      type: 'holiday'
+    });
+  }
+
+  const bannerContainer = document.getElementById('dashBannerContainer');
+  if (banners.length > 0) {
+    bannerContainer.innerHTML = banners.map(b => `
+      <div class="dash-banner ${b.type === 'holiday' ? 'holiday' : ''}">
+        <span class="banner-icon">${b.icon || '📌'}</span>
+        <span>${escapeHtml(b.text)}</span>
+      </div>
+    `).join('');
+    bannerContainer.style.display = 'block';
   } else {
-    banner.style.display = 'none';
+    bannerContainer.style.display = 'none';
   }
 
   const noticeList = document.getElementById('noticeList');
@@ -1228,6 +1268,14 @@ function loadTool(key, isInitial){
 function toggleSidebar(){
   sidebar.classList.toggle('open');
   overlay.classList.toggle('show');
+}
+
+// 한국 공휴일 판별
+function isKoreanHoliday(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return KOREAN_HOLIDAYS.includes(`${y}-${m}-${d}`);
 }
 
 document.querySelectorAll('.nav-item').forEach(el=>{

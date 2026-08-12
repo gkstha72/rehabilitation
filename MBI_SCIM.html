@@ -1,0 +1,2967 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MBI · SCIM 자동채점</title>
+<style>
+* { box-sizing:border-box; }
+body { margin:0; font-family:"Pretendard","Noto Sans KR",Arial,sans-serif; background:#f4f6fa; color:#162033; }
+.app { max-width:1180px; margin:0 auto; padding:20px 18px 60px; }
+.topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap; }
+.brand { display:flex; align-items:center; gap:10px; font-size:20px; font-weight:900; }
+.logo { width:40px; height:40px; border-radius:12px; color:white; display:grid; place-items:center; font-weight:900; font-size:18px; }
+.logo.mbi { background:#1e293b; }
+.logo.scim { background:#0f766e; }
+button { border:none; border-radius:12px; padding:10px 15px; font-size:14px; font-weight:900; cursor:pointer; }
+.primary { color:white; }
+.primary.mbi { background:#1e293b; }
+.primary.scim { background:#0f766e; }
+.warn { background:#ef4444; color:white; }
+.mini { background:#f1f5f9; color:#475569; padding:6px 10px; font-size:12px; border-radius:8px; }
+.mini.active { background:#e2e8f0; color:#1e293b; }
+
+/* 모드 탭 */
+.mode-tabs { display:flex; gap:6px; padding:5px; background:white; border:1px solid #e2e8f0; border-radius:14px; margin-bottom:16px; box-shadow:0 4px 12px rgba(15,30,60,.04); }
+.mode-tab { flex:1; padding:12px 16px; border:none; background:transparent; border-radius:10px; font-weight:900; font-size:15px; cursor:pointer; color:#64748b; transition:all .15s; }
+.mode-tab.active.mbi { background:#1e293b; color:white; }
+.mode-tab.active.scim { background:#0f766e; color:white; }
+.mode-tab.active.convert { background:#7c2d12; color:white; }
+.mode-tab.active.print { background:#334155; color:white; }
+.mode-tab.active.guide { background:#7e22ce; color:white; }
+
+/* 채점 가이드 */
+.guide-header { background:linear-gradient(135deg,#7e22ce,#a855f7); color:white; border-radius:14px; padding:20px 22px; margin-bottom:16px; box-shadow:0 4px 12px rgba(126,34,206,.15); }
+.guide-header h2 { margin:0 0 6px; font-size:20px; font-weight:900; }
+.guide-header p { margin:0; font-size:13.5px; line-height:1.6; opacity:.95; }
+.guide-source { margin-top:8px; font-size:11.5px; opacity:.8; font-style:italic; }
+.guide-card { background:white; border:1px solid #e9d5ff; border-radius:14px; margin-bottom:10px; overflow:hidden; box-shadow:0 2px 8px rgba(126,34,206,.06); }
+.guide-card-head { padding:12px 16px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none; transition:background .15s; }
+.guide-card-head:hover { background:#faf5ff; }
+.guide-card-head.open { background:#f3e8ff; border-bottom:1px solid #e9d5ff; }
+.guide-card-title { font-weight:900; font-size:15px; color:#6b21a8; }
+.guide-card-title .en { font-weight:500; font-size:12px; color:#a78bfa; margin-left:6px; }
+.guide-card-icon { font-size:12px; color:#a855f7; transition:transform .2s; }
+.guide-card-icon.open { transform:rotate(180deg); }
+.guide-card-body { padding:0 16px; max-height:0; overflow:hidden; transition:max-height .3s ease, padding .3s ease; }
+.guide-card-body.open { padding:14px 16px 16px; max-height:2000px; }
+.guide-section { margin-bottom:14px; }
+.guide-section:last-child { margin-bottom:0; }
+.guide-section-title { font-size:13px; font-weight:900; color:#7e22ce; margin-bottom:6px; padding-bottom:3px; border-bottom:1px dashed #c4b5fd; display:flex; align-items:center; gap:6px; }
+.guide-section-content { font-size:13px; line-height:1.65; color:#334155; }
+.guide-section-content ul { margin:4px 0; padding-left:20px; }
+.guide-section-content li { margin-bottom:3px; }
+.guide-example { background:#faf5ff; border-left:3px solid #a855f7; padding:8px 12px; border-radius:6px; margin:6px 0; font-size:12.5px; line-height:1.55; }
+.guide-example strong { color:#6b21a8; }
+.guide-warn { background:#fef3c7; border-left:3px solid #f59e0b; padding:8px 12px; border-radius:6px; margin:6px 0; font-size:12.5px; line-height:1.55; color:#78350f; }
+.guide-warn strong { color:#78350f; }
+
+/* 인쇄용 페이지 */
+.print-controls { display:flex; gap:10px; padding:16px 18px; background:white; border-radius:14px; margin-bottom:16px; box-shadow:0 4px 12px rgba(15,30,60,.04); flex-wrap:wrap; align-items:center; }
+.print-controls .info { font-size:13px; color:#475569; flex:1; min-width:200px; }
+.print-btn { background:#334155; color:white; padding:10px 18px; border-radius:10px; font-weight:900; font-size:14px; border:none; cursor:pointer; }
+.print-btn:hover { background:#1e293b; }
+
+.print-page { background:white; padding:7mm 9mm; margin:0 auto 16px; box-shadow:0 4px 12px rgba(15,30,60,.08); width:210mm; max-width:100%; min-height:297mm; font-family:'Malgun Gothic','맑은 고딕',sans-serif; color:#000; font-size:8pt; line-height:1.3; }
+.print-header { text-align:center; padding-bottom:4px; border-bottom:1.5px solid #000; margin-bottom:6px; }
+.print-header h1 { margin:0; font-size:12.5pt; font-weight:900; }
+
+/* multi-column: 자동 균등 */
+.print-columns { column-count:2; column-gap:12px; column-fill:balance; }
+
+.print-item { margin-bottom:4px; break-inside:avoid; page-break-inside:avoid; }
+.print-item-head { border-bottom:1px solid #333; padding-bottom:1px; margin-bottom:2px; }
+.print-item-title { font-weight:900; font-size:9pt; }
+.print-item-title .en { font-weight:500; font-size:7pt; color:#666; margin-left:3px; }
+
+/* 세부활동 2열로 */
+.print-checks { display:grid; grid-template-columns:1fr 1fr; gap:1px 8px; font-size:7.5pt; }
+.print-checks.one { grid-template-columns:1fr; }
+.print-check { display:flex; align-items:flex-start; gap:3px; padding:0.5px 0; }
+.print-check .box { display:inline-block; width:8px; height:8px; border:1px solid #000; flex-shrink:0; margin-top:2px; border-radius:1px; }
+.print-check .txt { flex:1; line-height:1.25; }
+
+.print-activity { margin-top:2px; padding:2px 4px; background:#f5f5f5; border-left:2px solid #888; border-radius:2px; }
+.print-activity .label { font-size:7pt; font-weight:700; color:#444; margin-bottom:1px; }
+.print-page-break { page-break-before:always; }
+.print-page-scim { min-height:auto; }
+
+@media print {
+  body { background:white !important; margin:0 !important; }
+  body > *:not(main) { display:none !important; }
+  main > *:not(#printApp) { display:none !important; }
+  #printApp > *:not(.print-page-active) { display:none !important; }
+  .print-page-active { display:block !important; margin:0 !important; box-shadow:none !important; padding:0 !important; width:100% !important; min-height:auto !important; page-break-after:always; }
+  .print-page-active:last-of-type { page-break-after:auto; }
+  .print-controls, .mode-tabs { display:none !important; }
+  .print-item { page-break-inside:avoid; }
+}
+
+@page { size: A4 portrait; margin:8mm 10mm; }
+.convert-panel { background:white; border:1.5px solid #fed7aa; border-radius:18px; padding:16px 18px; margin-bottom:16px; }
+.convert-title { font-size:15px; font-weight:900; color:#7c2d12; margin-bottom:10px; }
+.convert-info { padding:12px 14px; background:#fff7ed; border-radius:10px; margin-bottom:12px; font-size:13px; line-height:1.6; color:#7c2d12; }
+.convert-info strong { color:#9a3412; }
+.convert-empty { text-align:center; padding:40px 20px; color:#94a3b8; font-size:14px; }
+.convert-empty strong { color:#475569; }
+.convert-row { display:flex; justify-content:space-between; padding:8px 12px; border-bottom:1px solid #f1f5f9; align-items:center; gap:10px; flex-wrap:wrap; }
+.convert-row:last-child { border-bottom:none; }
+.convert-row-label { font-weight:700; color:#334155; font-size:13.5px; }
+.convert-row-score { font-weight:900; padding:4px 10px; border-radius:6px; background:#f1f5f9; color:#475569; font-size:13px; min-width:60px; text-align:center; }
+.convert-mapping { font-size:12px; color:#94a3b8; }
+.mode-content { display:none; }
+.mode-content.active { display:block; }
+
+/* 항목 카드 */
+.item-card { background:white; border:1px solid #e2e8f0; border-radius:18px; padding:16px 18px; margin-bottom:14px; box-shadow:0 4px 12px rgba(15,30,60,.04); }
+.item-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.item-title { font-size:17px; font-weight:900; }
+.item-en { color:#64748b; font-size:13px; font-weight:600; margin-left:4px; }
+.item-note { display:inline-block; margin-left:6px; font-size:11px; color:#94a3b8; font-weight:600; padding:2px 8px; background:#f1f5f9; border-radius:6px; }
+.item-max { display:inline-block; margin-left:6px; font-size:11px; color:#94a3b8; font-weight:600; padding:2px 8px; background:#f1f5f9; border-radius:6px; }
+.score-badge { padding:7px 14px; border-radius:10px; font-weight:900; font-size:15px; min-width:80px; text-align:center; background:#f1f5f9; color:#475569; }
+.score-badge.na { background:#e5e7eb; color:#4b5563; }
+.score-badge.grade1 { background:#fee2e2; color:#991b1b; }
+.score-badge.grade2 { background:#fed7aa; color:#9a3412; }
+.score-badge.grade3 { background:#fef3c7; color:#854d0e; }
+.score-badge.grade4 { background:#d1fae5; color:#065f46; }
+.score-badge.grade5 { background:#dbeafe; color:#1e40af; }
+.score-badge.p0 { background:#fee2e2; color:#991b1b; }
+.score-badge.p1 { background:#fed7aa; color:#9a3412; }
+.score-badge.p2 { background:#fef3c7; color:#854d0e; }
+.score-badge.p3 { background:#d1fae5; color:#065f46; }
+.score-badge.p4 { background:#dbeafe; color:#1e40af; }
+.na-toggle { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:8px; background:#f8faff; cursor:pointer; font-size:12px; font-weight:700; color:#475569; user-select:none; }
+.na-toggle input { width:15px; height:15px; margin:0; accent-color:#64748b; }
+.check-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px 12px; margin-bottom:12px; }
+.check-item { display:flex; align-items:flex-start; gap:7px; padding:6px 8px; border-radius:8px; cursor:pointer; user-select:none; transition:background .15s; }
+.check-item.grade-bg-1 { background:#fef2f2; }
+.check-item.grade-bg-2 { background:#fff7ed; }
+.check-item.grade-bg-3 { background:#fefce8; }
+.check-item.grade-bg-4 { background:#f0fdf4; }
+.check-item.grade-bg-5 { background:#eff6ff; }
+.check-item.grade-bg-1:hover { background:#fee2e2; }
+.check-item.grade-bg-2:hover { background:#ffedd5; }
+.check-item.grade-bg-3:hover { background:#fef9c3; }
+.check-item.grade-bg-4:hover { background:#dcfce7; }
+.check-item.grade-bg-5:hover { background:#dbeafe; }
+.check-item:hover { background:#f8faff; }
+.check-item input[type=checkbox] { width:18px; height:18px; margin:0; flex-shrink:0; margin-top:1px; }
+.mbi .check-item input[type=checkbox] { accent-color:#334155; }
+.scim .check-item input[type=checkbox] { accent-color:#0f766e; }
+.check-item:hover.mbi-item { background:#f8fafc; }
+.check-item:hover.scim-item { background:#f0fdfa; }
+.check-item .txt { font-size:13.5px; line-height:1.4; }
+.g-tag { display:inline-block; margin-left:3px; padding:1px 6px; border-radius:5px; font-size:10px; font-weight:900; }
+.g-tag.g1, .p-tag.pt0 { background:#fee2e2; color:#991b1b; }
+.g-tag.g2, .p-tag.pt1 { background:#fed7aa; color:#9a3412; }
+.g-tag.g3, .p-tag.pt2 { background:#fef3c7; color:#854d0e; }
+.g-tag.g4, .p-tag.pt3 { background:#d1fae5; color:#065f46; }
+.g-tag.g5, .p-tag.pt4 { background:#dbeafe; color:#1e40af; }
+.g-tag.g-tool, .p-tag.pt-tool { background:#e0e7ff; color:#4338ca; }
+.p-tag { display:inline-block; margin-left:3px; padding:1px 6px; border-radius:5px; font-size:10px; font-weight:900; }
+.comment-wrap { display:flex; flex-direction:column; gap:5px; }
+.comment-label { display:flex; justify-content:space-between; align-items:center; }
+.comment-label span { font-size:12px; font-weight:900; color:#475569; }
+.regen-btn { padding:3px 9px; border-radius:6px; font-size:11px; font-weight:900; cursor:pointer; border:none; }
+.regen-btn.mbi { background:#f1f5f9; color:#334155; }
+.regen-btn.scim { background:#ecfeff; color:#0f766e; }
+textarea { width:100%; border:1px solid #dce3ef; border-radius:10px; padding:10px 12px; font-size:14px; outline:none; background:white; font-family:inherit; resize:vertical; line-height:1.55; }
+textarea:focus.mbi { border-color:#334155; }
+textarea:focus.scim { border-color:#0f766e; }
+
+.section-title { margin:24px 0 12px; font-size:16px; font-weight:900; padding:8px 14px; border-left:4px solid; border-radius:0 12px 12px 0; }
+.section-title.scim { color:#0f766e; background:linear-gradient(90deg,#f0fdfa,transparent); border-color:#0f766e; }
+
+.item-card.disabled { opacity:0.55; background:#fafbff; }
+.item-card.unchecked { border-left:4px solid #ef4444; }
+.item-card.unchecked .item-title::after { content:' · 미체크'; font-size:11px; color:#ef4444; font-weight:700; }
+.item-card.disabled .item-title::after { content:' · 비활성'; font-size:11px; color:#94a3b8; font-weight:600; }
+
+.activity-box { border-radius:12px; padding:10px 12px 12px; margin-top:10px; }
+.activity-box.mbi { background:#f8fafc; border:1px dashed #cbd5e1; }
+.activity-box.scim { background:#f0fdfa; border:1px dashed #a7f3d0; }
+.activity-label { font-size:12px; font-weight:900; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+.activity-label.mbi { color:#475569; }
+.activity-label.scim { color:#0f766e; }
+.activity-label::before { content:'📋'; font-size:13px; }
+.activity-box .check-grid { margin-bottom:0; }
+
+/* 종합 결과 sticky */
+.summary-panel { position:sticky; top:12px; z-index:10; background:white; border-radius:18px; padding:16px 18px; box-shadow:0 8px 24px rgba(0,0,0,.10); margin-bottom:16px; }
+.summary-panel.mbi { border:1.5px solid #cbd5e1; box-shadow:0 4px 16px rgba(15,23,42,.08); }
+.summary-panel.scim { border:1.5px solid #a7f3d0; box-shadow:0 4px 16px rgba(15,118,110,.08); }
+.summary-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+.summary-title { font-size:15px; font-weight:900; }
+.summary-title.mbi { color:#1e293b; }
+.summary-title.scim { color:#0f766e; }
+.summary-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.total-line { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; color:white; border-radius:10px; margin-bottom:10px; flex-wrap:wrap; gap:8px; }
+.total-line.mbi { background:#1e293b; }
+.total-line.scim { background:#0f766e; }
+.subscore-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.subscore-box { flex:1; min-width:120px; padding:8px 12px; border-radius:10px; border:1px solid; }
+.subscore-box.scim { background:#f0fdfa; border-color:#a7f3d0; }
+.subscore-label { font-size:11px; font-weight:700; }
+.subscore-label.scim { color:#0f766e; }
+.subscore-value { font-size:18px; font-weight:900; }
+.subscore-value.scim { color:#134e4a; }
+.total-line .label { font-size:12px; opacity:.9; font-weight:700; }
+.total-line .score { font-size:26px; font-weight:900; line-height:1; }
+.total-line .cat { font-size:13px; font-weight:700; opacity:.95; }
+.summary-text { width:100%; border:1px solid #dce3ef; border-radius:10px; padding:12px 14px; font-size:13.5px; line-height:1.7; font-family:inherit; background:#fafbff; min-height:100px; max-height:300px; resize:vertical; }
+.copy-notice { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; font-size:12.5px; color:#78350f; font-weight:700; margin-bottom:10px; line-height:1.4; }
+.copy-notice::before { content:'⚠️'; font-size:14px; flex-shrink:0; }
+.copy-status { display:inline-block; margin-left:6px; font-size:12px; color:#22c55e; font-weight:900; opacity:0; transition:opacity .2s; }
+.copy-status.show { opacity:1; }
+
+.side-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+.side-label { font-size:12px; font-weight:900; color:#475569; }
+.side-toggle { display:inline-flex; gap:4px; padding:3px; background:#f8faff; border-radius:8px; }
+.side-toggle button { padding:5px 10px; border:none; background:transparent; border-radius:6px; font-size:12px; font-weight:800; cursor:pointer; color:#64748b; }
+.side-toggle button.active { background:#475569; color:white; }
+.mobility-toggle button.active { background:#1e293b; color:white; }
+
+@media (max-width:800px) {
+  .summary-panel { position:static; }
+  .item-head { flex-direction:column; align-items:stretch; }
+  .check-grid { grid-template-columns:1fr; }
+}
+/* ========== 비밀번호 오버레이 ========== */
+#authOverlay {
+  position: fixed; inset: 0; z-index: 99999;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+#authOverlay.hidden { display: none; }
+.auth-card {
+  background: white; border-radius: 20px; padding: 40px 32px;
+  max-width: 400px; width: 100%; text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+.auth-icon {
+  font-size: 44px; margin-bottom: 12px;
+}
+.auth-title {
+  font-size: 20px; font-weight: 900; color: #1e293b; margin-bottom: 24px;
+}
+.auth-subtitle {
+  font-size: 13px; color: #64748b; margin-bottom: 24px; line-height: 1.5;
+}
+.auth-form { display: flex; flex-direction: column; gap: 10px; }
+.auth-input {
+  padding: 14px 16px; font-size: 15px; border: 2px solid #e2e8f0;
+  border-radius: 12px; outline: none; font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+.auth-input:focus { border-color: #1e293b; }
+.auth-submit {
+  padding: 14px; font-size: 15px; font-weight: 900;
+  background: #1e293b; color: white; border: none;
+  border-radius: 12px; cursor: pointer; font-family: inherit;
+  transition: background 0.15s ease;
+}
+.auth-submit:hover { background: #0f172a; }
+.auth-error {
+  color: #ef4444; font-size: 12px; margin-top: 6px; min-height: 16px;
+}
+.auth-info {
+  margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0;
+  font-size: 11px; color: #94a3b8; line-height: 1.6;
+}
+</style>
+</head>
+<body>
+
+<!-- ========== 비밀번호 잠금 화면 ========== -->
+<div id="authOverlay">
+  <div class="auth-card">
+    <div class="auth-icon">🔒</div>
+    <div class="auth-title">MBI · SCIM 자동채점</div>
+    <div class="auth-form">
+      <input type="password" id="authInput" class="auth-input" placeholder="비밀번호" autofocus>
+      <button class="auth-submit" onclick="checkAuth()">확인</button>
+      <div class="auth-error" id="authError"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== 비밀번호 설정 ==========
+// 원하는 비밀번호로 바꾸세요
+const AUTH_PASSWORD = 'mbi365';
+
+function checkAuth() {
+  const input = document.getElementById('authInput');
+  const error = document.getElementById('authError');
+  if (input.value === AUTH_PASSWORD) {
+    document.getElementById('authOverlay').classList.add('hidden');
+    error.textContent = '';
+  } else {
+    error.textContent = '비밀번호가 틀렸어요';
+    input.value = '';
+    input.focus();
+  }
+}
+
+// Enter 키 지원
+document.getElementById('authInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') checkAuth();
+});
+</script>
+<!-- ========== 잠금 화면 끝 ========== -->
+<main class="app">
+  <!-- 모드 탭 -->
+  <div class="mode-tabs">
+    <button class="mode-tab mbi active" onclick="switchMode('mbi')">MBI</button>
+    <button class="mode-tab scim" onclick="switchMode('scim')">SCIM</button>
+    <button class="mode-tab convert" onclick="switchMode('convert')">SCIM → MBI</button>
+    <button class="mode-tab print" onclick="switchMode('print')">인쇄</button>
+    <button class="mode-tab guide" onclick="switchMode('guide')">📖 채점 가이드</button>
+  </div>
+
+  <!-- ==================== MBI 모드 ==================== -->
+  <div id="mbiApp" class="mode-content active mbi">
+    <header class="topbar">
+      <div class="brand"><div class="logo mbi">M</div><span>MBI (Modified Barthel Index)</span></div>
+      <button class="warn" onclick="resetMbi()">전체 초기화</button>
+    </header>
+
+    <section class="summary-panel mbi">
+      <div class="summary-head">
+        <div class="summary-title mbi">📋 MBI 종합 결과 (EMR 복사용)</div>
+        <div class="summary-actions">
+          <button class="mini" id="mbiLangKo" onclick="mbi_setLang('ko')">한글</button>
+          <button class="mini active" id="mbiLangEn" onclick="mbi_setLang('en')">영문</button>
+          <button class="primary mbi" onclick="mbi_copyAll()">전체 복사<span id="mbiCopyStatus" class="copy-status">✓</span></button>
+        </div>
+      </div>
+      <div class="total-line mbi">
+        <div>
+          <div class="label">Total MBI Score</div>
+          <div class="score"><span id="mbiTotalScore">0</span> <span style="font-size:14px; opacity:.85;">/ 100</span></div>
+        </div>
+        <div>
+          <div class="label">의존도 분류</div>
+          <div class="cat" id="mbiDependencyLabel">-</div>
+        </div>
+      </div>
+      <div class="copy-notice">복사 전 반드시 자동 생성된 코멘트를 검토하고 실제 관찰과 대조하여 수정해주세요.</div>
+      <div class="side-row">
+        <span class="side-label">건측:</span>
+        <div class="side-toggle">
+          <button data-mbi-side="right" class="active" onclick="mbi_setSide('right')">우측</button>
+          <button data-mbi-side="left" onclick="mbi_setSide('left')">좌측</button>
+        </div>
+      </div>
+      <div class="side-row">
+        <span class="side-label">이동:</span>
+        <div class="side-toggle mobility-toggle">
+          <button data-mbi-mobility="am" class="active" onclick="mbi_setMobility('am')">보행</button>
+          <button data-mbi-mobility="wc" onclick="mbi_setMobility('wc')">의자차</button>
+        </div>
+      </div>
+      <textarea id="mbiSummaryText" class="summary-text" placeholder="세부활동을 체크하면 코멘트가 자동으로 정리됩니다." readonly></textarea>
+    </section>
+
+    <div id="mbiItemsContainer"></div>
+  </div>
+
+  <!-- ==================== SCIM 모드 ==================== -->
+  <div id="scimApp" class="mode-content scim">
+    <header class="topbar">
+      <div class="brand"><div class="logo scim">S</div><span>SCIM (Spinal Cord Independence Measure III)</span></div>
+      <button class="warn" onclick="resetScim()">전체 초기화</button>
+    </header>
+
+    <section class="summary-panel scim">
+      <div class="summary-head">
+        <div class="summary-title scim">📋 SCIM 종합 결과 (EMR 복사용)</div>
+        <div class="summary-actions">
+          <button class="primary scim" onclick="scim_copyAll()">전체 복사<span id="scimCopyStatus" class="copy-status">✓</span></button>
+        </div>
+      </div>
+      <div class="total-line scim">
+        <div>
+          <div class="label">Total SCIM Score</div>
+          <div class="score"><span id="scimTotalScore">0</span> <span style="font-size:14px; opacity:.85;">/ 100</span></div>
+        </div>
+      </div>
+      <div class="subscore-row">
+        <div class="subscore-box scim">
+          <div class="subscore-label scim">자기관리</div>
+          <div class="subscore-value scim"><span id="scimSubSelfcare">0</span> / 20</div>
+        </div>
+        <div class="subscore-box scim">
+          <div class="subscore-label scim">호흡·괄약근 조절</div>
+          <div class="subscore-value scim"><span id="scimSubResp">0</span> / 40</div>
+        </div>
+        <div class="subscore-box scim">
+          <div class="subscore-label scim">이동</div>
+          <div class="subscore-value scim"><span id="scimSubMobility">0</span> / 40</div>
+        </div>
+      </div>
+      <div class="copy-notice">복사 전 반드시 자동 생성된 코멘트를 검토하고 실제 관찰과 대조하여 수정해주세요.</div>
+      <textarea id="scimSummaryText" class="summary-text" placeholder="세부활동을 체크하면 코멘트가 자동으로 정리됩니다." readonly></textarea>
+    </section>
+
+    <div id="scimItemsContainer"></div>
+  </div>
+
+  <!-- ==================== SCIM → MBI 변환 ==================== -->
+  <div id="convertApp" class="mode-content">
+    <header class="topbar">
+      <div class="brand"><div class="logo" style="background:#7c2d12;">→</div><span>SCIM → MBI 자동 변환</span></div>
+      <button class="primary" style="background:#7c2d12; color:white;" onclick="convert_refresh()">↻ 새로고침</button>
+    </header>
+
+    <div class="convert-info">
+      <strong>⚠️ 자동 변환 결과는 초안이므로 반드시 실제 임상 관찰과 대조하여 최종 확인이 필요합니다.</strong><br><br>
+      <strong>정확한 변환을 위해 SCIM 채점 시 다음을 꼼꼼히 체크해주세요:</strong><br>
+      · <strong>식사</strong>: 쇠젓가락 / 에디슨 젓가락 / 포크 중 실제 사용 도구<br>
+      · <strong>목욕</strong>: 목욕의자·휠체어·손잡이 등 특별한 세팅 사용 여부<br>
+      · <strong>옷입기</strong>: 단추 / 지퍼 / 신발끈 조작 가능 여부<br>
+      · <strong>몸단장</strong>: Universal cuff / Adaptive comb 사용 여부<br>
+      · <strong>배뇨</strong>: 유치 도뇨관 / 외부 배뇨 도구(edi) 사용 여부<br>
+      · <strong>배변</strong>: 좌약 사용 여부<br>
+      · <strong>용변처리</strong>: Portable bidet / Toilet aids / 안전장치 사용 여부<br>
+      · <strong>계단</strong>: 난간 잡고 수행 / 난간 없이 수행<br>
+      · <strong>이동</strong>: '완전 독립 (감독 불필요)' 명시 체크 시에만 만점 반영<br><br>
+      <strong>※ 자동 변환의 한계:</strong><br>
+      · 배변·배뇨는 SCIM(실금 중시)과 MBI(조절 가능성) 관점 차이로 오차 발생 가능<br>
+      · 항목별 세부 상황(발톱 정리, 특정 부위 등)은 SCIM에 없어 반영 불가<br>
+      · 자동 변환 후 [MBI 탭에 반영] 클릭 → MBI 탭에서 세부 조정 필수
+    </div>
+
+    <section class="summary-panel mbi">
+      <div class="summary-head">
+        <div class="summary-title mbi">📋 변환된 MBI 결과 (EMR 복사용)</div>
+        <div class="summary-actions">
+          <button class="primary" style="background:#7c2d12; color:white;" onclick="convert_applyToMbi()">MBI 탭에 반영</button>
+          <button class="primary mbi" onclick="convert_copyAll()">전체 복사<span id="convertCopyStatus" class="copy-status">✓</span></button>
+        </div>
+      </div>
+      <div class="total-line mbi">
+        <div>
+          <div class="label">변환된 MBI Total Score</div>
+          <div class="score"><span id="convertTotalScore">0</span> <span style="font-size:14px; opacity:.85;">/ 100</span></div>
+        </div>
+        <div>
+          <div class="label">의존도 분류</div>
+          <div class="cat" id="convertDependencyLabel">-</div>
+        </div>
+      </div>
+      <div class="copy-notice">자동 변환은 초안입니다. 반드시 실제 임상 관찰과 대조하여 점수와 코멘트를 최종 검토해주세요.</div>
+      <textarea id="convertSummaryText" class="summary-text" placeholder="SCIM 탭에서 채점을 완료하면 자동으로 변환된 결과가 표시됩니다." readonly></textarea>
+    </section>
+
+    <div class="convert-panel">
+      <div class="convert-title">SCIM 항목 → MBI 항목 매핑 상세</div>
+      <div id="convertMappingContainer"></div>
+    </div>
+  </div>
+
+  <!-- ==================== 채점 가이드 ==================== -->
+  <div id="guideApp" class="mode-content">
+    <div class="guide-header">
+      <h2>📖 MBI · SCIM 채점 임상 가이드</h2>
+      <p>K-MBI(한글판)와 SCIM III 원문의 임상 예시와 채점 팁을 항목별로 정리했습니다.<br>각 항목을 클릭하면 세부 채점 원칙과 실제 사례를 볼 수 있습니다.</p>
+      <div class="guide-source">Sources: (1) 정한영 외, 한글판 수정바델지수(K-MBI)의 개발, 대한재활의학회지 2007;31(3):283-297<br>(2) Praxis Spinal Cord Institute, Toolkit for SCIM III, January 2024, v7.0</div>
+    </div>
+    <div id="guideContainer"></div>
+  </div>
+
+  <!-- ==================== 인쇄 ==================== -->
+  <div id="printApp" class="mode-content">
+    <div class="print-controls">
+      <div class="info">📄 종이로 뽑아서 손으로 체크할 수 있는 A4 체크리스트입니다. 인쇄할 페이지를 선택하세요.</div>
+      <button class="print-btn" onclick="printMbi()">🖨 MBI 인쇄</button>
+      <button class="print-btn" onclick="printScim()">🖨 SCIM 인쇄</button>
+    </div>
+
+    <!-- MBI 인쇄 페이지 -->
+    <div id="printMbiPage" class="print-page">
+      <div class="print-header">
+        <h1>MBI (Modified Barthel Index)</h1>
+      </div>
+      <div id="printMbiContent"></div>
+    </div>
+
+    <!-- SCIM 인쇄 페이지 -->
+    <div id="printScimPage" class="print-page print-page-scim" style="margin-top:24px;">
+      <div class="print-header">
+        <h1>SCIM (Spinal Cord Independence Measure III)</h1>
+      </div>
+      <div id="printScimContent"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ==================== 공통 모드 전환 ====================
+function switchMode(mode){
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.classList.contains(mode)));
+  document.querySelectorAll('.mode-content').forEach(c => {
+    if (c.id === mode + 'App') c.classList.add('active');
+    else c.classList.remove('active');
+  });
+  try { localStorage.setItem('current_mode', mode); } catch(e){}
+  if (mode === 'convert') convert_refresh();
+  if (mode === 'guide') renderGuide();
+  if (mode === 'print') {
+    const oldP2 = document.getElementById('printScimPage2');
+    if (oldP2) oldP2.remove();
+    print_renderMbi();
+    print_renderScim();
+  }
+}
+
+// ==================== MBI 데이터 ====================
+const MBI_DATA = [
+  {
+    id:'ph', name:'개인위생', nameEn:'Personal hygiene',
+    scoreMap:{1:0, 2:1, 3:3, 4:4, 5:5},
+    baseComments:{
+      1:'모든 개인위생 활동(이 닦기, 손 씻기, 세수, 머리 빗기, 면도 등)을 전혀 할 수 없어 완전히 의존적임',
+      2:'개인위생 활동 중 한두 가지는 스스로 할 수 있으나 대체로 다른 사람의 도움에 의해 수행되는 부분이 많음',
+      3:'개인위생 활동 중 하나 이상에서 약간의 도움이 필요하며 지속적인 힌트가 필요함',
+      4:'개인위생 활동을 수행할 수 있으나 수행 전·후에 최소한의 도움이 필요함',
+      5:'모든 개인위생 활동을 독립적으로 안전하게 수행할 수 있음'
+    },
+    items:[
+      { text:'모든 개인위생 활동 완전 의존', grade:1, phrase:'모든 개인위생 활동(이 닦기, 손 씻기, 세수, 머리 빗기, 면도 등)을 전혀 할 수 없어 완전히 의존적임' },
+      { text:'한두 가지만 스스로, 대체로 도움', grade:2, phrase:'개인위생 활동 중 한두 가지는 스스로 할 수 있으나 대체로 다른 사람의 도움에 의해 수행되는 부분이 많음' },
+      { text:'하나 이상 약간의 도움 필요', grade:3, phrase:'개인위생 활동 중 하나 이상에서 약간의 도움이 필요함' },
+      { text:'지속적 힌트 필요', grade:3, phrase:'작업을 끝내기 위해 지속적인 힌트가 필요함' },
+      { text:'수행 전·후 최소한의 도움', grade:4, phrase:'개인위생 활동 수행 전·후에 최소한의 도움이 필요함' },
+      { text:'안전 주의 필요 (플러그, 면도기 날, 뜨거운 물 등)', grade:4, phrase:'플러그 끼우기, 면도기 날 고정, 뜨거운 물 온도 조절 등 안전에 대한 주의가 필요함' },
+      { text:'화장 관련 약간의 도움', grade:4, phrase:'화장을 하거나 지우거나 고칠 때 약간의 도움이 필요할 수 있음' },
+      { text:'독립적으로 안전하게 수행', grade:5, phrase:'모든 개인위생 활동을 독립적으로 안전하게 수행함' },
+      // 활동 (도구 태그)
+      { text:'양치', commentOnly:true, activity:true, phrase:'양치 활동 중' },
+      { text:'세수', commentOnly:true, activity:true, phrase:'세수 활동 중' },
+      { text:'손 씻기', commentOnly:true, activity:true, phrase:'손 씻기 활동 중' },
+      { text:'머리 빗기', commentOnly:true, activity:true, phrase:'머리 빗기 활동 중' },
+      { text:'면도', commentOnly:true, activity:true, phrase:'면도 활동 중' },
+      { text:'손발톱 정리', commentOnly:true, activity:true, phrase:'손발톱 정리 활동 중' },
+      { text:'의치 관리', commentOnly:true, activity:true, phrase:'의치 관리 활동 중' },
+      { text:'치약 뚜껑 여닫기', commentOnly:true, activity:true, phrase:'치약 뚜껑 여닫기 활동 중' },
+      { text:'치약 짜기', commentOnly:true, activity:true, phrase:'치약 짜기 활동 중' },
+      { text:'화장', commentOnly:true, activity:true, phrase:'화장 활동 중' },
+      { text:'화장 지우기', commentOnly:true, activity:true, phrase:'화장 지우기 활동 중' },
+      { text:'면도기 관리(면도날, 청결)', commentOnly:true, activity:true, phrase:'면도기 관리(면도날, 청결) 활동 중' }
+    ]
+  },
+  {
+    id:'bt', name:'목욕하기', nameEn:'Bathing self',
+    scoreMap:{1:0, 2:1, 3:3, 4:4, 5:5},
+    baseComments:{
+      1:'목욕을 전적으로 타인에게 의존하며 몸을 씻지 못하고 온 몸을 말리지 못함',
+      2:'목욕의 모든 과정에서 도움과 지시가 필요하며 가슴과 팔은 스스로 씻을 수 있음',
+      3:'샤워실(욕조) 이동, 욕조에 앉기, 비누칠, 팔다리 씻기 등에 도움이 필요하며 힌트, 유도, 감독이 필요함',
+      4:'샤워실(욕조) 이동, 목욕물 온도 조절 시 안전에 대한 보호가 필요하며 목욕기구·물·세제 등 준비에 도움이 필요함. 비장애인의 3배 이상 시간 소요됨',
+      5:'모든 목욕 과정을 독립적으로 수행할 수 있음'
+    },
+    items:[
+      { text:'전적 의존 (몸 씻기·말리기 불가능)', grade:1, phrase:'목욕을 전적으로 타인에게 의존하며 몸을 씻지 못하고 온 몸을 말리지 못함' },
+      { text:'모든 과정 지시 필요 (가슴/팔만 스스로)', grade:2, phrase:'목욕의 모든 과정에서 도움과 지시가 필요하며 가슴과 팔은 스스로 씻을 수 있음' },
+      { text:'샤워실(욕조) 이동 도움', grade:3, phrase:'샤워실(욕조)로 이동 시 도움이 필요함' },
+      { text:'힌트·유도·감독 필요', grade:3, phrase:'목욕 시 힌트, 유도, 감독이 필요함' },
+      { text:'샤워실 이동·물 온도 조절 안전 보호', grade:4, phrase:'샤워실(욕조) 이동, 목욕물 온도 조절 시 안전에 대한 보호가 필요함' },
+      { text:'목욕기구·물·세제 준비 도움', grade:4, phrase:'목욕기구, 목욕물, 세제 등 준비에 도움이 필요함' },
+      { text:'3배 이상 시간 소요', grade:4, phrase:'목욕하는 데 비장애인의 3배 이상 시간이 소요됨' },
+      { text:'독립적 수행', grade:5, phrase:'모든 목욕 과정을 독립적으로 수행함' },
+      { text:'2배 이상 시간 소요', grade:5, phrase:'목욕시간이 비장애인의 2배까지 소요될 수 있음' },
+      // 도구
+      { text:'욕조 앉기', commentOnly:true, activity:true, phrase:'욕조 앉기 활동 중' },
+      { text:'건측 팔이 닿는 부위 씻기', commentOnly:true, activity:true, phrase:'건측 팔이 닿는 부위 씻기 활동 중' },
+      { text:'팔 씻기', commentOnly:true, activity:true, phrase:'팔 씻기 활동 중' },
+      { text:'몸통 씻기', commentOnly:true, activity:true, phrase:'몸통 씻기 활동 중' },
+      { text:'다리 씻기', commentOnly:true, activity:true, phrase:'다리 씻기 활동 중' },
+      { text:'수건 사용', commentOnly:true, activity:true, phrase:'수건 사용 활동 중' },
+      { text:'목욕의자 사용', commentOnly:true, phrase:'목욕의자에 앉아 목욕 수행 중' },
+      { text:'목욕침대 사용', commentOnly:true, phrase:'목욕침대에서 목욕 수행 중', dx:['amp','sci'] },
+      { text:'긴 손잡이 브러쉬 사용', commentOnly:true, phrase:'긴 손잡이 브러쉬를 사용하여 손이 닿지 않는 부위 세척 중' }
+    ]
+  },
+  {
+    id:'fd', name:'식사하기', nameEn:'Feeding',
+    scoreMap:{1:0, 2:2, 3:5, 4:8, 5:10},
+    baseComments:{
+      1:'모든 식사 과정을 타인에게 의존함. 보호자가 음식을 떠서 입에 넣어주면 씹고 삼키기만 하며, 튜브영양 시 주입·연결·세척 등에 많은 도움이 필요함',
+      2:'숟가락은 사용 가능하나 다른 사람이 숟가락에 음식을 올려주면 입으로 가져가 먹을 수 있음',
+      3:'숟가락으로 스스로 식사가 가능하나 젓가락 사용은 어려움. 식사 준비 과정에 도움이 필요하며 적절한 지시나 격려가 필요할 수 있음',
+      4:'고기 자르기, 김치 썰기, 병뚜껑 열기 등을 제외하고 스스로 식사가 가능함. 미세한 젓가락질은 어려우나 젓가락 사용은 가능하며 식사시간이 오래 걸림',
+      5:'식판이나 식탁 위 손이 닿는 음식을 혼자서 먹을 수 있으며 숟가락, 포크, 젓가락, 컵, 유리잔 등을 사용하여 독립적인 식사가 가능함'
+    },
+    items:[
+      { text:'완전 의존 (떠먹여야 함)', grade:1, phrase:'보호자가 음식을 떠서 입에 넣어주면 씹고 삼키기만 함' },
+      { text:'튜브영양', grade:1, phrase:'튜브영양 중이며 주입, 연결, 세척, 주입속도 조절 등에 많은 도움이 필요함' },
+      { text:'숟가락 사용은 가능하나 음식 뜨기 도움 필요', grade:2, phrase:'숟가락은 사용 가능하나 다른 사람이 숟가락에 음식을 올려주면 입으로 가져가 먹을 수 있음' },
+      { text:'숟가락으로 스스로 식사, 젓가락 어려움', grade:3, phrase:'숟가락으로 스스로 식사가 가능하나 젓가락 사용은 어려움' },
+      { text:'식사 준비 도움 (설탕, 소금·후추, 국에 밥 말기 등)', grade:3, phrase:'설탕 넣기, 소금·후추 치기, 국에 밥 말기 등 식사 준비 과정에 도움이 필요함' },
+      { text:'지시·격려 필요', grade:3, phrase:'식사 중 적절한 지시나 격려가 필요할 수 있음' },
+      { text:'고기 자르기, 김치 썰기, 병뚜껑 등 도움', grade:4, phrase:'고기 자르기, 김치 썰기, 병뚜껑 열기 등에 도움이 필요할 수 있음' },
+      { text:'미세 젓가락질 어려우나 젓가락 사용 가능', grade:4, phrase:'미세한 젓가락질은 어려우나 젓가락 사용은 가능함' },
+      { text:'식사시간 오래 걸림', grade:4, phrase:'식사시간이 오래 걸림' },
+      { text:'모든 도구 사용 독립적', grade:5, phrase:'숟가락, 포크, 젓가락, 컵, 유리잔 등을 사용하여 독립적인 식사가 가능함' },
+      { text:'유텐실 사용', commentOnly:true, phrase:'유텐실(utensil)을 사용하여 식사함' },
+      { text:'빌트업(built-up) 식기 사용', commentOnly:true, phrase:'빌트업(built-up) 식기를 사용하여 식사함' },
+      { text:'에디슨 젓가락 사용', commentOnly:true, phrase:'에디슨 젓가락을 사용하여 식사함' },
+      { text:'포크 사용', commentOnly:true, phrase:'포크를 사용하여 식사함' }
+    ]
+  },
+  {
+    id:'tl', name:'용변처리', nameEn:'Toilet',
+    scoreMap:{1:0, 2:2, 3:5, 4:8, 5:10},
+    baseComments:{
+      1:'용변을 전적으로 타인에 의해 처리함',
+      2:'변기 이동, 옷 추스르기, 화장지 사용, 회음부 위생 등 모든 용변 과정에 많은 도움이 필요함',
+      3:'회음부 위생은 스스로 수행 가능하나 변기 이동, 옷 추스르기, 손 씻기에 도움이 필요할 수 있음',
+      4:'안전한 용변을 위해 보호가 필요하며 화장지 준비에 도움이 필요할 수 있음. 좌변기는 스스로 사용 가능하나 재래식 변기 사용은 어려움',
+      5:'변기에 앉고 일어나기, 옷 벗고 입기가 가능하며 용변 시 옷을 더럽히지 않음. 좌변기와 재래식 변기 모두 사용 가능함'
+    },
+    items:[
+      { text:'전적 의존', grade:1, phrase:'용변을 전적으로 타인에 의해 처리함' },
+      { text:'많은 도움 필요', grade:2, phrase:'변기 이동, 옷 추스르기, 화장지 사용, 회음부 위생 등 모든 용변 과정에 많은 도움이 필요함' },
+      { text:'회음부 위생 스스로 수행', grade:3, phrase:'회음부 위생은 스스로 수행 가능함' },
+      { text:'옷 추스르기(지퍼 등) 도움', grade:3, phrase:'옷 추스르기(지퍼 열고 닫기 등)에 도움이 필요할 수 있음' },
+      { text:'균형 잡기 위해 도움', grade:3, phrase:'용변 시 균형을 잡기 위해 도움이 필요할 수 있음' },
+      { text:'안전한 용변 보호 필요', grade:4, phrase:'안전한 용변을 위해 보호가 필요함' },
+      { text:'화장지 준비 도움', grade:4, phrase:'화장지 준비에 도움이 필요할 수 있음' },
+      { text:'밤에 이동변기 필요', grade:4, phrase:'밤에 이동변기가 필요할 수 있음' },
+      { text:'좌변기 가능, 재래식 어려움', grade:4, phrase:'좌변기는 스스로 사용 가능하나 쪼그려 앉는 재래식 변기 사용은 어려움' },
+      { text:'독립적 용변 (좌변기·재래식 모두 가능)', grade:5, phrase:'변기에 앉고 일어나기, 옷 벗고 입기가 가능하며 좌변기와 재래식 변기 모두 사용 가능함' },
+      { text:'화장실(변기) 이동', commentOnly:true, activity:true, phrase:'화장실(변기) 이동 활동 중' },
+      { text:'바지·팬티 벗고 입기', commentOnly:true, activity:true, phrase:'바지·팬티 벗고 입기 활동 중' },
+      { text:'화장지 사용', commentOnly:true, activity:true, phrase:'화장지 사용 활동 중' },
+      { text:'회음부 위생', commentOnly:true, activity:true, phrase:'회음부 위생 활동 중' },
+      { text:'손 씻기', commentOnly:true, activity:true, phrase:'손 씻기 활동 중' },
+      { text:'옷 추스르기', commentOnly:true, activity:true, phrase:'옷 추스르기 활동 중' }
+    ]
+  },
+  {
+    id:'st', name:'계단 오르내리기', nameEn:'Stair climbing',
+    scoreMap:{1:0, 2:2, 3:5, 4:8, 5:10},
+    baseComments:{
+      1:'계단을 오르내릴 수 없어 2인 이상의 도움이 필요함',
+      2:'계단 오르내리기 전 과정에서 1인의 부축이 필요함',
+      3:'계단을 오르내릴 수 있으나 보호자나 보조자가 필요함',
+      4:'도움 없이 계단을 오르내릴 수 있으나 사지가 뻣뻣하거나 숨이 찬 경우 안전을 위한 보호가 필요함',
+      5:'타인의 도움이나 보호 없이 스스로 계단을 안전하게 오르내릴 수 있으며 난간, 지팡이, 목발 사용 가능함'
+    },
+    items:[
+      { text:'오르내리기 불가능 (2인 이상 도움)', grade:1, phrase:'계단을 오르내릴 수 없어 2인 이상의 도움이 필요함' },
+      { text:'전 과정 도움 (1인 부축)', grade:2, phrase:'계단 오르내리기 전 과정에서 1인의 부축이 필요함' },
+      { text:'오르내리기 가능하나 보호자/보조자 필요', grade:3, phrase:'계단을 오르내릴 수 있으나 보호자나 보조자가 필요함' },
+      { text:'도움 없이 가능하나 안전 보호 필요', grade:4, phrase:'도움 없이 계단을 오르내릴 수 있으나 사지가 뻣뻣하거나 숨이 찬 경우 안전을 위한 보호가 필요함' },
+      { text:'스스로 안전하게 오르내리기', grade:5, phrase:'타인의 도움이나 보호 없이 스스로 계단을 안전하게 오르내릴 수 있음' },
+      { text:'난간 잡고 수행', commentOnly:true, phrase:'난간을 잡고 계단을 오르내림' },
+      { text:'난간 없이 수행', commentOnly:true, phrase:'난간 없이 계단을 오르내림' }
+    ]
+  },
+  {
+    id:'dr', name:'옷 입기', nameEn:'Dressing',
+    scoreMap:{1:0, 2:2, 3:5, 4:8, 5:10},
+    baseComments:{
+      1:'옷 갈아입는 전 과정에서 의존적이며 타인이 전적으로 옷을 입혀 주어야 함',
+      2:'옷 갈아입기에 일부 참여는 가능하나 전반적으로 타인의 최대한의 도움이 필요함',
+      3:'옷 입고 벗기 과정에서 도움이 필요함. 옷 준비, 의상 부속품 치장, 옷 입고 벗기의 시작·마무리 단계에서 도움이 필요함',
+      4:'옷장에서 옷 꺼내기, 조이기(단추, 지퍼, 브래지어, 신발끈) 등에 약간의 도움이 필요함. 유도, 재촉, 힌트가 필요할 수 있으며 옷 입는 시간이 3배 이상 오래 걸림',
+      5:'옷을 준비해서 입고 벗을 수 있으며 신발끈, 코르셋, 보조기, 의지도 관리 가능함'
+    },
+    items:[
+      { text:'전 과정 의존', grade:1, phrase:'옷 갈아입는 전 과정에서 의존적이며 타인이 전적으로 옷을 입혀 주어야 함' },
+      { text:'일부 참여 가능, 최대 도움 필요', grade:2, phrase:'옷 갈아입기 일부 참여는 가능하나 전반적으로 타인의 최대한의 도움이 필요함' },
+      { text:'상의 한쪽 팔 끼우기만 가능', grade:2, phrase:'상의 한쪽 팔 끼우기는 가능하나 머리 넣기, 다른 팔 넣기에 도움이 필요함' },
+      { text:'옷 입고 벗기 도움', grade:3, phrase:'옷 입고 벗기 과정에서 도움이 필요함' },
+      { text:'옷 준비·의상 부속품 치장 도움', grade:3, phrase:'옷 준비 및 의상 부속품 치장에 도움이 필요함' },
+      { text:'시작·마무리 단계 도움', grade:3, phrase:'옷 입고 벗기의 시작과 마무리 단계에서 도움이 필요함' },
+      { text:'옷장에서 옷 꺼내기 도움', grade:4, phrase:'옷장에서 옷을 꺼낼 때 도움이 필요할 수 있음' },
+      { text:'조이기 (단추, 지퍼, 브래지어, 신발끈) 도움', grade:4, phrase:'단추, 지퍼, 브래지어, 신발끈 등 조이기에 약간의 도움이 필요함' },
+      { text:'유도·재촉·힌트 필요', grade:4, phrase:'옷 입기 시 유도, 재촉, 힌트가 필요할 수 있음' },
+      { text:'3배 이상 시간 소요', grade:4, phrase:'옷 입는 시간이 3배 이상 오래 걸림' },
+      { text:'독립적 옷 입기', grade:5, phrase:'옷을 준비해서 독립적으로 입고 벗을 수 있으며 신발끈, 코르셋, 보조기, 의지도 관리 가능함' },
+      { text:'상의(티셔츠) 입고 벗기', commentOnly:true, activity:true, phrase:'상의(티셔츠) 입고 벗기 활동 중' },
+      { text:'스웨터/장목 상의 입고 벗기', commentOnly:true, activity:true, phrase:'스웨터/장목 상의 입고 벗기 활동 중' },
+      { text:'외투 입고 벗기', commentOnly:true, activity:true, phrase:'외투 입고 벗기 활동 중' },
+      { text:'바지 입고 벗기', commentOnly:true, activity:true, phrase:'바지 입고 벗기 활동 중' },
+      { text:'치마 입고 벗기', commentOnly:true, activity:true, phrase:'치마 입고 벗기 활동 중' },
+      { text:'속옷 입고 벗기', commentOnly:true, activity:true, phrase:'속옷 입고 벗기 활동 중' },
+      { text:'브래지어 입고 벗기', commentOnly:true, activity:true, phrase:'브래지어 입고 벗기 활동 중' },
+      { text:'양말 신고 벗기', commentOnly:true, activity:true, phrase:'양말 신고 벗기 활동 중' },
+      { text:'신발 신고 벗기', commentOnly:true, activity:true, phrase:'신발 신고 벗기 활동 중' },
+      { text:'코르셋 입고 벗기', commentOnly:true, activity:true, phrase:'코르셋 입고 벗기 활동 중' },
+      { text:'보조기·의지 입고 벗기', commentOnly:true, activity:true, phrase:'보조기·의지 입고 벗기 활동 중' },
+      { text:'Reacher 사용', commentOnly:true, phrase:'Reacher를 사용하여 옷 입음' },
+      { text:'Button hook 사용', commentOnly:true, phrase:'Button hook을 사용하여 단추를 잠금' },
+      { text:'Zipper pulls 사용', commentOnly:true, phrase:'Zipper pulls를 사용하여 지퍼를 조작함' },
+      { text:'Dressing stick 사용', commentOnly:true, phrase:'Dressing stick을 사용하여 옷 입음' },
+      { text:'Sock aid 사용', commentOnly:true, phrase:'Sock aid를 사용하여 양말 신음' },
+      { text:'침대 난간 사용', commentOnly:true, phrase:'침대 난간을 사용하여 옷 입음' },
+      { text:'앉은 자세에서 옷 입기', commentOnly:true, phrase:'앉은 자세에서 옷을 입음' },
+      { text:'누운 자세에서 바지 입기', commentOnly:true, phrase:'누운 자세에서 바지를 입음' }
+    ]
+  },
+  {
+    id:'bo', name:'배변조절', nameEn:'Bowel control',
+    scoreMap:{1:0, 2:2, 3:5, 4:8, 5:10},
+    baseComments:{
+      1:'배변을 조절하지 못하여 기저귀나 흡수용 패드를 착용함',
+      2:'적절한 배변자세를 취하거나 장운동촉진 방법을 시행하기 위해 도움이 필요하며 실변이 자주 있어 패드 착용이 필요함',
+      3:'적절한 배변자세는 취할 수 있으나 배변 후 항문 닦기, 실변 보조기구(패드 등) 착용에 도움이 필요함. 실변은 드묾',
+      4:'좌약 삽입, 관장 과정에 보호가 필요하며 실변 예방을 위해 재촉, 힌트, 규칙적 배변이 필요함',
+      5:'스스로 배변조절이 가능하며 실변이 없음'
+    },
+    items:[
+      { text:'조절 못함, 기저귀/패드 착용', grade:1, phrase:'배변을 조절하지 못하여 기저귀나 흡수용 패드를 착용함' },
+      { text:'배변자세·장운동촉진 도움, 실변 자주', grade:2, phrase:'적절한 배변자세를 취하거나 장운동촉진 방법을 시행하기 위해 도움이 필요하며 실변이 자주 있어 패드 착용이 필요함' },
+      { text:'배변자세 가능하나 항문 닦기 도움', grade:3, phrase:'적절한 배변자세는 취할 수 있으나 배변 후 항문 닦기에 도움이 필요함' },
+      { text:'실변 보조기구(패드) 착용 도움', grade:3, phrase:'실변 보조기구(패드 등) 착용에 도움이 필요함' },
+      { text:'좌약·관장 과정 보호', grade:4, phrase:'좌약 삽입, 관장 과정에 보호가 필요함' },
+      { text:'실변 예방 재촉·힌트·규칙적 배변', grade:4, phrase:'실변 예방을 위해 재촉이나 힌트, 규칙적 배변이 필요함' },
+      { text:'스스로 완벽 조절', grade:5, phrase:'스스로 배변조절이 가능하며 실변이 없음' }
+    ]
+  },
+  {
+    id:'bl', name:'배뇨조절', nameEn:'Bladder control',
+    scoreMap:{1:0, 2:2, 3:5, 4:8, 5:10},
+    baseComments:{
+      1:'배뇨조절을 전혀 할 수 없어 실뇨가 있거나 지속적 도뇨를 하고 있으며 외부도뇨, 배뇨백, 야간백 사용에 모두 도움이 필요함',
+      2:'실뇨가 있으나 도뇨 기구 사용으로 도움이 됨. 배뇨자세, 외부 도뇨기구, 튜브, 배뇨백 관리에 도움이 필요함',
+      3:'배뇨는 가능하나 배뇨자세, 도뇨 기구, 패드 등 사용에 도움이 필요하며 간혹 실뇨가 있음',
+      4:'대체적으로 실뇨는 없으나 화장실을 빨리 찾지 못하면 실뇨가 발생할 수 있음. 기구 사용이나 준비에 약간의 도움이 필요함',
+      5:'배뇨조절이 가능하며 기구 사용을 스스로 할 수 있음'
+    },
+    items:[
+      { text:'조절 못함 (실뇨/지속적 도뇨)', grade:1, phrase:'배뇨조절을 전혀 할 수 없어 실뇨가 있거나 지속적 도뇨를 하고 있음' },
+      { text:'외부도뇨·배뇨백·야간백 도움', grade:1, phrase:'외부도뇨, 배뇨백, 야간백 사용에 모두 도움이 필요함' },
+      { text:'실뇨 있으나 도뇨 기구로 도움 됨', grade:2, phrase:'실뇨가 있으나 도뇨 기구 사용으로 도움이 됨' },
+      { text:'배뇨자세 도움', grade:2, phrase:'배뇨자세를 취하기 위해 도움이 필요함' },
+      { text:'외부 도뇨, 튜브, 배뇨백 관리 도움', grade:2, phrase:'외부 도뇨기구, 튜브, 배뇨백 관리에 도움이 필요함' },
+      { text:'배뇨 가능하나 배뇨자세 도움', grade:3, phrase:'배뇨는 가능하나 배뇨자세를 취하는 데 도움이 필요함' },
+      { text:'도뇨 기구·패드 사용 도움', grade:3, phrase:'도뇨 기구, 패드 사용에 도움이 필요함' },
+      { text:'간혹 실뇨', grade:3, phrase:'간혹 실뇨가 있음' },
+      { text:'힌트·감독 필요', grade:3, phrase:'유도, 힌트, 감독이 필요할 수 있음' },
+      { text:'화장실 못 찾으면 실뇨', grade:4, phrase:'대체적으로 실뇨는 없으나 화장실을 빨리 찾지 못하면 실뇨가 있을 수 있음' },
+      { text:'기구 사용/준비 약간 도움', grade:4, phrase:'기구 사용이나 준비에 약간의 도움이 필요함' },
+      { text:'실뇨 예방 재촉·힌트·규칙적 배뇨', grade:4, phrase:'실뇨 예방을 위해 재촉이나 힌트, 규칙적 배뇨가 필요함' },
+      { text:'스스로 배뇨 조절', grade:5, phrase:'배뇨조절이 가능하며 기구 사용을 스스로 할 수 있음' }
+    ]
+  },
+  {
+    id:'am', name:'보행', nameEn:'Ambulation',
+    scoreMap:{1:0, 2:3, 3:8, 4:12, 5:15},
+    baseComments:{
+      1:'보행이 불가능하며 두 명 이상의 도움이 필요함',
+      2:'보행에 한 명 이상의 도움이 지속적으로 필요함',
+      3:'보행이 가능하나 보행보조기구(지팡이, 워커 등)를 챙기거나 조작하는 데, 문지방이나 불규칙한 지면을 지날 때 도움이 필요함',
+      4:'보행이 가능하나 50미터 미만이고 시간이 오래 걸리며 안전을 위해 보호가 필요함',
+      5:'보조기(목발, 지팡이, 워커 등)를 독립적으로 사용할 수 있으며 도움이나 보호 없이 50미터 이상 보행할 수 있음'
+    },
+    items:[
+      { text:'보행 불가능 (2명 이상 도움)', grade:1, phrase:'보행이 불가능하며 두 명 이상의 도움이 필요함' },
+      { text:'1명 이상 지속적 도움', grade:2, phrase:'보행에 한 명 이상의 도움이 지속적으로 필요함' },
+      { text:'보조기구 챙기기/조작 도움', grade:3, phrase:'보행보조기구를 챙기거나 조작하는 데 도움이 필요함' },
+      { text:'문지방/불규칙 지면 도움', grade:3, phrase:'문지방이나 불규칙한 지면을 지날 때 도움이 필요함' },
+      { text:'50m 미만, 시간 오래, 안전 보호', grade:4, phrase:'보행이 가능하나 50미터 미만이고 시간이 오래 걸리며 안전을 위해 보호가 필요함' },
+      { text:'독립적 50m 이상 보행', grade:5, phrase:'도움이나 보호 없이 50미터 이상 독립적으로 보행할 수 있음' },
+      // 도구
+      { text:'Q cane 사용', commentOnly:true, phrase:'Q cane을 사용하여 보행함', dx:['stroke'] },
+      { text:'Mono cane 사용', commentOnly:true, phrase:'Mono cane을 사용하여 보행함', dx:['pd','stroke'] },
+      { text:'Cane/지팡이 사용', commentOnly:true, phrase:'지팡이(cane)를 사용하여 보행함' },
+      { text:'High walker 사용', commentOnly:true, phrase:'High walker를 사용하여 보행함' },
+      { text:'Low walker 사용', commentOnly:true, phrase:'Low walker를 사용하여 보행함' },
+      { text:'실내보행', commentOnly:true, activity:true, phrase:'실내보행 활동 중' },
+      { text:'실외보행', commentOnly:true, activity:true, phrase:'실외보행 활동 중' },
+      { text:'평지', commentOnly:true, activity:true, phrase:'평지 보행 활동 중' },
+      { text:'경사로', commentOnly:true, activity:true, phrase:'경사로 보행 활동 중' },
+      { text:'불규칙 지면', commentOnly:true, activity:true, phrase:'불규칙 지면 보행 활동 중' },
+      { text:'코너', commentOnly:true, activity:true, phrase:'코너 보행 활동 중' }
+    ]
+  },
+  {
+    id:'wc', name:'의자차', nameEn:'Wheelchair', note:'보행 가능 시 미평가',
+    scoreMap:{1:0, 2:1, 3:3, 4:4, 5:5},
+    baseComments:{
+      1:'의자차 보행에 전적인 도움이 필요함',
+      2:'평지에서 단거리는 전진 가능하나 브레이크, 팔걸이 조절 등 조작에 도움이 필요함',
+      3:'의자차를 탁자, 침대에 가까이 대기, 가구 주위나 제한된 공간에서 조작 시 도움이 필요함',
+      4:'평지에서는 혼자 사용 가능하나 좁은 길모퉁이에서 약간의 도움이 필요함',
+      5:'의자차를 독립적으로 사용하여 길모퉁이 돌기, 회전, 탁자·침대 가까이 대기가 가능하며 50미터 이상 전진할 수 있음'
+    },
+    items:[
+      { text:'전적 도움 필요', grade:1, phrase:'의자차 보행에 전적인 도움이 필요함' },
+      { text:'평지 단거리 전진 가능, 조작 도움', grade:2, phrase:'평지에서 단거리는 전진 가능하나 브레이크, 팔걸이 조절 등 조작에 도움이 필요함' },
+      { text:'탁자/침대 가까이 대기 도움', grade:3, phrase:'의자차를 탁자, 침대에 가까이 댈 때 도움이 필요함' },
+      { text:'가구 주위/제한 공간 조작 도움', grade:3, phrase:'가구 주위나 제한된 공간에서 의자차 조작 시 도움이 필요함' },
+      { text:'평지 혼자 사용, 좁은 길모퉁이 도움', grade:4, phrase:'평지에서는 혼자 사용 가능하나 좁은 길모퉁이에서 약간의 도움이 필요함' },
+      { text:'제한 공간 구두 지시 필요', grade:4, phrase:'제한된 공간에서 의자차 조작 시 구두 지시가 가끔 필요함' },
+      { text:'독립적 조작 50m 이상', grade:5, phrase:'의자차를 독립적으로 사용하여 50미터 이상 전진할 수 있음' },
+      { text:'화장실 조작', commentOnly:true, activity:true, phrase:'화장실 조작 활동 중' }
+    ]
+  },
+  {
+    id:'tr', name:'의자/침대 이동', nameEn:'Chair/bed transfer',
+    scoreMap:{1:0, 2:3, 3:8, 4:12, 5:15},
+    baseComments:{
+      1:'이동 시 참여하지 못하며 두 명의 도움이 필요함',
+      2:'이동에 참여는 하지만 이동 동작의 전 과정에서 한 명의 최대한의 도움이 필요함',
+      3:'이동에 한 명의 도움이 필요하며 이동 동작의 어느 과정에서도 도움이 필요할 수 있음',
+      4:'슬라이딩 보드를 조절하고 의자차 발판을 움직일 수 있으나 최소의 도움이 필요함. 안전을 위해 한 명의 보호자가 필요함',
+      5:'의자/침대 이동 동작을 독립적으로 수행할 수 있음'
+    },
+    items:[
+      { text:'참여 못함, 2명 도움', grade:1, phrase:'이동 시 참여하지 못하며 두 명의 도움이 필요함' },
+      { text:'참여하나 1인 최대 도움', grade:2, phrase:'이동에 참여는 하지만 이동 동작의 전 과정에서 한 명의 최대한의 도움이 필요함' },
+      { text:'1인 도움 (어느 과정에서든)', grade:3, phrase:'이동에 한 명의 도움이 필요하며 이동 동작의 어느 과정에서도 도움이 필요할 수 있음' },
+      { text:'발판 조절 가능, 최소 도움', grade:4, phrase:'의자차 발판을 조절할 수 있으나 최소의 도움이 필요함' },
+      { text:'안전 위해 1인 보호자 필요', grade:4, phrase:'이동 동작을 잘 수행하나 안전을 위해 한 명의 보호자가 필요함' },
+      { text:'독립적 이동', grade:5, phrase:'의자/침대 이동 동작을 독립적으로 수행할 수 있음' },
+      { text:'슬라이딩 보드 사용', commentOnly:true, phrase:'슬라이딩 보드를 사용하여 이동함' }
+    ]
+  }
+];
+
+const HAND_SENSITIVE = ['ph', 'bt', 'fd', 'dr'];
+
+const HAND_PREFIX = {
+  ph: {
+    right: '우측 손 위주로 개인위생 활동 수행 중',
+    left: '좌측 손 위주로 개인위생 활동 수행 중',
+    both: '양손을 사용하여 개인위생 활동 수행 중'
+  },
+  bt: {
+    right: '우측 손으로 손이 닿는 부위(가슴, 팔 등)까지 씻기 가능함',
+    left: '좌측 손으로 손이 닿는 부위(가슴, 팔 등)까지 씻기 가능함',
+    both: '양손을 사용하여 목욕 활동 수행 중'
+  },
+  fd: {
+    right: '우측 손으로 숟가락 사용하여 식사 중',
+    left: '좌측 손으로 숟가락 사용하여 식사 중',
+    both: '양손을 사용하여 식사 활동 수행 중'
+  },
+  dr: {
+    right: '우측 손 위주로 옷 입고 벗기 활동 수행 중',
+    left: '좌측 손 위주로 옷 입고 벗기 활동 수행 중',
+    both: '양손을 사용하여 옷 입고 벗기 활동 수행 중'
+  }
+};
+
+
+const MBI_ACTIVITY_LABELS = {
+  ph: '참여 활동',
+  bt: '참여 활동 · 보조도구',
+  am: '참여 활동 · 보조도구',
+  wc: '참여 활동',
+  tr: '보조도구',
+  dr: '참여 활동 · 보조도구',
+  tl: '참여 활동',
+  fd: '보조도구',
+  st: '보조도구'
+};
+
+// ==================== MBI 로직 ====================
+const MBI_STORAGE_KEY = 'mbi_evaluation_current';
+let mbi_currentLang = 'en';
+let mbi_currentSide = 'right';
+let mbi_currentMobility = 'am';
+
+const MbiStore = {
+  load(){ try { const v = localStorage.getItem(MBI_STORAGE_KEY); return v ? JSON.parse(v) : null; } catch { return null; } },
+  save(data){ try { localStorage.setItem(MBI_STORAGE_KEY, JSON.stringify(data)); return true; } catch { return false; } }
+};
+
+let mbi_saveTimer = null;
+function mbi_scheduleSave(){ clearTimeout(mbi_saveTimer); mbi_saveTimer = setTimeout(()=>{ MbiStore.save(mbi_collectState()); }, 500); }
+
+function mbi_setLang(lang){
+  mbi_currentLang = lang;
+  document.getElementById('mbiLangKo').classList.toggle('active', lang === 'ko');
+  document.getElementById('mbiLangEn').classList.toggle('active', lang === 'en');
+  mbi_updateSummary();
+  mbi_scheduleSave();
+}
+
+function mbi_setSide(side){
+  mbi_currentSide = side;
+  document.querySelectorAll('[data-mbi-side]').forEach(b => b.classList.toggle('active', b.dataset.mbiSide === side));
+  HAND_SENSITIVE.forEach(id => {
+    const ta = document.querySelector(`#mbiApp textarea[data-comment="${id}"]`);
+    if (ta && ta.dataset.edited !== 'true') mbi_updateItem(id);
+  });
+  mbi_updateSummary();
+  mbi_scheduleSave();
+}
+
+function mbi_setMobility(m){
+  mbi_currentMobility = m;
+  document.querySelectorAll('[data-mbi-mobility]').forEach(b => b.classList.toggle('active', b.dataset.mbiMobility === m));
+  const activeId = m;
+  const inactiveId = m === 'am' ? 'wc' : 'am';
+  const activeNa = document.querySelector(`#mbiApp input[data-na="${activeId}"]`);
+  if (activeNa) {
+    activeNa.checked = false;
+    activeNa.disabled = false;
+    document.querySelectorAll(`#mbiApp input[data-item="${activeId}"]`).forEach(cb => cb.disabled = false);
+  }
+  const activeCard = document.querySelector(`#mbiApp .item-card[data-id="${activeId}"]`);
+  if (activeCard) activeCard.classList.remove('disabled');
+  const inactiveNa = document.querySelector(`#mbiApp input[data-na="${inactiveId}"]`);
+  if (inactiveNa) {
+    inactiveNa.checked = true;
+    inactiveNa.disabled = true;
+    document.querySelectorAll(`#mbiApp input[data-item="${inactiveId}"]`).forEach(cb => {
+      cb.disabled = true;
+      cb.checked = false;
+    });
+  }
+  const inactiveCard = document.querySelector(`#mbiApp .item-card[data-id="${inactiveId}"]`);
+  if (inactiveCard) inactiveCard.classList.add('disabled');
+  const inactiveTa = document.querySelector(`#mbiApp textarea[data-comment="${inactiveId}"]`);
+  if (inactiveTa) inactiveTa.dataset.edited = 'false';
+  mbi_updateItem(activeId);
+  mbi_updateItem(inactiveId);
+  mbi_updateSummary();
+  mbi_scheduleSave();
+}
+
+function mbi_renderItems(){
+  const container = document.getElementById('mbiItemsContainer');
+  container.innerHTML = '';
+  MBI_DATA.forEach(item => {
+    const card = document.createElement('section');
+    card.className = 'item-card mbi';
+    card.dataset.id = item.id;
+    const makeCheckHtml = (c, idx) => {
+      const dxAttr = c.dx ? ` data-dx="${c.dx.join(',')}"` : '';
+      const scoreForGrade = c.grade ? item.scoreMap[c.grade] : null;
+      const tag = c.commentOnly
+        ? `<span class="g-tag g-tool">참여</span>`
+        : `<span class="g-tag g${c.grade}">${scoreForGrade}점</span>`;
+      const bgClass = c.grade ? ` grade-bg-${c.grade}` : '';
+      return `<label class="check-item mbi-item${bgClass}"${dxAttr}>
+        <input type="checkbox" data-item="${item.id}" data-idx="${idx}" onchange="mbi_onCheckChange('${item.id}', event)" />
+        <span class="txt">${c.text}${tag}</span>
+      </label>`;
+    };
+    const gradeChecks = item.items.map((c, idx) => c.commentOnly ? null : makeCheckHtml(c, idx)).filter(Boolean).join('');
+    const activityChecks = item.items.map((c, idx) => c.commentOnly ? makeCheckHtml(c, idx) : null).filter(Boolean).join('');
+    let checksHtml = `<div class="check-grid">${gradeChecks}</div>`;
+    if (activityChecks) {
+      const labelText = MBI_ACTIVITY_LABELS[item.id] || '참여 활동 · 도구';
+      checksHtml += `<div class="activity-box mbi"><div class="activity-label mbi">${labelText}</div><div class="check-grid">${activityChecks}</div></div>`;
+    }
+    card.innerHTML = `
+      <div class="item-head">
+        <div>
+          <div class="item-title">${item.name}<span class="item-en">${item.nameEn}</span>${item.note ? `<span class="item-note">${item.note}</span>` : ''}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label class="na-toggle">
+            <input type="checkbox" data-na="${item.id}" onchange="mbi_onNaChange('${item.id}')" />
+            <span>미평가</span>
+          </label>
+          <div class="score-badge na" id="mbi-badge-${item.id}">0점</div>
+        </div>
+      </div>
+      ${checksHtml}
+      <div class="comment-wrap">
+        <div class="comment-label">
+          <span>코멘트</span>
+          <button class="regen-btn mbi" onclick="mbi_regenComment('${item.id}')">↻ 재생성</button>
+        </div>
+        <textarea data-comment="${item.id}" oninput="mbi_onCommentEdit('${item.id}')" rows="2"></textarea>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function mbi_getCheckedGrades(itemId){
+  const boxes = document.querySelectorAll(`#mbiApp input[data-item="${itemId}"]:checked`);
+  return Array.from(boxes).map(b => {
+    const idx = parseInt(b.dataset.idx);
+    const item = MBI_DATA.find(x => x.id === itemId).items[idx];
+    return { idx, grade: item.grade, phrase: item.phrase, text: item.text, commentOnly: !!item.commentOnly, activity: !!item.activity };
+  });
+}
+
+function mbi_calcGrade(itemId){
+  const na = document.querySelector(`#mbiApp input[data-na="${itemId}"]`).checked;
+  if (na) return { grade: null, na: true };
+  const gradeItems = mbi_getCheckedGrades(itemId).filter(c => !c.commentOnly);
+  if (gradeItems.length === 0) return { grade: 1, na: false, empty: true };  // 아무것도 안 체크 = 0점(등급 1)
+  return { grade: Math.min(...gradeItems.map(c => c.grade)), na: false };
+}
+
+function mbi_buildCommentOnlyPhrases(checkedItems){
+  const activities = checkedItems.filter(c => c.activity).map(c => c.text);
+  const others = checkedItems.filter(c => c.commentOnly && !c.activity).map(c => c.phrase);
+  const result = [];
+  if (activities.length > 0) result.push(activities.join(', ') + ' 활동 중');
+  result.push(...others);
+  return result;
+}
+
+function mbi_generateComment(itemId, finalGrade, isEmpty){
+  const item = MBI_DATA.find(x => x.id === itemId);
+  const allChecked = mbi_getCheckedGrades(itemId);
+  const commentOnlyPhrases = mbi_buildCommentOnlyPhrases(allChecked);
+  let mainComment;
+  if (isEmpty) {
+    // 아무 체크 없음: 코멘트도 비움
+    if (commentOnlyPhrases.length > 0) mainComment = commentOnlyPhrases.map(p => p + '.').join(' ');
+    else mainComment = '';
+  } else if (finalGrade === 5) {
+    const grade5Specific = allChecked.filter(c => !c.commentOnly && c.grade === 5);
+    const phrases = [...commentOnlyPhrases, ...grade5Specific.map(c => c.phrase)];
+    if (phrases.length === 0) mainComment = item.baseComments[5];
+    else mainComment = phrases.map(p => p + '.').join(' ');
+  } else {
+    const gradeSpecific = allChecked.filter(c => !c.commentOnly && c.grade === finalGrade);
+    const phrases = [...commentOnlyPhrases, ...gradeSpecific.map(c => c.phrase)];
+    if (phrases.length === 0) mainComment = item.baseComments[finalGrade] + '.';
+    else mainComment = phrases.map(p => p + '.').join(' ');
+  }
+  if (HAND_SENSITIVE.includes(itemId) && mbi_currentSide !== 'none' && finalGrade >= 2 && finalGrade <= 4 && !isEmpty) {
+    const prefix = HAND_PREFIX[itemId]?.[mbi_currentSide];
+    if (prefix) mainComment = prefix + '. ' + mainComment;
+  }
+  return mainComment;
+}
+
+function mbi_onCheckChange(itemId, event){
+  const cb = event ? event.target : null;
+  const clickedIdx = cb ? parseInt(cb.dataset.idx) : null;
+  const item = MBI_DATA.find(x => x.id === itemId);
+  const clickedItem = clickedIdx !== null ? item.items[clickedIdx] : null;
+  
+  // 방금 체크된 경우 & 등급 항목인 경우에만 경고
+  if (cb && cb.checked && clickedItem && !clickedItem.commentOnly) {
+    const otherChecked = mbi_getCheckedGrades(itemId).filter(c => !c.commentOnly && c.idx !== clickedIdx);
+    const differentGrade = otherChecked.filter(c => c.grade !== clickedItem.grade);
+    
+    if (differentGrade.length > 0) {
+      const otherGrades = [...new Set(differentGrade.map(c => c.grade))].sort((a,b) => a-b);
+      const message = `⚠️ 이미 ${otherGrades.join('등급, ')}등급이 선택되어 있습니다.\n\n${clickedItem.grade}등급도 함께 체크하시겠습니까?\n(여러 등급 체크 시 최저 등급이 최종 점수로 적용됩니다)`;
+      if (!confirm(message)) {
+        cb.checked = false;
+        return;
+      }
+    }
+  }
+  
+  mbi_updateItem(itemId); mbi_updateSummary(); mbi_scheduleSave();
+}
+function mbi_onNaChange(itemId){
+  const na = document.querySelector(`#mbiApp input[data-na="${itemId}"]`).checked;
+  document.querySelectorAll(`#mbiApp input[data-item="${itemId}"]`).forEach(cb => {
+    cb.disabled = na;
+    if (na) cb.checked = false;
+  });
+  mbi_updateItem(itemId); mbi_updateSummary(); mbi_scheduleSave();
+}
+function mbi_onCommentEdit(itemId){
+  const ta = document.querySelector(`#mbiApp textarea[data-comment="${itemId}"]`);
+  ta.dataset.edited = 'true';
+  mbi_updateSummary(); mbi_scheduleSave();
+}
+function mbi_regenComment(itemId){
+  const result = mbi_calcGrade(itemId);
+  const ta = document.querySelector(`#mbiApp textarea[data-comment="${itemId}"]`);
+  if (result.na) ta.value = '';
+  else ta.value = mbi_generateComment(itemId, result.grade, result.empty);
+  ta.dataset.edited = 'false';
+  mbi_updateSummary(); mbi_scheduleSave();
+}
+
+function mbi_updateItem(itemId){
+  const item = MBI_DATA.find(x => x.id === itemId);
+  const result = mbi_calcGrade(itemId);
+  const badge = document.getElementById(`mbi-badge-${itemId}`);
+  const ta = document.querySelector(`#mbiApp textarea[data-comment="${itemId}"]`);
+  const card = document.querySelector(`#mbiApp .item-card[data-id="${itemId}"]`);
+  if (result.na){
+    badge.textContent = '미평가';
+    badge.className = 'score-badge na';
+    if (ta.dataset.edited !== 'true') ta.value = '';
+    if (card) card.classList.remove('unchecked');
+  } else {
+    const score = item.scoreMap[result.grade];
+    badge.textContent = `${score}점`;
+    badge.className = `score-badge grade${result.grade}`;
+    if (ta.dataset.edited !== 'true') ta.value = mbi_generateComment(itemId, result.grade, result.empty);
+    if (card) card.classList.toggle('unchecked', result.empty === true);
+  }
+}
+
+function mbi_updateSummary(){
+  let total = 0;
+  const lines = [];
+  let hasNa = false;
+  MBI_DATA.forEach(item => {
+    if (item.id === 'am' && mbi_currentMobility === 'wc') return;
+    if (item.id === 'wc' && mbi_currentMobility === 'am') return;
+    const result = mbi_calcGrade(item.id);
+    const ta = document.querySelector(`#mbiApp textarea[data-comment="${item.id}"]`);
+    const comment = ta.value.trim();
+    const label = mbi_currentLang === 'ko' ? item.name : item.nameEn;
+    if (result.na){
+      hasNa = true;
+      lines.push(`${label} - (미평가)`);
+    } else {
+      total += item.scoreMap[result.grade];
+      if (comment) lines.push(`${label} - ${comment}`);
+      else if (result.empty) lines.push(`${label} - (미체크)`);
+      else lines.push(`${label} - ${item.baseComments[result.grade]}.`);
+    }
+  });
+  document.getElementById('mbiTotalScore').textContent = total;
+  let depLabel = '';
+  if (total <= 24) depLabel = '완전 의존 (Total Dependence)';
+  else if (total <= 49) depLabel = '심한 의존 (Severe Dependence)';
+  else if (total <= 74) depLabel = '중등도 의존 (Moderate Dependence)';
+  else if (total <= 90) depLabel = '경도 의존 (Slight Dependence)';
+  else depLabel = '최소 의존 (Minimum/No Dependence)';
+  document.getElementById('mbiDependencyLabel').textContent = depLabel;
+  const header = `MBI Total: ${total}/100${hasNa ? ' (일부 미평가)' : ''}\n`;
+  document.getElementById('mbiSummaryText').value = header + '\n' + lines.join('\n');
+}
+
+async function mbi_copyAll(){
+  // 미체크 항목 확인
+  const unchecked = [];
+  MBI_DATA.forEach(item => {
+    if (item.id === 'am' && mbi_currentMobility === 'wc') return;
+    if (item.id === 'wc' && mbi_currentMobility === 'am') return;
+    const result = mbi_calcGrade(item.id);
+    if (!result.na && result.empty) unchecked.push(item.name);
+  });
+  if (unchecked.length > 0) {
+    const names = unchecked.join(', ');
+    if (!confirm(`⚠️ 다음 항목이 아직 채점되지 않았습니다:\n${names}\n\n그래도 복사하시겠습니까?`)) {
+      return;
+    }
+  }
+  const text = document.getElementById('mbiSummaryText').value;
+  try { await navigator.clipboard.writeText(text); }
+  catch(e) {
+    const ta = document.getElementById('mbiSummaryText');
+    ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly', '');
+  }
+  const s = document.getElementById('mbiCopyStatus');
+  s.classList.add('show');
+  setTimeout(()=>s.classList.remove('show'), 1500);
+}
+
+function mbi_collectState(){
+  const items = {};
+  MBI_DATA.forEach(item => {
+    const checked = [];
+    document.querySelectorAll(`#mbiApp input[data-item="${item.id}"]`).forEach(cb => {
+      if (cb.checked) checked.push(parseInt(cb.dataset.idx));
+    });
+    const na = document.querySelector(`#mbiApp input[data-na="${item.id}"]`).checked;
+    const ta = document.querySelector(`#mbiApp textarea[data-comment="${item.id}"]`);
+    items[item.id] = { checked, na, comment: ta.value, edited: ta.dataset.edited === 'true' };
+  });
+  return { items, lang: mbi_currentLang, side: mbi_currentSide, mobility: mbi_currentMobility };
+}
+
+function mbi_restoreState(data){
+  if (!data) return;
+  if (data.lang) mbi_setLang(data.lang);
+  if (data.side) mbi_setSide(data.side);
+  if (data.mobility) mbi_setMobility(data.mobility);
+  if (!data.items) return;
+  MBI_DATA.forEach(item => {
+    const s = data.items[item.id];
+    if (!s) return;
+    (s.checked || []).forEach(idx => {
+      const cb = document.querySelector(`#mbiApp input[data-item="${item.id}"][data-idx="${idx}"]`);
+      if (cb) cb.checked = true;
+    });
+    if (s.na) {
+      const na = document.querySelector(`#mbiApp input[data-na="${item.id}"]`);
+      na.checked = true;
+      document.querySelectorAll(`#mbiApp input[data-item="${item.id}"]`).forEach(cb => cb.disabled = true);
+    }
+    const ta = document.querySelector(`#mbiApp textarea[data-comment="${item.id}"]`);
+    if (s.edited) { ta.value = s.comment || ''; ta.dataset.edited = 'true'; }
+    mbi_updateItem(item.id);
+  });
+}
+
+function resetMbi(){
+  if (!confirm('MBI 평가를 모두 지우고 새로 시작하시겠습니까?')) return;
+  localStorage.removeItem(MBI_STORAGE_KEY);
+  MBI_DATA.forEach(item => {
+    document.querySelectorAll(`#mbiApp input[data-item="${item.id}"]`).forEach(cb => cb.checked = false);
+    const na = document.querySelector(`#mbiApp input[data-na="${item.id}"]`);
+    if (na) na.checked = false;
+    const ta = document.querySelector(`#mbiApp textarea[data-comment="${item.id}"]`);
+    if (ta) { ta.value = ''; ta.dataset.edited = 'false'; }
+    mbi_updateItem(item.id);
+  });
+  mbi_setSide('right');
+  mbi_setMobility('am');
+  mbi_updateSummary();
+}
+
+// ==================== SCIM 데이터 ====================
+const SCIM_DATA = [
+  // ========== 자기관리 (20점) ==========
+  {
+    section:'selfcare', id:'feeding', name:'식사', nameEn:'Feeding', max:3,
+    baseComment:'모든 활동을 독립적으로 수행함, 보조도구/특별한 세팅 필요 없음',
+    items:[
+      { text:'완전한 도움', score:0, phrase:'식사에 완전한 도움이 필요함' },
+      { text:'비경구식 섭취 (비위관/위관 영양)', score:0, phrase:'비경구식 섭취(비위관 영양, 위관 영양 등) 중' },
+      { text:'식사 과정 부분적 도움', score:1, phrase:'식사하는 과정(음식물 먹고 음료 마시기 등)에 부분적인 도움이 필요함' },
+      { text:'보조도구 착용 도움', score:1, phrase:'보조도구를 착용하기 위해 도움이 필요함' },
+      { text:'보조도구 이용하여 독립적 수행', score:2, phrase:'보조도구를 이용하여 독립적으로 식사를 수행함' },
+      { text:'Set-up 도움 (자르기/열기/따르기)', score:2, phrase:'먹기 좋도록 Set-up 가능(음식물 자르기, 캔 열기, 음료 따르기 도움 필요)' },
+      { text:'완전 독립 (도구/도움 필요 없음)', score:3, phrase:'모든 활동을 독립적으로 수행함, 보조도구/특별한 세팅 필요 없음' },
+      { text:'먹기', commentOnly:true, activity:true, phrase:'먹기 활동 중' },
+      { text:'컵 사용 (액체 마시기)', commentOnly:true, activity:true, phrase:'컵 사용 활동 중' },
+      { text:'음식물 자르기', commentOnly:true, activity:true, phrase:'음식물 자르기 활동 중' },
+      { text:'캔 열기', commentOnly:true, activity:true, phrase:'캔 열기 활동 중' },
+      { text:'음료 따르기', commentOnly:true, activity:true, phrase:'음료 따르기 활동 중' },
+      { text:'숟가락 사용', commentOnly:true, activity:true, phrase:'숟가락 사용 활동 중' },
+      { text:'쇠젓가락 사용', commentOnly:true, activity:true, phrase:'쇠젓가락 사용 활동 중' },
+      { text:'에디슨 젓가락 사용', commentOnly:true, activity:true, phrase:'에디슨 젓가락 사용 활동 중' },
+      { text:'포크 사용', commentOnly:true, activity:true, phrase:'포크 사용 활동 중' },
+      { text:'Universal cuff 사용', commentOnly:true, phrase:'Universal cuff을 사용하여 식사함' },
+      { text:'맞춤형 컵 사용', commentOnly:true, phrase:'맞춤형 컵을 사용하여 액체를 섭취함' }
+    ]
+  },
+  {
+    section:'selfcare', id:'bath_up', name:'목욕 - 상체', nameEn:'Bathing (upper body)', max:3,
+    baseComment:'상체 목욕의 모든 활동을 독립적으로 수행함, 보조도구/특별한 세팅 필요 없음',
+    items:[
+      { text:'완전한 도움', score:0, phrase:'상체 목욕에 완전한 도움이 필요함' },
+      { text:'부분적 도움', score:1, phrase:'상체 목욕에 부분적인 도움이 필요함' },
+      { text:'안전 위한 지속 감독 (물 온도 체크 등)', score:1, phrase:'상체 목욕 시 안전을 위한 지속적인 감독이 필요함 (물 온도 체크 등)' },
+      { text:'보조도구 이용하여 수행', score:2, phrase:'보조도구(긴 손잡이 브러쉬 등)를 이용하여 상체를 독립적으로 씻을 수 있음' },
+      { text:'특별한 세팅에서 독립적', score:2, phrase:'특별한 세팅(손잡이, 목욕의자, 목욕 휠체어 등)에서 상체를 독립적으로 씻을 수 있음' },
+      { text:'완전 독립 (도구/세팅 필요 없음)', score:3, phrase:'상체 목욕의 모든 활동을 독립적으로 수행함' },
+      { text:'비누칠하기', commentOnly:true, activity:true, phrase:'비누칠하기 활동 중' },
+      { text:'상체 씻기', commentOnly:true, activity:true, phrase:'상체 씻기 활동 중' },
+      { text:'몸과 머리 말리기', commentOnly:true, activity:true, phrase:'몸과 머리 말리기 활동 중' },
+      { text:'수도/샤워기 다루기', commentOnly:true, activity:true, phrase:'수도/샤워기 다루기 활동 중' },
+      { text:'긴 손잡이 브러쉬 사용', commentOnly:true, phrase:'긴 손잡이 브러쉬를 사용하여 목욕함' },
+      { text:'손잡이 사용', commentOnly:true, phrase:'손잡이를 사용하여 목욕함' },
+      { text:'목욕의자 사용', commentOnly:true, phrase:'목욕의자에 앉아 목욕함' },
+      { text:'목욕 휠체어 사용', commentOnly:true, phrase:'목욕 휠체어를 사용하여 목욕함' }
+    ]
+  },
+  {
+    section:'selfcare', id:'bath_lo', name:'목욕 - 하체', nameEn:'Bathing (lower body)', max:3,
+    baseComment:'하체 목욕의 모든 활동을 독립적으로 수행함, 보조도구/특별한 세팅 필요 없음',
+    items:[
+      { text:'완전한 도움', score:0, phrase:'하체 목욕에 완전한 도움이 필요함' },
+      { text:'부분적 도움', score:1, phrase:'하체 목욕에 부분적인 도움이 필요함' },
+      { text:'안전 위한 지속 감독 (물 온도 체크 등)', score:1, phrase:'하체 목욕 시 안전을 위한 지속적인 감독이 필요함 (물 온도 체크 등)' },
+      { text:'보조도구 이용하여 수행', score:2, phrase:'보조도구(긴 손잡이 브러쉬 등)를 이용하여 하체를 독립적으로 씻을 수 있음' },
+      { text:'특별한 세팅에서 독립적', score:2, phrase:'특별한 세팅(손잡이, 목욕의자, 목욕 휠체어 등)에서 하체를 독립적으로 씻을 수 있음' },
+      { text:'완전 독립 (도구/세팅 필요 없음)', score:3, phrase:'하체 목욕의 모든 활동을 독립적으로 수행함' },
+      { text:'비누칠하기', commentOnly:true, activity:true, phrase:'비누칠하기 활동 중' },
+      { text:'하체 씻기', commentOnly:true, activity:true, phrase:'하체 씻기 활동 중' },
+      { text:'몸 말리기', commentOnly:true, activity:true, phrase:'몸 말리기 활동 중' },
+      { text:'긴 손잡이 브러쉬 사용', commentOnly:true, phrase:'긴 손잡이 브러쉬를 사용하여 목욕함' },
+      { text:'손잡이 사용', commentOnly:true, phrase:'손잡이를 사용하여 목욕함' },
+      { text:'목욕의자 사용', commentOnly:true, phrase:'목욕의자에 앉아 목욕함' },
+      { text:'목욕 휠체어 사용', commentOnly:true, phrase:'목욕 휠체어를 사용하여 목욕함' }
+    ]
+  },
+  {
+    section:'selfcare', id:'dress_up', name:'옷 입기 - 상의', nameEn:'Dressing (upper body)', max:4,
+    baseComment:'모든 종류의 상의를 독립적으로 입음, 보조도구/특별한 세팅 필요 없음',
+    items:[
+      { text:'완전한 도움 필요', score:0, phrase:'상의 옷 입기 시 완전한 도움이 필요함' },
+      { text:'단추/지퍼/끈 없는 옷 부분적 도움', score:1, phrase:'단추, 지퍼, 끈이 없는 상의를 부분적 도움으로 입음' },
+      { text:'단추/지퍼/끈 없는 옷 보조도구/세팅 필요', score:2, phrase:'보조도구나 특별한 세팅에서 단추, 지퍼, 끈이 없는 상의를 독립적으로 입음' },
+      { text:'단추/지퍼/끈 있는 옷 여밈장치 도움', score:3, phrase:'보조도구/특별한 세팅 없이 단추, 지퍼, 끈이 없는 상의는 독립적으로 입으나 단추/지퍼/끈이 있는 옷은 도움/보조도구/특별한 세팅이 필요함' },
+      { text:'모든 종류의 상의 독립적 착용', score:4, phrase:'모든 종류의 상의를 독립적으로 입음, 보조도구/특별한 세팅 필요 없음' },
+      { text:'상의 입기', commentOnly:true, activity:true, phrase:'상의 입기 활동 중' },
+      { text:'상의 벗기', commentOnly:true, activity:true, phrase:'상의 벗기 활동 중' },
+      { text:'단추 조작', commentOnly:true, activity:true, phrase:'단추 조작 활동 중' },
+      { text:'지퍼 조작', commentOnly:true, activity:true, phrase:'지퍼 조작 활동 중' },
+      { text:'브래지어 조작', commentOnly:true, activity:true, phrase:'브래지어 조작 활동 중' },
+      { text:'맞춤형 의류 사용', commentOnly:true, phrase:'맞춤형 의류를 사용함' },
+      { text:'Button hook 사용', commentOnly:true, phrase:'Button hook을 사용하여 단추를 잠금' },
+      { text:'Reacher 사용', commentOnly:true, phrase:'Reacher를 사용함' },
+      { text:'Dressing stick 사용', commentOnly:true, phrase:'Dressing stick을 사용함' },
+      { text:'Zipper pulls 사용', commentOnly:true, phrase:'Zipper pulls를 사용함' },
+      { text:'Overhead loop 사용', commentOnly:true, phrase:'Overhead loop를 사용하여 옷 입음' },
+      { text:'침대 난간 사용', commentOnly:true, phrase:'침대 난간을 사용하여 옷 입음' },
+      { text:'앉은 자세에서 옷 입기', commentOnly:true, phrase:'앉은 자세에서 옷을 입음' },
+      { text:'누운 자세에서 바지 입기', commentOnly:true, phrase:'누운 자세에서 바지를 입음' }
+    ]
+  },
+  {
+    section:'selfcare', id:'dress_lo', name:'옷 입기 - 하의', nameEn:'Dressing (lower body)', max:4,
+    baseComment:'모든 종류의 하의를 독립적으로 입음, 보조도구/특별한 세팅 필요 없음',
+    items:[
+      { text:'완전한 도움 필요', score:0, phrase:'하의 옷 입기 시 완전한 도움이 필요함' },
+      { text:'단추/지퍼/끈 없는 옷 부분적 도움', score:1, phrase:'단추, 지퍼, 끈이 없는 하의를 부분적 도움으로 입음' },
+      { text:'단추/지퍼/끈 없는 옷 보조도구/세팅 필요', score:2, phrase:'보조도구나 특별한 세팅에서 단추, 지퍼, 끈이 없는 하의를 독립적으로 입음' },
+      { text:'단추/지퍼/끈 있는 옷 여밈장치 도움', score:3, phrase:'보조도구/특별한 세팅 없이 단추, 지퍼, 끈이 없는 하의는 독립적으로 입으나 단추/지퍼/끈이 있는 옷은 도움/보조도구/특별한 세팅이 필요함' },
+      { text:'모든 종류의 하의 독립적 착용', score:4, phrase:'모든 종류의 하의를 독립적으로 입음, 보조도구/특별한 세팅 필요 없음' },
+      { text:'하의 입기', commentOnly:true, activity:true, phrase:'하의 입기 활동 중' },
+      { text:'하의 벗기', commentOnly:true, activity:true, phrase:'하의 벗기 활동 중' },
+      { text:'단추/지퍼 조작', commentOnly:true, activity:true, phrase:'단추/지퍼 조작 활동 중' },
+      { text:'신발끈 조작', commentOnly:true, activity:true, phrase:'신발끈 조작 활동 중' },
+      { text:'신발 신기', commentOnly:true, activity:true, phrase:'신발 신기 활동 중' },
+      { text:'신발 벗기', commentOnly:true, activity:true, phrase:'신발 벗기 활동 중' },
+      { text:'양말 신기', commentOnly:true, activity:true, phrase:'양말 신기 활동 중' },
+      { text:'양말 벗기', commentOnly:true, activity:true, phrase:'양말 벗기 활동 중' },
+      { text:'맞춤형 의류 사용', commentOnly:true, phrase:'맞춤형 의류를 사용함' },
+      { text:'Reacher 사용', commentOnly:true, phrase:'Reacher를 사용함' },
+      { text:'Dressing stick 사용', commentOnly:true, phrase:'Dressing stick을 사용함' },
+      { text:'Zipper pulls 사용', commentOnly:true, phrase:'Zipper pulls를 사용함' },
+      { text:'Overhead loop 사용', commentOnly:true, phrase:'Overhead loop를 사용하여 옷 입음' },
+      { text:'침대 난간 사용', commentOnly:true, phrase:'침대 난간을 사용하여 옷 입음' },
+      { text:'앉은 자세에서 옷 입기', commentOnly:true, phrase:'앉은 자세에서 옷을 입음' },
+      { text:'누운 자세에서 바지 입기', commentOnly:true, phrase:'누운 자세에서 바지를 입음' }
+    ]
+  },
+  {
+    section:'selfcare', id:'grooming', name:'몸단장', nameEn:'Grooming', max:3,
+    baseComment:'모든 활동을 독립적으로 수행함, 보조도구/특별한 세팅 필요 없음',
+    items:[
+      { text:'완전한 도움', score:0, phrase:'몸단장에 완전한 도움이 필요함' },
+      { text:'부분적 도움', score:1, phrase:'몸단장에 부분적인 도움이 필요함' },
+      { text:'보조도구 이용하여 독립적', score:2, phrase:'보조도구를 이용하여 몸단장을 독립적으로 수행함' },
+      { text:'완전 독립 (도구 없음)', score:3, phrase:'모든 활동을 독립적으로 수행함, 보조도구/특별한 세팅 필요 없음' },
+      { text:'손과 얼굴 씻기', commentOnly:true, activity:true, phrase:'손과 얼굴 씻기 활동 중' },
+      { text:'양치질', commentOnly:true, activity:true, phrase:'양치질 활동 중' },
+      { text:'머리 빗기', commentOnly:true, activity:true, phrase:'머리 빗기 활동 중' },
+      { text:'면도', commentOnly:true, activity:true, phrase:'면도 활동 중' },
+      { text:'화장하기', commentOnly:true, activity:true, phrase:'화장하기 활동 중' },
+      { text:'Universal cuff 사용', commentOnly:true, phrase:'Universal cuff을 사용하여 몸단장함' },
+      { text:'Adaptive comb 사용', commentOnly:true, phrase:'Adaptive comb을 사용하여 머리를 빗음' },
+      { text:'전기면도기 사용', commentOnly:true, phrase:'전기면도기를 사용하여 면도함' }
+    ]
+  },
+  // ========== 호흡과 괄약근 조절 (40점) ==========
+  {
+    section:'resp', id:'respiration', name:'호흡', nameEn:'Respiration', max:10,
+    baseComment:'도움을 주거나 장치 없이 독립적으로 호흡함',
+    items:[
+      { text:'영구적/간헐적 인공호흡기 필요', score:0, phrase:'영구적이거나 간헐적으로 인공호흡기가 필요함' },
+      { text:'산소 + 기도삽입관 관리 많은 도움', score:2, phrase:'산소가 필요하고 기침이나 기도삽입관 관리에 많은 도움이 필요함' },
+      { text:'기도삽입관 관리 적은 도움', score:4, phrase:'기침이나 기도삽입관 관리에 적은 도움이 필요함' },
+      { text:'산소/마스크(peep)/간헐적 인공호흡기 필요', score:6, phrase:'기침에 많은 도움이 필요하고 호흡을 위해 산소, 마스크(peep) 또는 간헐적으로 인공호흡기가 필요함' },
+      { text:'기침 유발 또는 기침 약간 도움', score:8, phrase:'기침을 유발하거나 기침에 약간의 도움이 필요함' },
+      { text:'독립적 호흡 (장치/도움 없음)', score:10, phrase:'도움을 주거나 장치 없이 독립적으로 호흡함' },
+      { text:'자가 호흡', commentOnly:true, activity:true, phrase:'자가 호흡 활동 중' },
+      { text:'호흡 보조기구 사용', commentOnly:true, activity:true, phrase:'호흡 보조기구 사용 중' },
+      { text:'산소 사용', commentOnly:true, phrase:'산소를 사용하여 호흡함' },
+      { text:'마스크(peep) 사용', commentOnly:true, phrase:'마스크(peep)를 사용함' },
+      { text:'인공호흡기 사용', commentOnly:true, phrase:'인공호흡기를 사용함' },
+      { text:'기도삽입관(Tracheal tube) 사용', commentOnly:true, phrase:'기도삽입관(Tracheal tube)을 사용함' }
+    ]
+  },
+  {
+    section:'resp', id:'bladder', name:'괄약근 조절 - 배뇨', nameEn:'Sphincter - Bladder', max:15,
+    baseComment:'자연 배뇨 가능, 잔뇨량 100cc 미만, 도움 필요 없음, 외부 배뇨 도구(edi) 미사용',
+    items:[
+      { text:'유치 도뇨관 착용 + 완전 도움', score:0, phrase:'유치 도뇨관 착용 중이며 배뇨도구 불규칙 사용, 완전한 도움이 필요함' },
+      { text:'불규칙 도뇨 + 잔뇨량 100cc 이상 + 도움', score:3, phrase:'잔뇨량이 높고(100cc 이상) 손으로 방광을 자극 후 자연 배뇨하며 정기적 도뇨가 되지 않아 도움 필요함' },
+      { text:'규칙적 CIC + 잔뇨량 100cc 미만 + 도움 필요', score:6, phrase:'규칙적인 도뇨(CIC)로 잔뇨량 100cc 미만이나 배뇨기구 사용 시 도움이 필요함' },
+      { text:'규칙적 CIC + 도움 없음 + edi 사용(요실금)', score:9, phrase:'규칙적인 도뇨(CIC)로 잔뇨량 100cc 미만, 도움은 필요 없으나 외부 배뇨 도구(edi) 사용하며 요실금 있음' },
+      { text:'규칙적 CIC + 도움 없음 + edi 미사용', score:11, phrase:'규칙적인 도뇨(CIC)를 시행하며 요실금 없이 외부 배뇨 도구(edi) 필요 없음' },
+      { text:'자연 배뇨 + edi 사용(요실금)', score:13, phrase:'자연 배뇨 가능하며 잔뇨량 100cc 미만, 도움은 필요 없으나 외부 배뇨 도구(edi) 사용하며 요실금 있음' },
+      { text:'완전 독립 (실금 없음, edi 미사용)', score:15, phrase:'자연 배뇨 가능, 잔뇨량 100cc 미만, 도움 필요 없음, 외부 배뇨 도구(edi) 미사용' },
+      { text:'자연 배뇨', commentOnly:true, activity:true, phrase:'자연 배뇨 활동 중' },
+      { text:'규칙적인 도뇨(CIC)', commentOnly:true, activity:true, phrase:'규칙적인 도뇨(CIC) 시행 중' },
+      { text:'유치 도뇨관 사용', commentOnly:true, phrase:'유치 도뇨관 사용 중' },
+      { text:'외부 배뇨 도구(edi) 사용', commentOnly:true, phrase:'외부 배뇨 도구(edi)를 사용함' }
+    ]
+  },
+  {
+    section:'resp', id:'bowel', name:'괄약근 조절 - 배변', nameEn:'Sphincter - Bowel', max:10,
+    baseComment:'규칙적인 배변, 실변 없음, 보조적인 도움 필요 없음',
+    items:[
+      { text:'불규칙 배변/변비 (3일 1회 미만)', score:0, phrase:'불규칙적인 배변 또는 3일에 1회 미만의 변비가 있음' },
+      { text:'규칙적 배변 + 도움(좌약 등) + 1달 2번 이상 실변', score:5, phrase:'규칙적인 배변이나 도움(좌약 등)이 필요하며 1달에 2번 이상의 실변이 있음' },
+      { text:'규칙적 배변 + 도움 없음 + 1달 2번 미만 실변', score:8, phrase:'규칙적인 배변, 보조적인 도움 필요 없으나 1달에 2번 미만의 실변이 있음' },
+      { text:'완전 독립 (실변 없음)', score:10, phrase:'규칙적인 배변, 실변 없음, 보조적인 도움 필요 없음' },
+      { text:'좌약 사용', commentOnly:true, phrase:'좌약을 사용하여 규칙적으로 배변함' }
+    ]
+  },
+  {
+    section:'resp', id:'toilet', name:'용변처리 및 화장실 사용', nameEn:'Use of toilet', max:5,
+    baseComment:'독립적으로 용변처리, 보조도구/특별한 세팅 필요 없음',
+    items:[
+      { text:'완전한 도움 (용변처리 완전 의존)', score:0, phrase:'용변처리 시 완전한 도움이 필요함' },
+      { text:'회음부 위생 수행 어려움', score:1, phrase:'회음부 위생 수행이 어려워 부분적 도움이 필요함' },
+      { text:'회음부 위생 독립 + 옷 벗기/화장지/기저귀 도움', score:2, phrase:'회음부 위생은 독립적으로 가능하나 옷 입고 벗기, 화장지/기저귀 사용, 보조도구 사용에 부분적 도움이 필요함' },
+      { text:'보조도구/특별한 세팅에서 독립', score:4, phrase:'보조도구나 특별한 세팅에서 독립적으로 용변처리함' },
+      { text:'완전 독립 (도구/세팅 필요 없음)', score:5, phrase:'독립적으로 용변처리, 보조도구/특별한 세팅 필요 없음' },
+      { text:'회음부 위생', commentOnly:true, activity:true, phrase:'회음부 위생 활동 중' },
+      { text:'손 씻기', commentOnly:true, activity:true, phrase:'손 씻기 활동 중' },
+      { text:'옷 입고 벗기', commentOnly:true, activity:true, phrase:'옷 입고 벗기 활동 중' },
+      { text:'기저귀 등 처리', commentOnly:true, activity:true, phrase:'기저귀 등 처리 활동 중' },
+      { text:'Portable bidet 사용', commentOnly:true, phrase:'Portable bidet을 사용함' },
+      { text:'Toilet aids 사용', commentOnly:true, phrase:'Toilet aids를 사용함' },
+      { text:'안전장치(손잡이 등) 사용', commentOnly:true, phrase:'안전장치(손잡이 등)를 사용함' }
+    ]
+  },
+  // ========== 이동 - 방과 화장실 (10점) ==========
+  {
+    section:'mobility', id:'bed_mob', name:'침상동작과 욕창방지', nameEn:'Mobility in bed & pressure release', max:6,
+    baseComment:'침상 동작과 둔부의 압력을 없애는 동작을 독립적으로 수행함',
+    items:[
+      { text:'모든 활동에서 도움 필요', score:0, phrase:'모든 침상 동작에서 도움이 필요함' },
+      { text:'도움 없이 한 동작 가능', score:2, phrase:'도움 없이 침상 동작 중 한 가지를 수행할 수 있음' },
+      { text:'도움 없이 2~3개 동작 가능', score:4, phrase:'도움 없이 침상 동작 중 두 개나 세 개를 수행할 수 있음' },
+      { text:'모든 동작 독립적 수행', score:6, phrase:'침상 동작과 둔부의 압력을 없애는 동작을 독립적으로 수행함' },
+      { text:'완전 독립 (감독 불필요)', commentOnly:true, activity:true, phrase:'침상 동작 및 욕창방지 동작을 감독 없이 완전 독립적으로 수행함' }
+    ]
+  },
+  {
+    section:'mobility', id:'trans_bed', name:'옮겨앉기 - 침대↔휠체어', nameEn:'Transfers: bed–wheelchair', max:2,
+    baseComment:'휠체어 위치 조정, 브레이크 조작, 발판 올리기, 발 옮기기, 팔걸이 제거 및 조정, 옮겨 앉기를 독립적으로 수행함',
+    items:[
+      { text:'완전한 도움', score:0, phrase:'침대↔휠체어 이동에 완전한 도움이 필요함' },
+      { text:'감독 또는 부분적 도움', score:1, phrase:'침대↔휠체어 이동에 감독 또는 부분적인 도움이 필요함' },
+      { text:'보조도구(슬라이드 보드 등) 사용한 독립적 수행', score:1, phrase:'보조도구(슬라이드 보드 등)를 사용하여 독립적으로 수행함' },
+      { text:'완전 독립 (모든 과정)', score:2, phrase:'휠체어 위치 조정, 브레이크 조작, 발판 올리기, 발 옮기기, 팔걸이 제거 및 조정, 옮겨 앉기를 독립적으로 수행함' },
+      { text:'완전 독립 (감독 불필요)', commentOnly:true, activity:true, phrase:'감독 없이 완전히 독립적으로 이동 수행' }
+    ]
+  },
+  {
+    section:'mobility', id:'trans_toilet', name:'옮겨앉기 - 휠체어↔변기/욕조', nameEn:'Transfers: wheelchair–toilet–tub', max:2,
+    baseComment:'특별한 세팅과 보조도구 없이 독립적으로 변기/목욕장소로 이동함',
+    items:[
+      { text:'완전한 도움', score:0, phrase:'휠체어↔변기/욕조 이동에 완전한 도움이 필요함' },
+      { text:'감독 또는 부분적 도움', score:1, phrase:'휠체어↔변기/욕조 이동에 감독 또는 부분적인 도움이 필요함' },
+      { text:'보조도구/특별한 세팅 사용한 독립적 수행', score:1, phrase:'특별한 세팅(안전 손잡이 등)이나 보조도구(슬라이드 보드 등)를 사용하여 독립적으로 수행함' },
+      { text:'완전 독립 (도구/세팅 필요 없음)', score:2, phrase:'특별한 세팅과 보조도구 없이 독립적으로 변기/목욕장소로 이동함' }
+    ]
+  },
+  // ========== 이동 - 실내와 실외 (30점) ==========
+  {
+    section:'mobility', id:'indoor', name:'실내이동 (10m 이내)', nameEn:'Mobility indoors', max:8,
+    baseComment:'보조기 필요 없이 실내에서 독립적으로 걸음',
+    items:[
+      { text:'완전한 도움 필요', score:0, phrase:'실내이동 시 완전한 도움이 필요함' },
+      { text:'전동 휠체어 필요 or 수동 휠체어 부분 도움', score:1, phrase:'전동 휠체어가 필요하거나 수동 휠체어 이동에 부분적인 도움이 필요함' },
+      { text:'수동 휠체어로 독립적 이동', score:2, phrase:'수동 휠체어를 이용하여 독립적으로 실내 이동함' },
+      { text:'걷는 동안 감독 필요', score:3, phrase:'실내에서 걷는 동안 감독이 필요함 (보조도구 유무 관계없음)' },
+      { text:'워커/목발(swing pattern)', score:4, phrase:'실내에서 워커를 잡고 걷거나 목발을 이용한 스윙 패턴(swing pattern)으로 보행함' },
+      { text:'목발/지팡이 2개 (reciprocal)', score:5, phrase:'실내에서 목발이나 지팡이 2개를 잡고 상호교대적(reciprocal)으로 보행함' },
+      { text:'한 개의 지팡이', score:6, phrase:'실내에서 한 개의 지팡이를 사용하여 독립적으로 걸음' },
+      { text:'다리 보조기(AFO)만 필요', score:7, phrase:'실내에서 다리 보조기(예: AFO)만 필요하여 걸음' },
+      { text:'보조기 없이 독립적 보행', score:8, phrase:'보조기 필요 없이 실내에서 독립적으로 걸음' },
+      { text:'완전 독립 (감독 불필요)', commentOnly:true, activity:true, phrase:'감독 없이 완전 독립적으로 이동 가능함' }
+    ]
+  },
+  {
+    section:'mobility', id:'medium', name:'중등도 거리 이동 (10~100m)', nameEn:'Moderate distances', max:8,
+    baseComment:'보조기 필요 없이 중등도 거리를 독립적으로 걸음',
+    items:[
+      { text:'완전한 도움 필요', score:0, phrase:'중등도 거리 이동에 완전한 도움이 필요함' },
+      { text:'전동 휠체어 필요 or 수동 휠체어 부분 도움', score:1, phrase:'중등도 거리에서 전동 휠체어가 필요하거나 수동 휠체어 이동에 부분적인 도움이 필요함' },
+      { text:'수동 휠체어로 독립적 이동', score:2, phrase:'수동 휠체어를 이용하여 중등도 거리를 독립적으로 이동함' },
+      { text:'걷는 동안 감독 필요', score:3, phrase:'중등도 거리에서 걷는 동안 감독이 필요함' },
+      { text:'워커/목발(swing pattern)', score:4, phrase:'중등도 거리에서 워커를 잡고 걷거나 목발을 이용한 스윙 패턴으로 보행함' },
+      { text:'목발/지팡이 2개 (reciprocal)', score:5, phrase:'중등도 거리에서 목발이나 지팡이 2개를 잡고 상호교대적으로 보행함' },
+      { text:'한 개의 지팡이', score:6, phrase:'중등도 거리에서 한 개의 지팡이를 사용하여 걸음' },
+      { text:'다리 보조기(AFO)만 필요', score:7, phrase:'중등도 거리에서 다리 보조기(예: AFO)만 필요하여 걸음' },
+      { text:'보조기 없이 독립적 보행', score:8, phrase:'보조기 필요 없이 중등도 거리를 독립적으로 걸음' }
+    ]
+  },
+  {
+    section:'mobility', id:'outdoor', name:'실외이동 (100m 이상)', nameEn:'Mobility outdoors', max:8,
+    baseComment:'보조기 필요 없이 실외에서 독립적으로 걸음',
+    items:[
+      { text:'완전한 도움 필요', score:0, phrase:'실외이동에 완전한 도움이 필요함' },
+      { text:'전동 휠체어 필요 or 수동 휠체어 부분 도움', score:1, phrase:'실외에서 전동 휠체어가 필요하거나 수동 휠체어 이동에 부분적인 도움이 필요함' },
+      { text:'수동 휠체어로 독립적 이동', score:2, phrase:'수동 휠체어를 이용하여 실외에서 독립적으로 이동함' },
+      { text:'걷는 동안 감독 필요', score:3, phrase:'실외에서 걷는 동안 감독이 필요함' },
+      { text:'워커/목발(swing pattern)', score:4, phrase:'실외에서 워커를 잡고 걷거나 목발을 이용한 스윙 패턴으로 보행함' },
+      { text:'목발/지팡이 2개 (reciprocal)', score:5, phrase:'실외에서 목발이나 지팡이 2개를 잡고 상호교대적으로 보행함' },
+      { text:'한 개의 지팡이', score:6, phrase:'실외에서 한 개의 지팡이를 사용하여 걸음' },
+      { text:'다리 보조기(AFO)만 필요', score:7, phrase:'실외에서 다리 보조기(예: AFO)만 필요하여 걸음' },
+      { text:'보조기 없이 독립적 보행', score:8, phrase:'보조기 필요 없이 실외에서 독립적으로 걸음' }
+    ]
+  },
+  {
+    section:'mobility', id:'stairs', name:'계단 오르내리기', nameEn:'Stair management', max:3,
+    baseComment:'다리로 걸어서 최소 3계단 이상을 독립적으로 오르내림',
+    items:[
+      { text:'완전한 도움 필요', score:0, phrase:'계단 오르내리기에 완전한 도움이 필요함' },
+      { text:'엉덩이/휠체어 이용 계단 오르내리기', score:0, phrase:'엉덩이로 계단을 올라가거나 휠체어를 이용하여 계단 오르내리기를 함' },
+      { text:'부분적 도움 또는 감독', score:1, phrase:'계단 오르내리기에 부분적인 도움 또는 감독이 필요함' },
+      { text:'보조도구 사용 독립 (3계단 이상)', score:2, phrase:'보조도구(난간, 목발, 지팡이 등)를 사용하여 최소 3계단 이상 독립적으로 오르내림' },
+      { text:'완전 독립 (다리로 3계단 이상)', score:3, phrase:'다리로 걸어서 최소 3계단 이상 오르내리기를 독립적으로 수행함' },
+      { text:'난간 잡고 수행', commentOnly:true, activity:true, phrase:'난간을 잡고 계단 오르내림' },
+      { text:'난간 없이 수행', commentOnly:true, activity:true, phrase:'난간 없이 계단 오르내림' }
+    ]
+  },
+  {
+    section:'mobility', id:'trans_car', name:'옮겨앉기 - 휠체어↔자동차', nameEn:'Transfers: wheelchair–car', max:2,
+    baseComment:'차에 가까이 대기, 브레이크 잠그기, 발판/팔걸이 분리, 차/휠체어로 이동, 휠체어를 차에 싣고 밖으로 꺼내기 모두 독립적으로 수행함',
+    items:[
+      { text:'완전한 도움', score:0, phrase:'휠체어↔자동차 이동에 완전한 도움이 필요함' },
+      { text:'감독 또는 부분적 도움', score:1, phrase:'휠체어↔자동차 이동에 감독 또는 부분적인 도움이 필요함' },
+      { text:'보조도구/개조된 차 사용 독립적', score:1, phrase:'보조도구를 사용하거나 개조된 차를 이용하여 독립적으로 이동함' },
+      { text:'완전 독립 (모든 과정)', score:2, phrase:'차에 가까이 대기, 브레이크 잠그기, 발판/팔걸이 분리, 차/휠체어로 이동, 휠체어를 차에 싣고 밖으로 꺼내기 모두 독립적으로 수행함' }
+    ]
+  },
+  {
+    section:'mobility', id:'trans_floor', name:'옮겨앉기 - 바닥↔휠체어', nameEn:'Transfers: ground–wheelchair', max:1,
+    baseComment:'보조도구 사용 여부와 관계없이 독립적으로 바닥에서 휠체어로 이동함',
+    items:[
+      { text:'옮겨 앉는데 도움 필요', score:0, phrase:'바닥↔휠체어 이동에 도움이 필요함' },
+      { text:'독립적 이동 (도구 사용/미사용)', score:1, phrase:'보조도구 사용 여부와 관계없이 독립적으로 바닥에서 휠체어로 이동함' }
+    ]
+  }
+];
+
+// ==================== SCIM 로직 ====================
+const SCIM_SECTIONS = {
+  selfcare: { label:'자기관리 (Self-Care)', max:20 },
+  resp: { label:'호흡과 괄약근 조절 (Respiration & Sphincter Management)', max:40 },
+  mobility: { label:'이동 (Mobility)', max:40 }
+};
+const SCIM_STORAGE_KEY = 'scim_evaluation_current';
+
+const ScimStore = {
+  load(){ try { const v = localStorage.getItem(SCIM_STORAGE_KEY); return v ? JSON.parse(v) : null; } catch { return null; } },
+  save(data){ try { localStorage.setItem(SCIM_STORAGE_KEY, JSON.stringify(data)); return true; } catch { return false; } }
+};
+
+let scim_saveTimer = null;
+function scim_scheduleSave(){ clearTimeout(scim_saveTimer); scim_saveTimer = setTimeout(()=>{ ScimStore.save(scim_collectState()); }, 500); }
+
+function scim_scoreClass(score, max) {
+  const pct = score / max;
+  if (pct === 0) return 'p0';
+  if (pct < 0.34) return 'p1';
+  if (pct < 0.67) return 'p2';
+  if (pct < 1) return 'p3';
+  return 'p4';
+}
+function scim_tagClass(score, max) {
+  const c = scim_scoreClass(score, max);
+  return c === 'p0' ? 'pt0' : c === 'p1' ? 'pt1' : c === 'p2' ? 'pt2' : c === 'p3' ? 'pt3' : 'pt4';
+}
+
+function scim_renderItems(){
+  const container = document.getElementById('scimItemsContainer');
+  container.innerHTML = '';
+  let currentSection = null;
+  SCIM_DATA.forEach(item => {
+    if (item.section !== currentSection) {
+      currentSection = item.section;
+      const secTitle = document.createElement('div');
+      secTitle.className = 'section-title scim';
+      secTitle.textContent = SCIM_SECTIONS[currentSection].label + ` — ${SCIM_SECTIONS[currentSection].max}점 만점`;
+      container.appendChild(secTitle);
+    }
+    const card = document.createElement('section');
+    card.className = 'item-card scim';
+    card.dataset.id = item.id;
+    const makeCheck = (c, idx) => {
+      const tag = c.commentOnly
+        ? `<span class="p-tag pt-tool">참여</span>`
+        : `<span class="p-tag ${scim_tagClass(c.score, item.max)}">${c.score}점</span>`;
+      // score 비율에 따라 등급 색상 (1~5)
+      let bgClass = '';
+      if (!c.commentOnly) {
+        const pct = c.score / item.max;
+        const g = pct === 0 ? 1 : (pct < 0.34 ? 2 : (pct < 0.67 ? 3 : (pct < 1 ? 4 : 5)));
+        bgClass = ` grade-bg-${g}`;
+      }
+      return `<label class="check-item scim-item${bgClass}">
+        <input type="checkbox" data-item="${item.id}" data-idx="${idx}" onchange="scim_onCheckChange('${item.id}', event)" />
+        <span class="txt">${c.text}${tag}</span>
+      </label>`;
+    };
+    const gradeChecks = item.items.map((c, idx) => c.commentOnly ? null : makeCheck(c, idx)).filter(Boolean).join('');
+    const activityChecks = item.items.map((c, idx) => c.commentOnly ? makeCheck(c, idx) : null).filter(Boolean).join('');
+    let checksHtml = `<div class="check-grid">${gradeChecks}</div>`;
+    if (activityChecks) {
+      checksHtml += `<div class="activity-box scim"><div class="activity-label scim">참여 활동 · 보조도구</div><div class="check-grid">${activityChecks}</div></div>`;
+    }
+    card.innerHTML = `
+      <div class="item-head">
+        <div>
+          <div class="item-title">${item.name}<span class="item-en">${item.nameEn}</span><span class="item-max">최대 ${item.max}점</span></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label class="na-toggle">
+            <input type="checkbox" data-na="${item.id}" onchange="scim_onNaChange('${item.id}')" />
+            <span>미평가</span>
+          </label>
+          <div class="score-badge na" id="scim-badge-${item.id}">0점</div>
+        </div>
+      </div>
+      ${checksHtml}
+      <div class="comment-wrap">
+        <div class="comment-label">
+          <span>코멘트</span>
+          <button class="regen-btn scim" onclick="scim_regenComment('${item.id}')">↻ 재생성</button>
+        </div>
+        <textarea data-comment="${item.id}" oninput="scim_onCommentEdit('${item.id}')" rows="2"></textarea>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function scim_getCheckedItems(itemId){
+  const boxes = document.querySelectorAll(`#scimApp input[data-item="${itemId}"]:checked`);
+  return Array.from(boxes).map(b => {
+    const idx = parseInt(b.dataset.idx);
+    const item = SCIM_DATA.find(x => x.id === itemId).items[idx];
+    return { idx, score: item.score, phrase: item.phrase, text: item.text, commentOnly: !!item.commentOnly, activity: !!item.activity };
+  });
+}
+
+function scim_calcScore(itemId){
+  const na = document.querySelector(`#scimApp input[data-na="${itemId}"]`).checked;
+  if (na) return { score: null, na: true };
+  const gradeItems = scim_getCheckedItems(itemId).filter(c => !c.commentOnly);
+  if (gradeItems.length === 0) return { score: 0, na: false, empty: true };  // 0점 시작
+  return { score: Math.min(...gradeItems.map(c => c.score)), na: false };
+}
+
+function scim_buildCommentOnlyPhrases(checkedItems){
+  const activities = checkedItems.filter(c => c.activity).map(c => c.text.replace(/\s*활동 중\s*$/,''));
+  const tools = checkedItems.filter(c => c.commentOnly && !c.activity).map(c => c.phrase);
+  const result = [];
+  if (activities.length > 0) result.push(activities.join(', ') + ' 활동 중');
+  result.push(...tools);
+  return result;
+}
+
+function scim_generateComment(itemId, finalScore, isEmpty){
+  const item = SCIM_DATA.find(x => x.id === itemId);
+  const allChecked = scim_getCheckedItems(itemId);
+  const commentOnlyPhrases = scim_buildCommentOnlyPhrases(allChecked);
+  if (isEmpty) {
+    // 체크 없음: 도구/활동만 반영 (없으면 빈 문자열)
+    if (commentOnlyPhrases.length > 0) return commentOnlyPhrases.map(p => p + '.').join(' ');
+    return '';
+  }
+  if (finalScore === item.max) {
+    if (commentOnlyPhrases.length > 0) return commentOnlyPhrases.map(p => p + '.').join(' ') + ' ' + item.baseComment;
+    return item.baseComment;
+  }
+  const gradeSpecific = allChecked.filter(c => !c.commentOnly && c.score === finalScore);
+  const phrases = [...commentOnlyPhrases, ...gradeSpecific.map(c => c.phrase)];
+  if (phrases.length === 0) return item.baseComment + '.';
+  return phrases.map(p => p + '.').join(' ');
+}
+
+function scim_onCheckChange(itemId, event){
+  const cb = event ? event.target : null;
+  const clickedIdx = cb ? parseInt(cb.dataset.idx) : null;
+  const item = SCIM_DATA.find(x => x.id === itemId);
+  const clickedItem = clickedIdx !== null ? item.items[clickedIdx] : null;
+  
+  // 방금 체크된 경우 & 등급 항목인 경우에만 경고
+  if (cb && cb.checked && clickedItem && !clickedItem.commentOnly) {
+    const otherChecked = scim_getCheckedItems(itemId).filter(c => !c.commentOnly && c.idx !== clickedIdx);
+    const differentScore = otherChecked.filter(c => c.score !== clickedItem.score);
+    
+    if (differentScore.length > 0) {
+      const otherScores = [...new Set(differentScore.map(c => c.score))].sort((a,b) => a-b);
+      const message = `⚠️ 이미 ${otherScores.join('점, ')}점이 선택되어 있습니다.\n\n${clickedItem.score}점도 함께 체크하시겠습니까?\n(여러 점수 체크 시 최저 점수가 최종 점수로 적용됩니다)`;
+      if (!confirm(message)) {
+        cb.checked = false;
+        return;
+      }
+    }
+  }
+  
+  scim_updateItem(itemId); scim_updateSummary(); scim_scheduleSave();
+}
+function scim_onNaChange(itemId){
+  const na = document.querySelector(`#scimApp input[data-na="${itemId}"]`).checked;
+  document.querySelectorAll(`#scimApp input[data-item="${itemId}"]`).forEach(cb => {
+    cb.disabled = na;
+    if (na) cb.checked = false;
+  });
+  scim_updateItem(itemId); scim_updateSummary(); scim_scheduleSave();
+}
+function scim_onCommentEdit(itemId){
+  const ta = document.querySelector(`#scimApp textarea[data-comment="${itemId}"]`);
+  ta.dataset.edited = 'true';
+  scim_updateSummary(); scim_scheduleSave();
+}
+function scim_regenComment(itemId){
+  const result = scim_calcScore(itemId);
+  const ta = document.querySelector(`#scimApp textarea[data-comment="${itemId}"]`);
+  if (result.na) ta.value = '';
+  else ta.value = scim_generateComment(itemId, result.score, result.empty);
+  ta.dataset.edited = 'false';
+  scim_updateSummary(); scim_scheduleSave();
+}
+
+function scim_updateItem(itemId){
+  const item = SCIM_DATA.find(x => x.id === itemId);
+  const result = scim_calcScore(itemId);
+  const badge = document.getElementById(`scim-badge-${itemId}`);
+  const ta = document.querySelector(`#scimApp textarea[data-comment="${itemId}"]`);
+  const card = document.querySelector(`#scimApp .item-card[data-id="${itemId}"]`);
+  if (result.na){
+    badge.textContent = '미평가';
+    badge.className = 'score-badge na';
+    if (ta.dataset.edited !== 'true') ta.value = '';
+    if (card) card.classList.remove('unchecked');
+  } else {
+    badge.textContent = `${result.score}점`;
+    badge.className = `score-badge ${scim_scoreClass(result.score, item.max)}`;
+    if (ta.dataset.edited !== 'true') ta.value = scim_generateComment(itemId, result.score, result.empty);
+    if (card) card.classList.toggle('unchecked', result.empty === true);
+  }
+}
+
+function scim_updateSummary(){
+  let total = 0;
+  const subScores = { selfcare: 0, resp: 0, mobility: 0 };
+  let hasNa = false;
+  const lines = [];
+  let currentSection = null;
+  SCIM_DATA.forEach(item => {
+    const result = scim_calcScore(item.id);
+    const ta = document.querySelector(`#scimApp textarea[data-comment="${item.id}"]`);
+    const comment = ta.value.trim();
+    const label = item.name;
+    if (item.section !== currentSection) {
+      currentSection = item.section;
+      if (lines.length > 0) lines.push('');
+      lines.push(`[${SCIM_SECTIONS[currentSection].label}]`);
+    }
+    if (result.na) {
+      hasNa = true;
+      lines.push(`${label} - (미평가)`);
+    } else {
+      total += result.score;
+      subScores[item.section] += result.score;
+      if (comment) lines.push(`${label} (${result.score}점) - ${comment}`);
+      else if (result.empty) lines.push(`${label} (${result.score}점) - (미체크)`);
+      else lines.push(`${label} (${result.score}점) - ${item.baseComment}.`);
+    }
+  });
+  document.getElementById('scimTotalScore').textContent = total;
+  document.getElementById('scimSubSelfcare').textContent = subScores.selfcare;
+  document.getElementById('scimSubResp').textContent = subScores.resp;
+  document.getElementById('scimSubMobility').textContent = subScores.mobility;
+  const header = `SCIM Total: ${total}/100${hasNa ? ' (일부 미평가)' : ''}\n자기관리 ${subScores.selfcare}/20, 호흡·괄약근 ${subScores.resp}/40, 이동 ${subScores.mobility}/40\n`;
+  document.getElementById('scimSummaryText').value = header + '\n' + lines.join('\n');
+}
+
+async function scim_copyAll(){
+  // 미체크 항목 확인
+  const unchecked = [];
+  SCIM_DATA.forEach(item => {
+    const result = scim_calcScore(item.id);
+    if (!result.na && result.empty) unchecked.push(item.name);
+  });
+  if (unchecked.length > 0) {
+    const names = unchecked.join(', ');
+    if (!confirm(`⚠️ 다음 항목이 아직 채점되지 않았습니다:\n${names}\n\n그래도 복사하시겠습니까?`)) {
+      return;
+    }
+  }
+  const text = document.getElementById('scimSummaryText').value;
+  try { await navigator.clipboard.writeText(text); }
+  catch(e) {
+    const ta = document.getElementById('scimSummaryText');
+    ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly', '');
+  }
+  const s = document.getElementById('scimCopyStatus');
+  s.classList.add('show');
+  setTimeout(()=>s.classList.remove('show'), 1500);
+}
+
+function scim_collectState(){
+  const items = {};
+  SCIM_DATA.forEach(item => {
+    const checked = [];
+    document.querySelectorAll(`#scimApp input[data-item="${item.id}"]`).forEach(cb => {
+      if (cb.checked) checked.push(parseInt(cb.dataset.idx));
+    });
+    const na = document.querySelector(`#scimApp input[data-na="${item.id}"]`).checked;
+    const ta = document.querySelector(`#scimApp textarea[data-comment="${item.id}"]`);
+    items[item.id] = { checked, na, comment: ta.value, edited: ta.dataset.edited === 'true' };
+  });
+  return { items };
+}
+
+function scim_restoreState(data){
+  if (!data || !data.items) return;
+  SCIM_DATA.forEach(item => {
+    const s = data.items[item.id];
+    if (!s) return;
+    (s.checked || []).forEach(idx => {
+      const cb = document.querySelector(`#scimApp input[data-item="${item.id}"][data-idx="${idx}"]`);
+      if (cb) cb.checked = true;
+    });
+    if (s.na) {
+      const na = document.querySelector(`#scimApp input[data-na="${item.id}"]`);
+      na.checked = true;
+      document.querySelectorAll(`#scimApp input[data-item="${item.id}"]`).forEach(cb => cb.disabled = true);
+    }
+    const ta = document.querySelector(`#scimApp textarea[data-comment="${item.id}"]`);
+    if (s.edited) { ta.value = s.comment || ''; ta.dataset.edited = 'true'; }
+    scim_updateItem(item.id);
+  });
+}
+
+function resetScim(){
+  if (!confirm('SCIM 평가를 모두 지우고 새로 시작하시겠습니까?')) return;
+  localStorage.removeItem(SCIM_STORAGE_KEY);
+  SCIM_DATA.forEach(item => {
+    document.querySelectorAll(`#scimApp input[data-item="${item.id}"]`).forEach(cb => cb.checked = false);
+    const na = document.querySelector(`#scimApp input[data-na="${item.id}"]`);
+    if (na) na.checked = false;
+    const ta = document.querySelector(`#scimApp textarea[data-comment="${item.id}"]`);
+    if (ta) { ta.value = ''; ta.dataset.edited = 'false'; }
+    scim_updateItem(item.id);
+  });
+  scim_updateSummary();
+}
+
+// ==================== SCIM → MBI 변환 로직 ====================
+// SCIM 점수를 %로 환산 후 MBI 등급으로 매핑
+function convert_scoreToGrade(score, max) {
+  if (score === null || score === undefined) return null;
+  const pct = score / max;
+  if (pct === 0) return 1;              // 0% → 1등급 (완전 의존)
+  if (pct <= 0.25) return 2;            // 1-25% → 2등급 (많은 도움)
+  if (pct <= 0.50) return 3;            // 26-50% → 3등급 (중등도 도움)
+  if (pct <= 0.85) return 4;            // 51-85% → 4등급 (최소 도움)
+  return 5;                              // 86-100% → 5등급 (독립)
+}
+
+// SCIM 항목 점수 가져오기
+function convert_getScimScore(itemId) {
+  const scimSaved = ScimStore.load();
+  if (!scimSaved || !scimSaved.items || !scimSaved.items[itemId]) return null;
+  const s = scimSaved.items[itemId];
+  if (s.na) return null;
+  const checkedIdxs = s.checked || [];
+  if (checkedIdxs.length === 0) return 0;  // 아무것도 체크 안함 = 0점
+  const item = SCIM_DATA.find(x => x.id === itemId);
+  const scores = checkedIdxs.map(idx => item.items[idx].score).filter(sc => sc !== undefined);
+  const gradeItems = scores.filter((sc, i) => {
+    const c = item.items[checkedIdxs[i]];
+    return !c.commentOnly;
+  });
+  if (gradeItems.length === 0) return 0;
+  return Math.min(...gradeItems);
+}
+
+// SCIM 여러 항목의 합산 점수 (자기관리, 이동 등에서 사용)
+function convert_getScimSum(itemIds) {
+  return itemIds.reduce((sum, id) => {
+    const s = convert_getScimScore(id);
+    return sum + (s === null ? 0 : s);
+  }, 0);
+}
+
+// SCIM 특정 활동/도구가 체크되어 있는지 확인
+function convert_hasScimActivity(itemId, activityText) {
+  const scimSaved = ScimStore.load();
+  if (!scimSaved || !scimSaved.items || !scimSaved.items[itemId]) return false;
+  const s = scimSaved.items[itemId];
+  if (s.na) return false;
+  const checkedIdxs = s.checked || [];
+  const item = SCIM_DATA.find(x => x.id === itemId);
+  return checkedIdxs.some(idx => item.items[idx].text === activityText);
+}
+
+// 각 항목별 세부 매핑 함수 (실제 임상 케이스 반영, 좀 더 보수적)
+function _mbi_feed(s, hasIron, hasEdison, hasFork) {
+  if (s === null) return null;
+  if (s === 0) return 1;      // 0점
+  if (s === 1) return 2;      // 2점
+  if (s === 2) {
+    if (hasIron) return 4;    // 8점 (쇠젓가락 사용)
+    if (hasEdison) return 3;  // 5점 (에디슨 젓가락)
+    return 3;                 // 5점 (숟가락만)
+  }
+  // s === 3 (완전 독립)
+  if (hasEdison) return 4;    // 8점 (에디슨 젓가락 = 보조도구)
+  if (hasFork) return 4;      // 8점 (포크만)
+  return 5;                   // 10점 (도구 미체크 = 완전 독립으로 간주)
+}
+function _mbi_bath(sum, hasSetting, hasTool) {  // 상+하 합산, 0-6
+  if (sum === null) return null;
+  if (sum === 0) return 1;    // 0점
+  if (sum <= 2) return 2;     // 1점
+  if (sum <= 5) {
+    // 특별한 세팅(목욕의자/휠체어/손잡이) 사용 시 3등급 (3점)
+    // 도구만 사용(긴 손잡이 브러쉬 등) 시 4등급 (4점) - 미세한 도움
+    if (hasSetting) return 3;
+    if (hasTool) return 4;
+    return 3;                  // 3점
+  }
+  return 5;                   // 5점 (완전 독립)
+}
+function _mbi_dress_grade(s) {  // 각 부위별 등급 (0-4)
+  if (s === 0) return 1;    // 0점
+  if (s === 1) return 2;    // 2점
+  if (s === 2) return 3;    // 5점
+  if (s === 3) return 4;    // 8점 (부분 도움)
+  return 5;                 // 10점 (완전 독립)
+}
+function _mbi_dress(up, lo, hasBtn, hasZip, hasLace) {
+  if (up === null && lo === null) return null;
+  const upG = up === null ? 5 : _mbi_dress_grade(up);
+  const loG = lo === null ? 5 : _mbi_dress_grade(lo);
+  // 평균(내림) - 상/하 중 낮은 등급 반영
+  let grade = Math.floor((upG + loG) / 2);
+  // 단추/지퍼 다 체크되면 한 등급 상향
+  if (grade === 4 && hasBtn && hasZip) grade = 5;
+  return grade;
+}
+function _mbi_groom(s, hasTool) {
+  if (s === null) return null;
+  if (s === 0) return 1;      // 0점
+  if (s === 1) return 3;      // 3점 (부분 도움)
+  if (s === 2) return 3;      // 3점 (보조도구 사용)
+  // s === 3 (완전 독립)
+  if (hasTool) return 4;      // 4점 (도구 사용은 안전 감독 수준)
+  return 5;                   // 5점 (도구 없이 완전 독립)
+}
+function _mbi_toilet(s, hasTool) {
+  if (s === null) return null;
+  if (s === 0) return 1;      // 0점
+  if (s === 1) return 2;      // 2점
+  if (s === 2) return 3;      // 5점
+  if (s === 4) return 4;      // 8점
+  // s === 5 (완전 독립)
+  if (hasTool) return 4;      // 8점 (도구 사용 시 미세한 도움 상황)
+  return 5;                   // 10점 (완전 독립)
+}
+function _mbi_stairs(s, hasHandrail, noHandrail) {
+  if (s === null) return null;
+  if (s === 0) return 1;      // 0점
+  if (s === 1) return 2;      // 2점 (감독 하 3계단, 부분 도움)
+  if (s === 2) {
+    // 난간 잡고 수행 → 3등급 (5점, 안전을 위한 보호자)
+    if (hasHandrail) return 3;
+    return 4;                  // 8점 (보조도구 사용)
+  }
+  // s === 3 (완전 독립)
+  if (noHandrail) return 5;   // 10점 (난간 없이 완전 독립)
+  return 4;                    // 8점 (도구 미체크 = 안전)
+}
+function _mbi_bowel(s, hasSuppository) {
+  if (s === null) return null;
+  if (s === 0) return 1;      // 0점
+  if (s <= 5) return 3;       // 5점 (좌약 등 도움)
+  if (s <= 8) {
+    // 좌약 사용 = 도움 필요 → 낮은 등급
+    if (hasSuppository) return 3;  // 5점
+    return 4;                       // 8점
+  }
+  if (hasSuppository) return 4;    // 8점 (좌약 사용 시 완전 독립 X)
+  return 5;                         // 10점 (완전 독립)
+}
+function _mbi_bladder(s, hasIndwelling, hasEdi) {
+  if (s === null) return null;
+  if (s === 0) return 1;      // 0점 (유치 도뇨관)
+  if (hasIndwelling) return 1;// 유치 도뇨관 체크 시 무조건 0점
+  if (s <= 3) return 2;       // 2점
+  if (s <= 6) {
+    // edi(외부 배뇨 도구) 사용 = 실금 있음 → 낮은 등급
+    if (hasEdi) return 2;     // 2점
+    return 3;                 // 5점
+  }
+  if (s <= 11) {
+    if (hasEdi) return 3;     // 5점
+    return 4;                 // 8점
+  }
+  if (hasEdi) return 4;       // 8점 (edi 사용해도 도움 없음)
+  return 5;                   // 10점 (완전 독립)
+}
+function _mbi_amb(indoor, isFullyIndependent) {
+  if (indoor === null) return null;
+  if (indoor <= 2) return null;   // 휠체어 (의자차 항목에서)
+  if (indoor === 3) return 3;     // 감독 → 8점
+  if (indoor === 4) return 3;     // 워커 → 8점
+  if (indoor === 5) return 3;     // 목발/지팡이 2개 → 8점
+  if (indoor === 6) return 4;     // 지팡이 1개 → 12점
+  if (indoor === 7) return 4;     // AFO → 12점
+  // SCIM 8 (보조기 없이 걷기): 완전 독립 체크 시 5등급, 아니면 4등급
+  if (isFullyIndependent) return 5;
+  return 4;                       // 12점 (안전 위한 감독 가능성)
+}
+function _mbi_wc(indoor) {
+  if (indoor === null) return null;
+  if (indoor >= 3) return null;
+  if (indoor === 0) return 1;     // 0점
+  if (indoor === 1) return 2;     // 1점
+  return 5;                       // 5점 (수동 휠체어 독립)
+}
+function _mbi_tr(bedMob, transBed, isFullyIndependent) {
+  if (bedMob === null && transBed === null) return null;
+  const bm = bedMob || 0;
+  const tb = transBed === null ? 0 : transBed;
+  
+  // 침대↔휠체어(tb)를 우선 판단 기준으로
+  if (tb === 0) {
+    // 완전 도움 필요 → 침상동작 상관없이 낮은 등급
+    if (bm === 0) return 1;       // 0점
+    return 2;                      // 3점 (침상만 수행 가능)
+  }
+  if (tb === 1) {
+    // 부분 도움
+    if (bm <= 2) return 2;         // 3점
+    return 3;                      // 8점
+  }
+  // tb === 2 (독립)
+  if (bm <= 2) return 3;           // 8점
+  if (bm <= 5) return 4;           // 12점
+  // bm 6 + tb 2 = 완전 만점
+  if (isFullyIndependent) return 5; // 15점
+  return 4;                        // 12점 (감독 가능성)
+}
+
+// 매핑 규칙 정의
+const CONVERT_MAPPING = [
+  {
+    mbiId: 'ph',
+    mbiName: '개인위생',
+    scimSources: [{ id:'grooming', name:'몸단장', max:3 }],
+    calculate: () => {
+      const s = convert_getScimScore('grooming');
+      if (s === null) return { grade: null, na: true, note: 'SCIM 몸단장 미평가' };
+      // Praxis Toolkit v7.0 기준: 전기면도기는 adaptive device가 아님. Universal cuff/Adaptive comb만 인정
+      const hasTool = convert_hasScimActivity('grooming','Universal cuff 사용') || convert_hasScimActivity('grooming','Adaptive comb 사용');
+      const note = hasTool ? '보조도구 사용' : '';
+      return { grade: _mbi_groom(s, hasTool), scimScore: s, scimMax: 3, note };
+    }
+  },
+  {
+    mbiId: 'bt',
+    mbiName: '목욕하기',
+    scimSources: [
+      { id:'bath_up', name:'목욕 상체', max:3 },
+      { id:'bath_lo', name:'목욕 하체', max:3 }
+    ],
+    calculate: () => {
+      const up = convert_getScimScore('bath_up');
+      const lo = convert_getScimScore('bath_lo');
+      if (up === null && lo === null) return { grade: null, na: true, note: 'SCIM 목욕 미평가' };
+      const sum = (up || 0) + (lo || 0);
+      const hasSetting = convert_hasScimActivity('bath_up','목욕의자 사용') || convert_hasScimActivity('bath_lo','목욕의자 사용') || convert_hasScimActivity('bath_up','목욕 휠체어 사용') || convert_hasScimActivity('bath_lo','목욕 휠체어 사용') || convert_hasScimActivity('bath_up','손잡이 사용') || convert_hasScimActivity('bath_lo','손잡이 사용');
+      const hasTool = convert_hasScimActivity('bath_up','긴 손잡이 브러쉬 사용') || convert_hasScimActivity('bath_lo','긴 손잡이 브러쉬 사용');
+      const note = hasSetting ? '특별한 세팅' : (hasTool ? '보조도구' : '');
+      return { grade: _mbi_bath(sum, hasSetting, hasTool), scimScore: sum, scimMax: 6, note };
+    }
+  },
+  {
+    mbiId: 'fd',
+    mbiName: '식사하기',
+    scimSources: [{ id:'feeding', name:'식사', max:3 }],
+    calculate: () => {
+      const s = convert_getScimScore('feeding');
+      if (s === null) return { grade: null, na: true, note: 'SCIM 식사 미평가' };
+      const hasIron = convert_hasScimActivity('feeding', '쇠젓가락 사용');
+      const hasEdison = convert_hasScimActivity('feeding', '에디슨 젓가락 사용');
+      const hasFork = convert_hasScimActivity('feeding', '포크 사용');
+      const notes = [];
+      if (hasIron) notes.push('쇠젓가락');
+      if (hasEdison) notes.push('에디슨 젓가락');
+      if (hasFork) notes.push('포크');
+      const note = notes.length ? notes.join('/') + ' 사용' : '';
+      return { grade: _mbi_feed(s, hasIron, hasEdison, hasFork), scimScore: s, scimMax: 3, note };
+    }
+  },
+  {
+    mbiId: 'tl',
+    mbiName: '용변처리',
+    scimSources: [{ id:'toilet', name:'용변처리', max:5 }],
+    calculate: () => {
+      const s = convert_getScimScore('toilet');
+      if (s === null) return { grade: null, na: true, note: 'SCIM 용변처리 미평가' };
+      const hasTool = convert_hasScimActivity('toilet','Portable bidet 사용') || convert_hasScimActivity('toilet','Toilet aids 사용') || convert_hasScimActivity('toilet','안전장치(손잡이 등) 사용');
+      const note = hasTool ? '보조도구/안전장치' : '';
+      return { grade: _mbi_toilet(s, hasTool), scimScore: s, scimMax: 5, note };
+    }
+  },
+  {
+    mbiId: 'st',
+    mbiName: '계단 오르기',
+    scimSources: [{ id:'stairs', name:'계단', max:3 }],
+    calculate: () => {
+      const s = convert_getScimScore('stairs');
+      if (s === null) return { grade: null, na: true, note: 'SCIM 계단 미평가' };
+      const hasHandrail = convert_hasScimActivity('stairs', '난간 잡고 수행');
+      const noHandrail = convert_hasScimActivity('stairs', '난간 없이 수행');
+      const note = hasHandrail ? '난간 잡고 수행' : (noHandrail ? '난간 없이 수행' : '');
+      return { grade: _mbi_stairs(s, hasHandrail, noHandrail), scimScore: s, scimMax: 3, note };
+    }
+  },
+  {
+    mbiId: 'dr',
+    mbiName: '옷 입기',
+    scimSources: [
+      { id:'dress_up', name:'옷 입기 상의', max:4 },
+      { id:'dress_lo', name:'옷 입기 하의', max:4 }
+    ],
+    calculate: () => {
+      const up = convert_getScimScore('dress_up');
+      const lo = convert_getScimScore('dress_lo');
+      if (up === null && lo === null) return { grade: null, na: true, note: 'SCIM 옷입기 미평가' };
+      const sum = (up || 0) + (lo || 0);
+      const upStr = up === null ? '-' : up;
+      const loStr = lo === null ? '-' : lo;
+      const hasBtn = convert_hasScimActivity('dress_up', '단추 조작') || convert_hasScimActivity('dress_lo', '단추/지퍼 조작');
+      const hasZip = convert_hasScimActivity('dress_up', '지퍼 조작') || convert_hasScimActivity('dress_lo', '단추/지퍼 조작');
+      const hasLace = convert_hasScimActivity('dress_lo', '신발끈 조작');
+      const notes = [];
+      if (hasBtn) notes.push('단추');
+      if (hasZip) notes.push('지퍼');
+      if (hasLace) notes.push('신발끈');
+      const note = notes.length ? notes.join('/') + ' 조작 가능' : '';
+      return { grade: _mbi_dress(up, lo, hasBtn, hasZip, hasLace), scimScore: `상${upStr}+하${loStr}`, scimMax: 8, note };
+    }
+  },
+  {
+    mbiId: 'bo',
+    mbiName: '배변 조절',
+    scimSources: [{ id:'bowel', name:'배변', max:10 }],
+    calculate: () => {
+      const s = convert_getScimScore('bowel');
+      if (s === null) return { grade: null, na: true, note: 'SCIM 배변 미평가' };
+      const hasSuppository = convert_hasScimActivity('bowel','좌약 사용');
+      const note = hasSuppository ? '좌약 사용' : '';
+      return { grade: _mbi_bowel(s, hasSuppository), scimScore: s, scimMax: 10, note };
+    }
+  },
+  {
+    mbiId: 'bl',
+    mbiName: '배뇨 조절',
+    scimSources: [{ id:'bladder', name:'배뇨', max:15 }],
+    calculate: () => {
+      const s = convert_getScimScore('bladder');
+      if (s === null) return { grade: null, na: true, note: 'SCIM 배뇨 미평가' };
+      const hasIndwelling = convert_hasScimActivity('bladder','유치 도뇨관 사용');
+      const hasEdi = convert_hasScimActivity('bladder','외부 배뇨 도구(edi) 사용');
+      const note = hasIndwelling ? '유치 도뇨관' : (hasEdi ? 'edi 사용' : '');
+      return { grade: _mbi_bladder(s, hasIndwelling, hasEdi), scimScore: s, scimMax: 15, note };
+    }
+  },
+  {
+    mbiId: 'am',
+    mbiName: '보행',
+    scimSources: [
+      { id:'indoor', name:'실내이동', max:8 },
+      { id:'medium', name:'중등도 이동', max:8 },
+      { id:'outdoor', name:'실외이동', max:8 }
+    ],
+    calculate: () => {
+      const indoor = convert_getScimScore('indoor');
+      if (indoor === null) return { grade: null, na: true, note: 'SCIM 실내이동 미평가' };
+      const isFullyIndependent = convert_hasScimActivity('indoor', '완전 독립 (감독 불필요)');
+      const grade = _mbi_amb(indoor, isFullyIndependent);
+      if (grade === null) return { grade: null, na: true, note: '휠체어 사용 (의자차 항목 참조)' };
+      const note = isFullyIndependent ? '완전 독립' : (indoor >= 6 ? '안전 감독 가능성' : '실내이동 기준');
+      return { grade, scimScore: indoor, scimMax: 8, note };
+    }
+  },
+  {
+    mbiId: 'wc',
+    mbiName: '의자차',
+    scimSources: [{ id:'indoor', name:'실내이동', max:8 }],
+    calculate: () => {
+      const indoor = convert_getScimScore('indoor');
+      if (indoor === null) return { grade: null, na: true, note: 'SCIM 실내이동 미평가' };
+      const grade = _mbi_wc(indoor);
+      if (grade === null) return { grade: null, na: true, note: '보행 가능 (보행 항목 참조)' };
+      return { grade, scimScore: indoor, scimMax: 8, note: '휠체어 사용' };
+    }
+  },
+  {
+    mbiId: 'tr',
+    mbiName: '의자/침대 이동',
+    scimSources: [
+      { id:'bed_mob', name:'침상동작', max:6 },
+      { id:'trans_bed', name:'침대↔휠체어', max:2 }
+    ],
+    calculate: () => {
+      const bedmob = convert_getScimScore('bed_mob');
+      const transbed = convert_getScimScore('trans_bed');
+      if (bedmob === null && transbed === null) return { grade: null, na: true, note: 'SCIM 침상동작/이동 미평가' };
+      const sum = (bedmob || 0) + (transbed || 0);
+      // "완전 독립 (감독 불필요)"가 명시적으로 체크되어야 5등급
+      const isFullyIndependent = convert_hasScimActivity('trans_bed', '완전 독립 (감독 불필요)');
+      const note = isFullyIndependent ? '완전 독립' : (sum >= 6 ? '안전 감독 필요' : '');
+      return { grade: _mbi_tr(bedmob, transbed, isFullyIndependent), scimScore: sum, scimMax: 8, note };
+    }
+  }
+];
+
+function convert_refresh() {
+  const results = [];
+  let total = 0;
+  let hasNa = false;
+  let currentMobility = 'am'; // 기본은 보행
+
+  CONVERT_MAPPING.forEach(map => {
+    const result = map.calculate();
+    if (result.na) {
+      hasNa = true;
+      results.push({ ...map, ...result, score: 0 });
+    } else {
+      const item = MBI_DATA.find(x => x.id === map.mbiId);
+      const score = item.scoreMap[result.grade];
+      results.push({ ...map, ...result, score });
+      // 보행/의자차 상호 배타 처리
+      if (map.mbiId === 'am') {
+        total += score;
+        currentMobility = 'am';
+      } else if (map.mbiId === 'wc') {
+        // 의자차만 유효할 때
+        if (results.find(r => r.mbiId === 'am' && r.na)) {
+          total += score;
+          currentMobility = 'wc';
+        }
+      } else {
+        total += score;
+      }
+    }
+  });
+
+  // 종합 결과 렌더링
+  document.getElementById('convertTotalScore').textContent = total;
+  let depLabel = '';
+  if (total <= 24) depLabel = '완전 의존 (Total Dependence)';
+  else if (total <= 49) depLabel = '심한 의존 (Severe Dependence)';
+  else if (total <= 74) depLabel = '중등도 의존 (Moderate Dependence)';
+  else if (total <= 90) depLabel = '경도 의존 (Slight Dependence)';
+  else depLabel = '최소 의존 (Minimum/No Dependence)';
+  document.getElementById('convertDependencyLabel').textContent = depLabel;
+
+  // 요약 텍스트 생성
+  const lines = [`MBI Total (변환): ${total}/100${hasNa ? ' (일부 미평가)' : ''}`, ''];
+  results.forEach(r => {
+    if (r.na) {
+      lines.push(`${r.mbiName} - (${r.note || '미평가'})`);
+    } else {
+      const item = MBI_DATA.find(x => x.id === r.mbiId);
+      const comment = item.baseComments[r.grade];
+      lines.push(`${r.mbiName} (${r.score}점) - ${comment}.`);
+    }
+  });
+  document.getElementById('convertSummaryText').value = lines.join('\n');
+
+  // 매핑 상세 렌더링
+  const mappingContainer = document.getElementById('convertMappingContainer');
+  mappingContainer.innerHTML = '';
+  results.forEach(r => {
+    const item = MBI_DATA.find(x => x.id === r.mbiId);
+    const scimSourcesText = r.scimSources.map(s => s.name).join(' + ');
+    const row = document.createElement('div');
+    row.className = 'convert-row';
+    if (r.na) {
+      row.innerHTML = `
+        <div>
+          <div class="convert-row-label">${r.mbiName}</div>
+          <div class="convert-mapping">← ${scimSourcesText} · ${r.note || '미평가'}</div>
+        </div>
+        <div class="convert-row-score">미평가</div>
+      `;
+    } else {
+      const maxScore = item.scoreMap[5];
+      row.innerHTML = `
+        <div>
+          <div class="convert-row-label">${r.mbiName}</div>
+          <div class="convert-mapping">← ${scimSourcesText} (${r.scimScore}/${r.scimMax}) · ${r.grade}등급${r.note ? ' · ' + r.note : ''}</div>
+        </div>
+        <div class="convert-row-score">${r.score}/${maxScore}점</div>
+      `;
+    }
+    mappingContainer.appendChild(row);
+  });
+}
+
+async function convert_copyAll() {
+  const text = document.getElementById('convertSummaryText').value;
+  try { await navigator.clipboard.writeText(text); }
+  catch(e) {
+    const ta = document.getElementById('convertSummaryText');
+    ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly', '');
+  }
+  const s = document.getElementById('convertCopyStatus');
+  s.classList.add('show');
+  setTimeout(()=>s.classList.remove('show'), 1500);
+}
+
+function convert_applyToMbi() {
+  if (!confirm('변환된 결과를 MBI 탭에 반영하시겠습니까? 기존 MBI 데이터는 덮어씌워집니다.')) return;
+  
+  // 기존 MBI 초기화
+  MBI_DATA.forEach(item => {
+    document.querySelectorAll(`#mbiApp input[data-item="${item.id}"]`).forEach(cb => cb.checked = false);
+    const na = document.querySelector(`#mbiApp input[data-na="${item.id}"]`);
+    if (na) { na.checked = false; na.disabled = false; }
+    document.querySelectorAll(`#mbiApp input[data-item="${item.id}"]`).forEach(cb => cb.disabled = false);
+    const ta = document.querySelector(`#mbiApp textarea[data-comment="${item.id}"]`);
+    if (ta) { ta.value = ''; ta.dataset.edited = 'false'; }
+  });
+
+  // 변환 결과 반영
+  let hasWheelchair = false;
+  CONVERT_MAPPING.forEach(map => {
+    const result = map.calculate();
+    if (result.na) {
+      if (map.mbiId === 'am' && result.note && result.note.includes('휠체어')) {
+        hasWheelchair = true;
+      }
+      const na = document.querySelector(`#mbiApp input[data-na="${map.mbiId}"]`);
+      if (na) na.checked = true;
+      document.querySelectorAll(`#mbiApp input[data-item="${map.mbiId}"]`).forEach(cb => cb.disabled = true);
+    } else {
+      // 해당 등급의 첫 번째 세부활동 체크
+      const item = MBI_DATA.find(x => x.id === map.mbiId);
+      const targetIdx = item.items.findIndex(c => !c.commentOnly && c.grade === result.grade);
+      if (targetIdx !== -1) {
+        const cb = document.querySelector(`#mbiApp input[data-item="${map.mbiId}"][data-idx="${targetIdx}"]`);
+        if (cb) cb.checked = true;
+      }
+    }
+    mbi_updateItem(map.mbiId);
+  });
+
+  // 보행/의자차 상호 배타 설정
+  if (hasWheelchair) mbi_setMobility('wc');
+  else mbi_setMobility('am');
+
+  mbi_updateSummary();
+  mbi_scheduleSave();
+  
+  // MBI 탭으로 전환
+  switchMode('mbi');
+  alert('MBI 탭에 반영되었습니다. 실제 임상 상황에 맞춰 세부활동을 조정해주세요.');
+}
+
+// ==================== 인쇄 페이지 ====================
+function print_renderMbi() {
+  const container = document.getElementById('printMbiContent');
+  container.innerHTML = '';
+  MBI_DATA.forEach((item, idx) => {
+    const gradeItems = item.items.filter(c => !c.commentOnly);
+    const activities = item.items.filter(c => c.commentOnly);
+    
+    let html = `<div class="print-item">
+      <div class="print-item-head">
+        <div class="print-item-title">${idx+1}. ${item.name}<span class="en">${item.nameEn}</span></div>
+      </div>`;
+    
+    // 도움 수준
+    html += '<div class="print-checks">';
+    gradeItems.forEach(c => {
+      html += `<div class="print-check"><span class="box"></span><span class="txt">${c.text}</span></div>`;
+    });
+    html += '</div>';
+    
+    // 참여 활동/도구
+    if (activities.length > 0) {
+      const label = MBI_ACTIVITY_LABELS[item.id] || '참여 활동 · 도구';
+      html += `<div class="print-activity">
+        <div class="label">📋 ${label}</div>
+        <div class="print-checks tight">`;
+      activities.forEach(c => {
+        html += `<div class="print-check"><span class="box"></span><span class="txt">${c.text}</span></div>`;
+      });
+      html += '</div></div>';
+    }
+    
+    html += '</div>';
+    container.insertAdjacentHTML('beforeend', html);
+  });
+  
+}
+
+function print_renderScim() {
+  const container = document.getElementById('printScimContent');
+  container.innerHTML = '';
+  
+  let currentSection = null;
+  SCIM_DATA.forEach((item, idx) => {
+    if (item.section !== currentSection) {
+      currentSection = item.section;
+      container.insertAdjacentHTML('beforeend', 
+        `<div style="font-weight:900; margin:8px 0 4px; padding:3px 6px; background:#e5e5e5; border-radius:3px; font-size:10pt;">
+          ${SCIM_SECTIONS[currentSection].label} · ${SCIM_SECTIONS[currentSection].max}점
+        </div>`);
+    }
+    
+    const gradeItems = item.items.filter(c => !c.commentOnly);
+    const activities = item.items.filter(c => c.commentOnly);
+    
+    let html = `<div class="print-item">
+      <div class="print-item-head">
+        <div class="print-item-title">${item.name}<span class="en">${item.nameEn}</span></div>
+      </div>`;
+    
+    html += '<div class="print-checks">';
+    gradeItems.forEach(c => {
+      html += `<div class="print-check"><span class="box"></span><span class="txt">${c.text}</span></div>`;
+    });
+    html += '</div>';
+    
+    if (activities.length > 0) {
+      html += `<div class="print-activity">
+        <div class="label">📋 참여 활동 · 보조도구</div>
+        <div class="print-checks tight">`;
+      activities.forEach(c => {
+        html += `<div class="print-check"><span class="box"></span><span class="txt">${c.text}</span></div>`;
+      });
+      html += '</div></div>';
+    }
+    
+    html += '</div>';
+    container.insertAdjacentHTML('beforeend', html);
+  });
+  
+}
+
+function printMbi() {
+  document.getElementById('printMbiPage').classList.add('print-page-active');
+  document.getElementById('printScimPage').classList.remove('print-page-active');
+  window.print();
+  setTimeout(()=>document.getElementById('printMbiPage').classList.remove('print-page-active'), 100);
+}
+
+function printScim() {
+  document.getElementById('printScimPage').classList.add('print-page-active');
+  const p2 = document.getElementById('printScimPage2');
+  if (p2) p2.classList.add('print-page-active');
+  document.getElementById('printMbiPage').classList.remove('print-page-active');
+  window.print();
+  setTimeout(()=>{
+    document.getElementById('printScimPage').classList.remove('print-page-active');
+    if (p2) p2.classList.remove('print-page-active');
+  }, 100);
+}
+
+// ==================== 채점 가이드 데이터 ====================
+// K-MBI 채점 가이드 (정한영 외, 대한재활의학회지 2007;31(3):283-297 기반)
+const MBI_GUIDE = [
+  {
+    id: 'ph', name: '개인위생', nameEn: 'Personal Hygiene', maxScore: 5,
+    principles: [
+      "<strong>0점</strong>: 치아/머리/손/얼굴/면도/화장 등 모든 면에서 의존",
+      "<strong>1점</strong>: 상기 활동 중 한두 가지는 스스로 가능하나 대부분 도움 필요",
+      "<strong>3점</strong>: 여러 단계에서 부분 도움 (양치질 시 치약 짜기, 한 손 씻기·뒷머리 빗기·턱밑 수염 등), 계속적 힌트 필요",
+      "<strong>4점</strong>: 수행 전·후 최소 도움 (안전 준비 - 온도 조절·면도날 고정, 수행 후 정리, 화장 얼룩 등)",
+      "<strong>5점</strong>: 완전 안전 독립 (모든 종류 면도기 사용, 서랍/선반에서 도구 꺼내기 포함)"
+    ],
+    examples: [
+      "3점: 화장하기, 한 손 씻기, 이 닦기, 턱밑 수염 깎기 등 부분 도움",
+      "4점: 뜨거운 물 다루기 등 안전 문제 감독 필요",
+      "5점: 남자는 모든 종류 면도기 사용 가능, 여자는 화장 스스로 가능"
+    ],
+    warn: "면도날 관련 문항은 생략 가능. 남자는 <strong>손톱깎기</strong>, 여자는 <strong>화장하기</strong> 수행 여부 확인"
+  },
+  {
+    id: 'bt', name: '목욕하기', nameEn: 'Bathing Self', maxScore: 5,
+    principles: [
+      "<strong>0점</strong>: 목욕 전반 의존, 못 씻고 못 닦음",
+      "<strong>1점</strong>: 모든 단계·지시 도움, 가슴/팔 정도만 스스로 씻을 수 있음",
+      "<strong>3점</strong>: 이동·씻기·말리기 부분 도움, 힌트·유도·감독 필요 (욕조 앉기, 비누칠, 수건 사용, 팔다리 씻기 등)",
+      "<strong>4점</strong>: 물 온도·이동 시 안전 감독, 목욕기구·물·세제 준비 도움 (정상 대비 3배 이상 시간)",
+      "<strong>5점</strong>: 완전 독립 (2배 이상 시간 걸려도 무방, 보조 없이)"
+    ],
+    examples: [
+      "3점: 욕조 앉기, 비누칠, 팔다리 씻기, 수건 사용에 도움",
+      "5점: 손잡이 달린 스펀지 등 도구 사용 가능"
+    ],
+    warn: "3점의 적용 범위가 매우 넓음 - 힌트 필요 정도부터 부위별 도움까지 포함"
+  },
+  {
+    id: 'fd', name: '식사하기', nameEn: 'Feeding', maxScore: 10,
+    principles: [
+      "<strong>0점</strong>: 전적 의존 (씹기·삼키기만 가능하거나 튜브영양 시 주입·연결·세척·속도 조절 모두 도움)",
+      "<strong>2점</strong>: 숟가락 다룰 수 있으나 <strong>음식을 숟가락에 올려주어야</strong> 입으로 가져감",
+      "<strong>5점</strong>: 감시 하에 스스로 가능, 국에 밥 말기·양념·병 열기 등 준비 도움. 속도 조절·삼킴 관련 지시나 감시 필요",
+      "<strong>8점</strong>: 김치 자르기·생선 바르기·우유팩·병뚜껑 외 <strong>독립적</strong>, 정상보다 시간 오래 걸림, 삼킴을 위한 음식 조절·배려 필요",
+      "<strong>10점</strong>: 완전 독립 (도구, 통조림, 액체 붓기, 고기 자르기 모두 위험 없이 가능)"
+    ],
+    examples: [
+      "2점: 숟가락에 음식(밥이나 반찬)을 올려주면 입으로 가져갈 수 있음",
+      "5점: 숟가락으로 직접 음식을 입으로 가져갈 수 있으나 나머지 동작에 도움 필요",
+      "8점: 감독 또는 준비가 필요한 경우"
+    ]
+  },
+  {
+    id: 'tl', name: '용변처리', nameEn: 'Toilet', maxScore: 10,
+    principles: [
+      "<strong>0점</strong>: 완전 의존",
+      "<strong>2점</strong>: 이동·옷·화장지·회음부 위생 모두 많은 도움",
+      "<strong>5점</strong>: 착탈의·이동·손 씻기 도움, 옷 추스르기·지퍼 조작 시 균형 유지 도움",
+      "<strong>8점</strong>: 안전 감시, 밤에는 이동변기 사용 가능하나 세척에는 도움 필요, 화장지 준비·변기 위치 알려주기 도움",
+      "<strong>10점</strong>: 변기 앉기/일어나기/착탈의/화장지 사용 자립, 밤 이동변기 관리·세척까지 자립. 옷 집게·지퍼 손잡이·벽 손잡이 등 보조 장비 활용 가능"
+    ],
+    examples: [
+      "5점: 무엇이든 한 가지를 확실히 수행 가능 (특히 <strong>회음부 위생</strong>)",
+      "8점: 감독 또는 준비가 필요한 경우"
+    ],
+    warn: "고무줄 바지를 병동에 요구할 수도 있음"
+  },
+  {
+    id: 'st', name: '계단 오르내리기', nameEn: 'Stair Climbing', maxScore: 10,
+    principles: [
+      "<strong>0점</strong>: 계단 오르내릴 수 없음 (두 명 도움 필요)",
+      "<strong>2점</strong>: 부축이 필요, 보행 보조기 포함 모든 면 도움",
+      "<strong>5점</strong>: 오르내릴 수는 있으나 보조기 사용 못 함, 감독·보조 필요",
+      "<strong>8점</strong>: 일반적 도움 불필요, 안전 위한 감독만 (오전 근육 굳음·숨참 등). 보행 보조기 스스로 운반 가능",
+      "<strong>10점</strong>: 완전 안전 독립, 난간·지팡이·목발·휴대용 보조장비 자립 사용 및 운반 가능"
+    ],
+    examples: [
+      "0점: 도와주는 사람이 <strong>2명</strong>일 경우",
+      "2점: 도와주는 사람이 <strong>부축</strong>하는 경우",
+      "8점: 감독이 필요한 경우"
+    ]
+  },
+  {
+    id: 'dr', name: '옷 입기', nameEn: 'Dressing', maxScore: 10,
+    principles: [
+      "<strong>0점</strong>: 스스로 할 수 있는 요소 없음, 완전 의존 (앞뒤 기대기·침대 난간 이용 정도)",
+      "<strong>2점</strong>: 참여는 하지만 모든 과정 도움 (팔·다리 넣기까지만 가능)",
+      "<strong>5점</strong>: 옷 입고 벗기 준비·시작·마무리 도움, 의상 부속품 치장 도움",
+      "<strong>8점</strong>: 조이기(단추·지퍼·브래지어·신발끈) 약간 도움. 옷장에서 옷 꺼내기·보조기/의지 착용에도 도움 필요할 수 있음 (정상의 3배 시간)",
+      "<strong>10점</strong>: 완전 독립 (모든 옷·신발끈·코르셋·보조기 조이고 벗기). 벨크로·지퍼 손잡이 등 보조 장치도 활용 가능"
+    ],
+    examples: [
+      "2점: 상의는 한쪽 팔만 소매에 넣을 수 있으나 다른 팔 못 넣음. 하의는 다리는 넣으나 엉덩이까지 올리지 못함",
+      "2점: 단추만 잠글 수 있고 다른 동작 불가",
+      "5점: 조금이라도 도움이 필요함",
+      "8점: 감독 또는 준비가 필요한 경우"
+    ]
+  },
+  {
+    id: 'bo', name: '배변조절', nameEn: 'Bowel Control', maxScore: 10,
+    principles: [
+      "<strong>0점</strong>: 조절 못함, 기저귀·패드 착용",
+      "<strong>2점</strong>: 배변자세 취하거나 장운동촉진법 도움, 종종 실변 (패드 필요)",
+      "<strong>5점</strong>: 배변자세 가능, 장운동촉진법·회음부 세척 도움, 종종 실변",
+      "<strong>8점</strong>: 좌약·관장 감독, 가끔 실변",
+      "<strong>10점</strong>: 완전 조절, 실변 없음, 좌약·관장 자립 (인공항문 자립 관리 포함)"
+    ],
+    examples: [
+      "2점: 시늉만 함. <strong>배변훈련 초기 단계</strong>인 경우가 해당될 수 있음",
+      "5점: 종종 실변이 있으나 적절한 배변자세를 취할 수 있음. 회음부 뒤처리에 도움 필요",
+      "8점: 가끔 실변이 있으나 감독이 필요한 정도"
+    ]
+  },
+  {
+    id: 'bl', name: '배뇨조절', nameEn: 'Bladder Control', maxScore: 10,
+    principles: [
+      "<strong>0점</strong>: 의존적, 실뇨/지속적 도뇨",
+      "<strong>2점</strong>: 실뇨 있으나 삽입/외용 기구로 도움",
+      "<strong>5점</strong>: 낮은 실뇨 없음, 밤 실뇨 있음, 기구 사용 도움",
+      "<strong>8점</strong>: 대체적 조절, 가끔 실뇨, 기구 사용 약간 도움",
+      "<strong>10점</strong>: 항시 조절 가능, 기구 독립 사용, 패드·기저귀 스스로 교환"
+    ],
+    examples: [
+      "2점: 배뇨자세 도움 필요, 외부 도뇨기구·튜브·배뇨백 관리 모두 도움",
+      "5점: 배뇨는 하나 자세·기구·패드 도움. 도뇨관 삽입 가능하나 가끔 실뇨",
+      "8점: 화장실 못 찾거나 늦으면 실뇨. 약물치료 필요할 수 있음"
+    ]
+  },
+  {
+    id: 'am', name: '보행', nameEn: 'Ambulation', maxScore: 15,
+    principles: [
+      "<strong>0점</strong>: 스스로 보행 불가 (두 명 도움 필요) → <strong>의자차 항목 평가</strong>",
+      "<strong>3점</strong>: 최소 한 명 계속 도움 (최대한 도움)",
+      "<strong>8점</strong>: 보조기 도달·조작 도움, 길모퉁이·문지방·불규칙 지면에서 도움",
+      "<strong>12점</strong>: 독립 보행하나 50m 미만, 위험 시 감독 필요. 힌트·재촉 필요할 수 있음",
+      "<strong>15점</strong>: 목발·지팡이·보행기·특수 신발 자립 사용, 50m 이상 독립. 복도 왕복 가능하며 <strong>길 잃거나 넘어질 위험 없음</strong>"
+    ],
+    examples: [
+      "0점: 평가하지 않고 <strong>의자차 항목</strong>을 평가함",
+      "8점: 보행 준비 과정에서 보조기(cane, walker)에 도달하기 위해 도움 필요",
+      "12점: 감독이 필요한 정도. <strong>50미터 보행 가능한지 확인</strong>"
+    ],
+    warn: "보행 불가로 의자차 훈련만 하면 이 항목 평가 안함"
+  },
+  {
+    id: 'wc', name: '의자차', nameEn: 'Wheelchair', maxScore: 5,
+    principles: [
+      "보행 가능 시 <strong>적용하지 않음</strong> (보행 2등급 이상)",
+      "<strong>0점</strong>: 의자차 보행 전적 도움",
+      "<strong>1점</strong>: 평지 단거리 전진만 가능. 브레이크 잠금·팔걸이/쿠션 조절·가구 주위·불규칙 지면 이동 모두 도움",
+      "<strong>3점</strong>: 한 명 도움, 탁자·침대 가까이 댈 때 항상 도움. 가구 주위·제한 공간 조작 시 도움",
+      "<strong>4점</strong>: 평평한 지면 자립, 좁은 길모퉁이·제한 공간 조작 시 도움이나 구두 지시 필요",
+      "<strong>5점</strong>: 완전 독립, 50m 이상, 길모퉁이·회전·탁자·침대·화장실 조작 가능"
+    ]
+  },
+  {
+    id: 'tr', name: '의자/침대 이동', nameEn: 'Chair/Bed Transfer', maxScore: 15,
+    principles: [
+      "<strong>0점</strong>: 참여 안 됨, 두 명 도움 필요 (장비 유무 무관)",
+      "<strong>3점</strong>: 참여는 하나 이동 동작 전 과정에서 한 명의 최대 도움 필요",
+      "<strong>8점</strong>: 한 명 도움, 이동 동작 어느 과정에서든 도움 필요",
+      "<strong>12점</strong>: 확신·안전 감독 위해 한 명, 슬라이딩 보드 조절·발판 조작·제동장치 조정 수행 가능하며 최소 도움만 필요",
+      "<strong>15점</strong>: 완전 독립 (의자차↔침대 모든 과정: 위치·제동·발판·이동·눕기·앉기). 보행 가능 시 의자에서 앉고 서기·침대로 이동 안전 수행"
+    ],
+    examples: [
+      "12점: 슬라이딩 보드 조절, 발판 움직임, 제동장치 조정 가능하나 감독 필요",
+      "15점: 의자차 위치·제동·발판·이동·눕기·앉기 모든 과정 안전하게 수행"
+    ]
+  }
+];
+
+// SCIM III 채점 가이드 (Praxis Toolkit v7.0, 2024 기반)
+const CLINICAL_GUIDE = [
+  {
+    id: 'feeding', name: '식사', nameEn: 'Feeding',
+    principles: [
+      "Setup 도움만 있고 실제 식사는 스스로 = 2점 (음식 자르기/개봉/따르기 도움)",
+      "adaptive device를 <strong>스스로 착용</strong>하고 사용 = 3점",
+      "adaptive device 착용에 <strong>도움 필요</strong> = 2점"
+    ],
+    examples: [
+      "카멜백 컵, 맞춤형 컵 = adaptive aid로 인정 (2점)",
+      "Universal cuff 스스로 착용 후 자립 식사 = 3점",
+      "쇠젓가락 사용 가능 = 완전 손 기능 (SCIM 3점, MBI 10점)",
+      "에디슨 젓가락 사용 = adaptive device (SCIM 2점 수준)"
+    ],
+    warn: "젓가락 종류(쇠/에디슨) 구분해서 체크해야 MBI 변환 정확도 up"
+  },
+  {
+    id: 'bathing', name: '목욕 (상체/하체)', nameEn: 'Bathing',
+    principles: [
+      "부분 도움 = <strong>구두 지시/prompt 포함</strong> (1점)",
+      "adaptive device 사용 = 긴 손잡이 브러쉬 등 (2점)",
+      "Specific setting = 목욕의자·목욕휠체어·손잡이 (2점)",
+      "완전 독립 = 도구·세팅 없이 자립 (3점)"
+    ],
+    examples: [
+      "그냥 옆에서 지켜보며 지시 = 1점 (부분 도움)",
+      "목욕의자에 앉아 자립 = 2점 (specific setting)",
+      "긴 손잡이 브러쉬로 등 씻기 자립 = 2점 (adaptive device)"
+    ],
+    warn: "\'해줘야 안심되는 것\'과 \'실제 필요\'는 다름 - 실제 필요 기준으로 채점"
+  },
+  {
+    id: 'dressing', name: '옷 입기 (상의/하의)', nameEn: 'Dressing',
+    principles: [
+      "CWOBZL = 단추·지퍼·끈 <strong>없는</strong> 옷",
+      "BZL = 단추·지퍼·끈 <strong>있는</strong> 옷",
+      "0점: 완전 도움 필요",
+      "1점: CWOBZL 부분 도움",
+      "2점: CWOBZL 자립하나 도구/세팅 필요",
+      "3점: CWOBZL 자립 (도구 없음), BZL만 도움/도구 필요",
+      "4점: 모든 옷 완전 자립 (도구·세팅 없음)"
+    ],
+    examples: [
+      "티셔츠는 스스로, 셔츠 단추만 도움 필요 = 3점",
+      "Button hook, zipper pull, dressing stick = adaptive device",
+      "침대 난간 사용해서 자세 유지 = specific setting"
+    ],
+    warn: "상체/하체 각각 별도 채점, 낮은 쪽이 실제 기능 반영"
+  },
+  {
+    id: 'grooming', name: '몸단장', nameEn: 'Grooming',
+    principles: [
+      "활동: 세수, 양치, 머리 빗기, 면도, 화장",
+      "1점: 부분 도움 필요",
+      "2점: adaptive device 사용해 자립",
+      "3점: adaptive device 없이 자립"
+    ],
+    examples: [
+      "Universal cuff, adapted comb = <strong>adaptive device</strong> (2점)",
+      "일반 시판 전기 칫솔 = adaptive device <strong>아님</strong>",
+      "일반 시판 전기면도기 = adaptive device <strong>아님</strong> (특수 개조 시에만 인정)"
+    ],
+    warn: "일상 상용 도구(전기칫솔·전기면도기)는 감점 사유 아님"
+  },
+  {
+    id: 'respiration', name: '호흡', nameEn: 'Respiration',
+    principles: [
+      "0점: TT + 인공호흡기 (permanent/intermittent)",
+      "2점: TT 있으나 자가호흡, 산소/기침에 많은 도움",
+      "4점: TT 있으나 자가호흡, 기침에 적은 도움",
+      "6점: TT 없이 자가호흡, 산소·마스크·BiPAP 등 필요",
+      "8점: TT 없이 자가호흡, 기침에 적은 도움/자극",
+      "10점: 완전 자립 호흡"
+    ],
+    examples: [
+      "기침 유발 자극만 필요 = 8점",
+      "산소만 사용 (BiPAP/CPAP 아닌) + 기침 어려움 = 6점"
+    ],
+    warn: "\'assistance for coughing\'의 정도(much vs little) 정확히 판단"
+  },
+  {
+    id: 'bladder', name: '배뇨', nameEn: 'Sphincter - Bladder',
+    principles: [
+      "0점: 유치 도뇨관 착용 중",
+      "3점: RUV > 100cc, 규칙적 도뇨 없음",
+      "6점: RUV < 100cc 또는 자가 CIC, 기구 착용에 도움 필요",
+      "9점: 자가 CIC + 외부 배뇨 도구(edi) 사용",
+      "11점: 자가 CIC, CIC 사이 실금 없음, edi 미사용",
+      "13점: RUV < 100cc + edi만 사용",
+      "15점: 완전 자립 (실금 없음, edi 미사용)"
+    ],
+    examples: [
+      "RUV = residual urine volume (잔뇨량)",
+      "CIC = clean intermittent catheterization (자가 간헐 도뇨)",
+      "edi = external drainage instrument (콘돔형 도뇨관, 성인용 기저귀 등)"
+    ],
+    warn: "유치 도뇨관 착용 시 무조건 0점 (다른 상태와 무관)"
+  },
+  {
+    id: 'bowel', name: '배변', nameEn: 'Sphincter - Bowel',
+    principles: [
+      "0점: 불규칙 또는 매우 낮은 빈도 (3일 1회 미만)",
+      "5점: 규칙적, 도움 필요, 드문 실변 (한 달 2회 미만)",
+      "8점: 규칙적, 도움 없음, 드문 실변",
+      "10점: 규칙적, 도움 없음, 실변 없음"
+    ],
+    examples: [
+      "\'Rare accidents\' = 한 달 2회 미만 실변",
+      "좌약 사용 = 도움에 해당 (5점 수준)",
+      "규칙적 배변 스케줄 = 매일 또는 이틀에 한 번"
+    ],
+    warn: "실변 빈도가 애매하면 최근 2주-1개월 관찰 데이터 필요"
+  },
+  {
+    id: 'toilet', name: '용변처리', nameEn: 'Use of Toilet',
+    principles: [
+      "0점: 모든 과정 완전 도움",
+      "1점: 부분 도움, <strong>회음부 위생 스스로 못함</strong>",
+      "2점: 부분 도움, 회음부 위생은 스스로 가능",
+      "4점: 모든 과정 자립하나 adaptive device 또는 special setting 필요",
+      "5점: 완전 자립 (도구·세팅 없음)"
+    ],
+    examples: [
+      "adaptive device 예: raised toilet seat, portable bidet, toilet aids",
+      "special setting 예: 안전 손잡이, hoist system",
+      "회음부 위생 자립 여부가 1점 vs 2점 판정에 결정적"
+    ],
+    warn: "기저귀 착용 중이면 별도로 배변/배뇨 항목에서 반영"
+  },
+  {
+    id: 'bed_mob', name: '침상동작 & 욕창방지', nameEn: 'Bed Mobility',
+    principles: [
+      "4가지 활동 평가:",
+      "① 침대에서 <strong>상체 돌리기</strong>",
+      "② 침대에서 <strong>하체 돌리기</strong>",
+      "③ 침대에서 <strong>누웠다 앉기</strong>",
+      "④ 휠체어에서 <strong>엉덩이 들기(푸시업)</strong> or lateral lean",
+      "각 활동 도움 없이 수행 수에 따라 점수 (0/2/4/6점)"
+    ],
+    examples: [
+      "Pressure relief = 완전 lift 또는 완전 lateral lean",
+      "1개 활동만 자립 = 2점",
+      "2-3개 자립 = 4점",
+      "모두 자립 = 6점"
+    ],
+    warn: "부분적 lean/lift는 카운트하지 않음. 완전 수행 기준"
+  },
+  {
+    id: 'trans_bed', name: '침대 ↔ 휠체어 이동', nameEn: 'Transfers bed-wheelchair',
+    principles: [
+      "6단계 활동:",
+      "① 휠체어 위치 조정 ② 브레이크 조작",
+      "③ 발판 올리기 ④ 발 옮기기",
+      "⑤ 팔걸이 제거/조정 ⑥ 옮겨 앉기",
+      "0점: 완전 도움",
+      "1점: 부분 도움/감독/adaptive device",
+      "2점: 완전 자립"
+    ],
+    examples: [
+      "Sliding board 사용 자립 = 1점",
+      "안전 위한 감독만 필요 = 1점",
+      "휠체어 미사용 케이스 = 2점 처리",
+      "MBI 변환 시: \'완전 독립 (감독 불필요)\' 명시 체크 필수"
+    ]
+  },
+  {
+    id: 'trans_toilet', name: '휠체어 ↔ 변기/욕조 이동', nameEn: 'Transfers wc-toilet-tub',
+    principles: [
+      "위 침대↔휠체어와 동일한 6단계 구조",
+      "0점: 완전 도움",
+      "1점: 부분 도움/감독/adaptive device (예: grab-bars)",
+      "2점: 완전 자립"
+    ],
+    examples: [
+      "안전 손잡이(grab bar) 사용 = 1점",
+      "높낮이 차이 커서 부분 도움 = 1점"
+    ]
+  },
+  {
+    id: 'indoor', name: '실내이동 (10m 이내)', nameEn: 'Mobility Indoors',
+    principles: [
+      "<strong>보행 보조기(walking aid) 기준으로 채점 - gait pattern 아님</strong>",
+      "0점: 완전 도움",
+      "1점: 전동 휠체어 또는 수동 휠체어 부분 도움",
+      "2점: 수동 휠체어 자립",
+      "3점: 감독 필요 (도구 유무 무관)",
+      "4점: 워커 또는 목발 (swing gait)",
+      "5점: 목발 또는 지팡이 2개 (reciprocal gait)",
+      "6점: 지팡이 1개",
+      "7점: 다리 보조기(AFO)만 필요",
+      "8점: 보조기 없이 자립"
+    ],
+    warn: "실내/중등도/실외 각각 독립적으로 채점 - 거리마다 사용 도구 다를 수 있음"
+  },
+  {
+    id: 'medium', name: '중등도 이동 (10-100m)', nameEn: 'Mobility Moderate',
+    principles: [
+      "실내이동과 동일한 척도 사용",
+      "실내에서는 지팡이 1개면 실외에서는 워커 필요할 수 있음",
+      "실제 사용 도구 기준으로 채점"
+    ]
+  },
+  {
+    id: 'outdoor', name: '실외이동 (100m 이상)', nameEn: 'Mobility Outdoors',
+    principles: [
+      "실내이동과 동일한 척도 사용",
+      "실외에서는 지면 상태·거리 등 영향으로 더 낮은 점수 나올 수 있음"
+    ]
+  },
+  {
+    id: 'stairs', name: '계단 오르내리기', nameEn: 'Stair Management',
+    principles: [
+      "<strong>3계단 이상</strong> 기준",
+      "0점: 불가능",
+      "1점: 다른 사람 지지/감독으로 3계단 이상",
+      "2점: 난간 또는 목발/지팡이 지지로 3계단 이상",
+      "3점: 완전 자립 (지지/감독 없이)"
+    ],
+    examples: [
+      "난간 잡고 감독 하 계단 = 1점",
+      "난간만 잡고 자립 = 2점",
+      "완전 자립 (지지 없음) = 3점"
+    ]
+  },
+  {
+    id: 'trans_car', name: '휠체어 ↔ 자동차 이동', nameEn: 'Transfers wc-car',
+    principles: [
+      "5단계 참여 활동:",
+      "① 차에 가까이 대기 ② 브레이크 잠그기",
+      "③ 발판/팔걸이 분리 ④ 차↔휠체어 이동",
+      "⑤ 휠체어 싣고 꺼내기",
+      "0점: 완전 도움",
+      "1점: 부분 도움/감독/adaptive device",
+      "2점: 완전 자립 (개조된 차 또는 도구 없음)"
+    ]
+  },
+  {
+    id: 'trans_floor', name: '바닥 ↔ 휠체어 이동', nameEn: 'Transfers ground-wc',
+    principles: [
+      "0점: 도움 필요",
+      "1점: 완전 자립 (adaptive device 사용 여부 무관)"
+    ]
+  }
+];
+
+function renderGuide() {
+  const container = document.getElementById('guideContainer');
+  container.innerHTML = '';
+  
+  function renderCard(item, maxScoreDisplay) {
+    let html = `<div class="guide-card">
+      <div class="guide-card-head" onclick="toggleGuideCard(this)">
+        <div class="guide-card-title">${item.name}<span class="en">${item.nameEn}${maxScoreDisplay ? ' · 최대 ' + item.maxScore + '점' : ''}</span></div>
+        <div class="guide-card-icon">▼</div>
+      </div>
+      <div class="guide-card-body">`;
+    
+    if (item.principles && item.principles.length) {
+      html += `<div class="guide-section">
+        <div class="guide-section-title">📌 채점 원칙</div>
+        <div class="guide-section-content"><ul>`;
+      item.principles.forEach(p => { html += `<li>${p}</li>`; });
+      html += '</ul></div></div>';
+    }
+    
+    if (item.examples && item.examples.length) {
+      html += `<div class="guide-section">
+        <div class="guide-section-title">💡 임상 예시</div>
+        <div class="guide-section-content">`;
+      item.examples.forEach(e => {
+        html += `<div class="guide-example">${e}</div>`;
+      });
+      html += '</div></div>';
+    }
+    
+    if (item.warn) {
+      html += `<div class="guide-section">
+        <div class="guide-warn"><strong>⚠️ 주의:</strong> ${item.warn}</div>
+      </div>`;
+    }
+    
+    html += '</div></div>';
+    return html;
+  }
+  
+  // MBI 섹션
+  let mbiHtml = '<div class="guide-section-header" style="margin:8px 0 12px; padding:14px 18px; background:linear-gradient(135deg,#1e293b,#334155); color:white; border-radius:12px;">';
+  mbiHtml += '<div style="font-size:18px; font-weight:900;">📊 K-MBI 채점 가이드</div>';
+  mbiHtml += '<div style="font-size:12px; opacity:.9; margin-top:4px;">한글판 수정바델지수 · 정한영 외, 대한재활의학회지 2007;31(3):283-297</div>';
+  mbiHtml += '</div>';
+  MBI_GUIDE.forEach(item => { mbiHtml += renderCard(item, true); });
+  container.insertAdjacentHTML('beforeend', mbiHtml);
+  
+  // SCIM 섹션
+  let scimHtml = '<div class="guide-section-header" style="margin:24px 0 12px; padding:14px 18px; background:linear-gradient(135deg,#0f766e,#14b8a6); color:white; border-radius:12px;">';
+  scimHtml += '<div style="font-size:18px; font-weight:900;">🦽 SCIM III 채점 가이드</div>';
+  scimHtml += '<div style="font-size:12px; opacity:.9; margin-top:4px;">Spinal Cord Independence Measure III · Praxis Spinal Cord Institute Toolkit v7.0, 2024</div>';
+  scimHtml += '</div>';
+  CLINICAL_GUIDE.forEach(item => { scimHtml += renderCard(item, false); });
+  container.insertAdjacentHTML('beforeend', scimHtml);
+}
+
+function toggleGuideCard(el) {
+  const body = el.nextElementSibling;
+  const icon = el.querySelector('.guide-card-icon');
+  const isOpen = body.classList.contains('open');
+  if (isOpen) {
+    body.classList.remove('open');
+    el.classList.remove('open');
+    icon.classList.remove('open');
+  } else {
+    body.classList.add('open');
+    el.classList.add('open');
+    icon.classList.add('open');
+  }
+}
+
+// ==================== 초기화 ====================
+function init(){
+  // MBI
+  mbi_renderItems();
+  const mbiSaved = MbiStore.load();
+  if (mbiSaved) mbi_restoreState(mbiSaved);
+  else mbi_setMobility('am');
+  MBI_DATA.forEach(item => mbi_updateItem(item.id));
+  mbi_updateSummary();
+  
+  // SCIM
+  scim_renderItems();
+  const scimSaved = ScimStore.load();
+  if (scimSaved) scim_restoreState(scimSaved);
+  SCIM_DATA.forEach(item => scim_updateItem(item.id));
+  scim_updateSummary();
+  
+  // 모드 복원
+  try {
+    const savedMode = localStorage.getItem('current_mode');
+    if (savedMode) switchMode(savedMode);
+  } catch(e){}
+}
+
+init();
+</script>
+</body>
+</html>

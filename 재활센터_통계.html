@@ -2685,6 +2685,25 @@ function extract15Patients(cellText) {
     return out;
 }
 
+// 시간표 이름 → EMR 수진자명 보정
+// 동명이인일 때 시간표는 "김옥자1 · 김옥자2", EMR은 "김옥자 · 김옥자2" 로 적히는 경우가 있다.
+// 시간표의 "○○○1" 이 EMR에 없고 숫자를 뗀 이름이 EMR에 있으면 그 이름으로 맞춘다.
+function resolveEmrPatientName(n) {
+    if (!n) return n;
+    if (!globalEmrPatientNames || Object.keys(globalEmrPatientNames).length === 0) return n;
+    if (globalEmrPatientNames[n]) return n;
+    var base = n.replace(/\d+$/, "");
+    if (base && base !== n && globalEmrPatientNames[base]) return base;
+    return n;
+}
+// EMR 이름 → 시간표에 적힐 수 있는 이름 후보 (김옥자 → 김옥자, 김옥자1)
+function schedNameVariants(n) {
+    if (!n) return [];
+    var out = [n];
+    if (!/\d$/.test(n)) out.push(n + "1");
+    return out;
+}
+
 // 셀 안에 그 환자가 있는지 — 김옥자 / 김옥자2 처럼 이름이 겹칠 때 오매칭 방지
 function textHasPatient(text, name) {
     if (!name) return false;
@@ -2767,7 +2786,8 @@ function analyzeQtyCheckLogic() {
     // 시간표 (15분) 표기 수집
     var sched15 = {};
     collect15Cells().forEach(function(cell) {
-        extract15Patients(cell.text).forEach(function(n) {
+        extract15Patients(cell.text).forEach(function(n0) {
+            var n = resolveEmrPatientName(n0);
             if (!sched15[n]) sched15[n] = (GRID_LABELS[cell.grid]||"") + " · " + cell.text.replace(/\r?\n|\r/g," ");
         });
     });
@@ -2870,7 +2890,10 @@ function analyzeQtyCheckLogic() {
         var group = slotGroups[gk];
         var who = group[0].who, patient = group[0].patient;
         var mine = schedule[who] || [];
-        var assigned = mine.filter(function(x){ return textHasPatient(x.text, patient); })
+        var pv = schedNameVariants(patient);
+        var assigned = mine.filter(function(x){
+            return pv.some(function(nm){ return textHasPatient(x.text, nm); });
+        })
                            .map(function(x){ return x.slot; });
         if (assigned.length === 0) return;   // 시간표에 없는 건은 대조하지 않음
         var assignedTxt = assigned.slice().sort().join("·");

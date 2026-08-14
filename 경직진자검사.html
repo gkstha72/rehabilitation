@@ -787,6 +787,32 @@
       background: rgba(255,255,255,0.72);
     }
 
+    .png-preview-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: rgba(15, 23, 42, 0.82);
+    }
+
+    .png-preview-card {
+      width: min(100%, 760px);
+      max-height: calc(100dvh - 32px);
+      overflow: auto;
+      padding: 18px;
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.32);
+    }
+
+    .png-preview-card h2 { margin: 0 0 8px; }
+    .png-preview-card p { margin: 0 0 14px; color: #475467; line-height: 1.6; }
+    .png-preview-card img { display: block; width: 100%; height: auto; border: 1px solid #d8dee9; border-radius: 10px; }
+    .png-preview-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .png-preview-actions a { display: grid; place-items: center; text-decoration: none; }
+
     .qc-table {
       font-size: 12px;
     }
@@ -1062,7 +1088,7 @@
   <div id="privacyOverlay" class="privacy-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="privacyTitle">
     <section class="privacy-card">
       <h2 id="privacyTitle">개인정보처리방침</h2>
-      <p class="privacy-version">시행일: 2026-08-14 · 웹앱 버전 0.8.2</p>
+      <p class="privacy-version">시행일: 2026-08-14 · 웹앱 버전 0.8.3</p>
 
       <h3>1. 처리하는 정보</h3>
       <p>사용자가 선택적으로 입력한 비식별 검사코드, 측정일, 환측 정보와 기기 자이로스코프 측정값 및 분석 결과를 처리합니다. 성명과 병원등록번호는 입력하지 마십시오.</p>
@@ -1094,6 +1120,18 @@
       <p>개인정보 관련 문의는 App Store 제품 페이지에 표시된 개발자 지원 연락처를 이용하십시오.</p>
 
       <button id="privacyCloseBtn" class="primary privacy-close" type="button">확인</button>
+    </section>
+  </div>
+
+  <div id="pngPreviewOverlay" class="png-preview-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pngPreviewTitle">
+    <section class="png-preview-card">
+      <h2 id="pngPreviewTitle">PNG 보고서 저장</h2>
+      <p>아래 이미지를 길게 누른 뒤 ‘사진에 저장’을 선택하세요. 파일 앱에 저장하려면 ‘파일 다운로드’를 누르세요.</p>
+      <img id="pngPreviewImage" alt="진자검사 PNG 보고서 미리보기" />
+      <div class="png-preview-actions">
+        <a id="pngDownloadLink" class="primary" href="#" download>파일 다운로드</a>
+        <button id="pngPreviewCloseBtn" class="secondary" type="button">닫기</button>
+      </div>
     </section>
   </div>
 
@@ -1151,6 +1189,10 @@
       installBtn: $("installBtn"),
       privacyOverlay: $("privacyOverlay"),
       privacyCloseBtn: $("privacyCloseBtn"),
+      pngPreviewOverlay: $("pngPreviewOverlay"),
+      pngPreviewImage: $("pngPreviewImage"),
+      pngDownloadLink: $("pngDownloadLink"),
+      pngPreviewCloseBtn: $("pngPreviewCloseBtn"),
       imageReport: $("imageReport"),
       qcPanel: $("qcPanel"),
       meanBody: $("meanBody"),
@@ -1205,6 +1247,10 @@
     els.privacyCloseBtn.addEventListener("click", closePrivacyPolicy);
     els.privacyOverlay.addEventListener("click", (event) => {
       if (event.target === els.privacyOverlay) closePrivacyPolicy();
+    });
+    els.pngPreviewCloseBtn.addEventListener("click", closePngPreview);
+    els.pngPreviewOverlay.addEventListener("click", (event) => {
+      if (event.target === els.pngPreviewOverlay) closePngPreview();
     });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !els.privacyOverlay.classList.contains("hidden")) {
@@ -3747,12 +3793,28 @@
             dataUrl
           });
         } else {
-          const link = document.createElement("a");
-          link.href = dataUrl;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
+          const pngBlob = dataUrlToBlob(dataUrl);
+          const pngFile = new File([pngBlob], fileName, { type: "image/png" });
+          const canShareFile = navigator.share &&
+            (!navigator.canShare || navigator.canShare({ files: [pngFile] }));
+
+          if (canShareFile) {
+            try {
+              await navigator.share({
+                title: "Pendulum Test Result",
+                files: [pngFile]
+              });
+              return;
+            } catch (shareError) {
+              if (shareError && shareError.name === "AbortError") return;
+            }
+          }
+
+          if (isMobileBrowser()) {
+            openPngPreview(dataUrl, fileName);
+          } else {
+            downloadPng(dataUrl, fileName);
+          }
         }
       } catch (error) {
         alert(`이미지 저장에 실패했습니다: ${error.message || error}`);
@@ -3760,6 +3822,44 @@
         els.imageBtn.disabled = false;
         els.imageBtn.textContent = originalText;
       }
+    }
+
+    function dataUrlToBlob(dataUrl) {
+      const [header, payload] = dataUrl.split(",");
+      const mime = (header.match(/data:([^;]+)/) || [null, "image/png"])[1];
+      const bytes = atob(payload);
+      const array = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i += 1) array[i] = bytes.charCodeAt(i);
+      return new Blob([array], { type: mime });
+    }
+
+    function isMobileBrowser() {
+      return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 1 && window.innerWidth <= 1024);
+    }
+
+    function downloadPng(dataUrl, fileName) {
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    function openPngPreview(dataUrl, fileName) {
+      els.pngPreviewImage.src = dataUrl;
+      els.pngDownloadLink.href = dataUrl;
+      els.pngDownloadLink.download = fileName;
+      els.pngPreviewOverlay.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closePngPreview() {
+      els.pngPreviewOverlay.classList.add("hidden");
+      els.pngPreviewImage.removeAttribute("src");
+      els.pngDownloadLink.href = "#";
+      document.body.style.overflow = "";
     }
 
     function drawMetricTableCanvas(ctx, x, y, width, right, left) {

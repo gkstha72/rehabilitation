@@ -3,7 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pendulum Test FINAL v0.6.5.1</title>
+  <title>Pendulum Test Web v0.8.2</title>
+  <meta name="description" content="휴대폰 자이로스코프 기반 양측 진자검사 측정·분석·보고서" />
+  <meta name="theme-color" content="#2457a7" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <style>
     :root {
       --bg: #f4f6f8;
@@ -44,6 +51,29 @@
     .subtitle {
       margin: 0;
       color: var(--muted);
+    }
+
+    .app-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .link-button {
+      min-height: 36px;
+      padding: 7px 12px;
+      border: 1px solid #b8c9e3;
+      background: #ffffff;
+      color: #294363;
+      font-size: 12px;
     }
 
     .notice {
@@ -106,6 +136,244 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 14px;
       margin-top: 17px;
+    }
+
+    .sensor-capture {
+      margin-top: 18px;
+      border: 1px solid #b8c9e3;
+      border-radius: 16px;
+      padding: 16px;
+      background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+    }
+
+    .sensor-capture-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 13px;
+    }
+
+    .sensor-capture-head h3 { font-size: 19px; }
+    .sensor-capture-head p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .sensor-support {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      padding: 5px 10px;
+      background: #edf2f9;
+      color: #344054;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .sensor-support.ok { background: #e9f7ef; color: var(--ok); }
+    .sensor-support.warn { background: #fff3dc; color: var(--warn); }
+    .sensor-support.bad { background: #feeceb; color: var(--bad); }
+
+    .measurement-side-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .measure-side-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: #fff;
+    }
+
+    .measure-side-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .measure-side-status {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-align: right;
+    }
+
+    .measure-side-card button { width: 100%; }
+    .measure-side-card.right button { background: var(--right); color: #fff; }
+    .measure-side-card.left button { background: var(--left); color: #fff; }
+
+    .sensor-instructions {
+      margin-top: 12px;
+      padding: 11px 13px;
+      border-radius: 11px;
+      background: #eef4ff;
+      color: #294363;
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .legacy-upload {
+      margin-top: 15px;
+      border-top: 1px solid var(--line);
+      padding-top: 13px;
+    }
+
+    .legacy-upload summary {
+      cursor: pointer;
+      color: #344054;
+      font-weight: 900;
+    }
+
+    .recording-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(15, 23, 42, 0.86);
+    }
+
+    .privacy-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(15, 23, 42, 0.72);
+    }
+
+    .privacy-card {
+      width: min(680px, 100%);
+      max-height: min(82vh, 760px);
+      overflow: auto;
+      border-radius: 20px;
+      padding: 22px;
+      background: #ffffff;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.28);
+    }
+
+    .privacy-card h2 { margin-bottom: 6px; }
+    .privacy-card h3 { margin-top: 18px; font-size: 15px; }
+    .privacy-card p, .privacy-card li { font-size: 13px; }
+    .privacy-card ul { margin: 7px 0 0; padding-left: 20px; }
+    .privacy-card .privacy-version { color: var(--muted); font-size: 11px; }
+    .privacy-card .privacy-close { width: 100%; margin-top: 18px; }
+
+    .recording-card {
+      width: min(520px, 100%);
+      border-radius: 24px;
+      padding: 24px;
+      background: #fff;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.28);
+    }
+
+    .recording-side {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 6px 12px;
+      margin-bottom: 12px;
+      background: #edf2f9;
+      color: #253b5c;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .recording-countdown {
+      min-height: 110px;
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      font-size: 82px;
+      line-height: 1;
+      font-weight: 950;
+    }
+
+    .recording-status {
+      margin-top: 5px;
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .recording-detail {
+      min-height: 42px;
+      margin: 7px 0 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .recording-time {
+      margin: 4px 0 15px;
+      font-variant-numeric: tabular-nums;
+      font-size: 32px;
+      font-weight: 900;
+    }
+
+    .recording-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+    }
+
+    .sensor-decision {
+      margin-top: 14px;
+      border: 1px solid #cfd8e6;
+      border-radius: 14px;
+      padding: 14px;
+      background: #fff;
+    }
+
+    .sensor-decision h3 { margin-bottom: 10px; }
+
+    .sensor-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 11px 0;
+    }
+
+    .sensor-metric {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px;
+      background: #f9fbfd;
+      text-align: center;
+    }
+
+    .sensor-metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .sensor-metric strong {
+      display: block;
+      margin-top: 3px;
+      font-size: 17px;
+    }
+
+    .sensor-decision-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .sensor-error {
+      border: 1px solid #f0b9b4;
+      border-radius: 10px;
+      padding: 11px 12px;
+      background: #fff1f0;
+      color: #8f251b;
+      font-size: 13px;
     }
 
     .side-upload {
@@ -535,7 +803,13 @@
     @media (max-width: 660px) {
       .wrap { width: min(100% - 16px, 1160px); margin-top: 12px; }
       .panel, .report { padding: 14px; }
-      .grid, .bilateral-upload-grid, .qc-columns, .velocity-grid { grid-template-columns: 1fr; }
+      .grid, .bilateral-upload-grid, .qc-columns, .velocity-grid,
+      .measurement-side-grid { grid-template-columns: 1fr; }
+      .sensor-capture-head { display: block; }
+      .sensor-support { display: inline-flex; margin-top: 9px; }
+      .sensor-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .sensor-decision-actions { grid-template-columns: 1fr; }
+      .app-header { align-items: center; }
       .report-header { display: block; }
       .affected-badge { display: inline-flex; margin-top: 10px; }
       canvas { height: 260px; }
@@ -551,18 +825,24 @@
 </head>
 <body>
   <main class="wrap">
-    <header>
-      <h1>Pendulum Test</h1>
-      <p class="subtitle">Gwangju365Rehabilitation Hospital</p>
+    <header class="app-header">
+      <div>
+        <h1>Pendulum Test</h1>
+        <p class="subtitle">Gwangju365Rehabilitation Hospital</p>
+      </div>
+      <div class="header-actions">
+        <button id="installBtn" class="link-button hidden" type="button">홈 화면 설치</button>
+        <button id="privacyBtn" class="link-button" type="button">개인정보 안내</button>
+      </div>
     </header>
 
     <section class="panel input-panel">
-      <h2>검사 정보와 파일</h2>
+      <h2>검사 정보와 측정</h2>
 
       <div class="grid">
         <div>
-          <label for="subjectId">대상자 ID</label>
-          <input id="subjectId" type="text" placeholder="예: P001" />
+          <label for="subjectId">비식별 검사코드</label>
+          <input id="subjectId" type="text" placeholder="예: P001" autocomplete="off" />
         </div>
         <div>
           <label for="testDate">측정일</label>
@@ -578,7 +858,7 @@
         </div>
         <div>
           <label>분석축</label>
-          <div class="fixed-field">WZ 고정</div>
+          <div class="fixed-field">직접 측정 자동 · CSV WZ</div>
         </div>
         <div>
           <label>자이로 단위</label>
@@ -586,40 +866,85 @@
         </div>
       </div>
 
-      <div class="bilateral-upload-grid">
-        <section class="side-upload right">
-          <h3>오른쪽 검사 파일</h3>
-          <div id="rightDropzone" class="dropzone" tabindex="0" role="button">
-            <div>
-              <strong>오른쪽 CSV 업로드</strong>
-              <span>오른쪽 시행 파일을 선택하세요.</span>
-              <div class="help">지원: time + WX/WY/WZ 또는 Galaxy ωx/ωy/ωz (rad/s)</div>
-            </div>
+      <section class="sensor-capture" aria-labelledby="sensorCaptureTitle">
+        <div class="sensor-capture-head">
+          <div>
+            <h3 id="sensorCaptureTitle">휴대폰 자이로 직접 측정</h3>
+            <p>휴대폰 한 대를 하퇴에 부착하고 오른쪽과 왼쪽을 차례로 측정합니다.</p>
           </div>
-          <input id="rightFileInput" class="hidden" type="file" accept=".csv,text/csv" multiple />
-          <div id="rightFileList" class="file-list">선택된 오른쪽 파일 없음</div>
-        </section>
+          <span id="sensorSupport" class="sensor-support">센서 확인 중</span>
+        </div>
 
-        <section class="side-upload left">
-          <h3>왼쪽 검사 파일</h3>
-          <div id="leftDropzone" class="dropzone" tabindex="0" role="button">
-            <div>
-              <strong>왼쪽 CSV 업로드</strong>
-              <span>왼쪽 시행 파일을 선택하세요.</span>
-              <div class="help">지원: time + WX/WY/WZ 또는 Galaxy ωx/ωy/ωz (rad/s)</div>
+        <div class="measurement-side-grid">
+          <section class="measure-side-card right">
+            <div class="measure-side-head">
+              <span class="side-label right">오른쪽</span>
+              <span id="rightMeasureStatus" class="measure-side-status">미측정</span>
             </div>
+            <button id="rightMeasureBtn" type="button">오른쪽 측정 시작</button>
+          </section>
+
+          <section class="measure-side-card left">
+            <div class="measure-side-head">
+              <span class="side-label left">왼쪽</span>
+              <span id="leftMeasureStatus" class="measure-side-status">미측정</span>
+            </div>
+            <button id="leftMeasureBtn" type="button">왼쪽 측정 시작</button>
+          </section>
+        </div>
+
+        <div class="sensor-instructions">
+          측정 시작 → 3초 준비 → 기록 시작 후 1초 이상 정지 → 다리 놓기 → 진동이 멈추면 자동 종료
+        </div>
+
+        <section id="sensorDecision" class="sensor-decision hidden" aria-live="polite">
+          <h3 id="sensorDecisionTitle">측정 결과 확인</h3>
+          <div id="sensorDecisionBody"></div>
+          <div class="sensor-decision-actions">
+            <button id="confirmMeasurementBtn" class="primary" type="button">측정 확정</button>
+            <button id="retryNowBtn" class="secondary" type="button">바로 재측정</button>
+            <button id="retryLaterBtn" class="secondary" type="button">나중에 재측정</button>
           </div>
-          <input id="leftFileInput" class="hidden" type="file" accept=".csv,text/csv" multiple />
-          <div id="leftFileList" class="file-list">선택된 왼쪽 파일 없음</div>
         </section>
-      </div>
+      </section>
+
+      <details class="legacy-upload">
+        <summary>기존 CSV 파일 불러오기</summary>
+        <div class="bilateral-upload-grid">
+          <section class="side-upload right">
+            <h3>오른쪽 검사 파일</h3>
+            <div id="rightDropzone" class="dropzone" tabindex="0" role="button">
+              <div>
+                <strong>오른쪽 CSV 업로드</strong>
+                <span>오른쪽 시행 파일을 선택하세요.</span>
+                <div class="help">지원: time + WX/WY/WZ 또는 Galaxy ωx/ωy/ωz (rad/s)</div>
+              </div>
+            </div>
+            <input id="rightFileInput" class="hidden" type="file" accept=".csv,text/csv" multiple />
+            <div id="rightFileList" class="file-list">선택된 오른쪽 파일 없음</div>
+          </section>
+
+          <section class="side-upload left">
+            <h3>왼쪽 검사 파일</h3>
+            <div id="leftDropzone" class="dropzone" tabindex="0" role="button">
+              <div>
+                <strong>왼쪽 CSV 업로드</strong>
+                <span>왼쪽 시행 파일을 선택하세요.</span>
+                <div class="help">지원: time + WX/WY/WZ 또는 Galaxy ωx/ωy/ωz (rad/s)</div>
+              </div>
+            </div>
+            <input id="leftFileInput" class="hidden" type="file" accept=".csv,text/csv" multiple />
+            <div id="leftFileList" class="file-list">선택된 왼쪽 파일 없음</div>
+          </section>
+        </div>
+      </details>
 
       <div class="toolbar">
         <button id="analyzeBtn" class="primary" disabled>좌·우 분석 실행</button>
-        <button id="imageBtn" class="image-btn" disabled>사진으로 저장(PNG)</button>
+        <button id="imageBtn" class="image-btn" disabled>보고서 저장·공유(PNG)</button>
         <button id="exportBtn" class="secondary" disabled>결과 CSV 저장</button>
         <button id="printBtn" class="secondary" disabled>인쇄</button>
-        <button id="resetBtn" class="danger">초기화</button>
+        <button id="resetBtn" class="danger">검사 종료 및 데이터 삭제</button>
       </div>
     </section>
 
@@ -677,7 +1002,7 @@
         </div>
       </div>
 
-      <h3 class="section-title">Clinical Interpretation</h3>
+      <h3 class="section-title">측정 결과 요약</h3>
       <div id="clinicalImpression" class="impression-box"></div>
 
       <h3 class="section-title">References</h3>
@@ -720,6 +1045,58 @@
     </section>
   </main>
 
+  <div id="recordingOverlay" class="recording-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="recordingStatus">
+    <div class="recording-card">
+      <div id="recordingSide" class="recording-side">오른쪽 측정</div>
+      <div id="recordingCountdown" class="recording-countdown">3</div>
+      <div id="recordingStatus" class="recording-status">측정 준비</div>
+      <div id="recordingDetail" class="recording-detail">휴대폰을 하퇴에 단단히 고정하십시오.</div>
+      <div id="recordingTime" class="recording-time">0.0 s</div>
+      <div class="recording-actions">
+        <button id="stopMeasurementBtn" class="primary" type="button" disabled>측정 종료</button>
+        <button id="cancelMeasurementBtn" class="danger" type="button">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="privacyOverlay" class="privacy-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="privacyTitle">
+    <section class="privacy-card">
+      <h2 id="privacyTitle">개인정보처리방침</h2>
+      <p class="privacy-version">시행일: 2026-08-14 · 웹앱 버전 0.8.2</p>
+
+      <h3>1. 처리하는 정보</h3>
+      <p>사용자가 선택적으로 입력한 비식별 검사코드, 측정일, 환측 정보와 기기 자이로스코프 측정값 및 분석 결과를 처리합니다. 성명과 병원등록번호는 입력하지 마십시오.</p>
+
+      <h3>2. 처리 목적</h3>
+      <p>무릎 진자검사의 측정, 결과 분석, 재측정 판단 및 사용자가 요청한 보고서 생성에만 사용합니다.</p>
+
+      <h3>3. 처리·전송 방식</h3>
+      <ul>
+        <li>측정과 분석은 사용 중인 기기 안에서만 수행됩니다.</li>
+        <li>앱은 검사정보와 측정값을 외부 서버, 광고업체 또는 분석업체로 전송하지 않습니다.</li>
+        <li>앱은 검사 세션을 별도의 계정이나 클라우드 데이터베이스에 저장하지 않습니다.</li>
+      </ul>
+
+      <h3>4. 보유와 삭제</h3>
+      <p>검사정보와 측정값은 현재 검사 세션 동안에만 기기 메모리에서 사용됩니다. ‘검사 종료 및 데이터 삭제’를 누르면 입력값, 측정값, 분석결과와 앱의 임시 보고서 파일을 삭제합니다.</p>
+
+      <h3>5. 보고서 저장·공유</h3>
+      <p>사용자가 사진, 파일, 메시지 또는 다른 앱으로 내보낸 보고서는 앱의 관리 범위를 벗어납니다. 저장·공유 전에 대상자 식별 가능성과 보관 위치, iCloud 등 외부 동기화 여부를 확인하십시오.</p>
+
+      <h3>6. 사용자 주의사항</h3>
+      <ul>
+        <li>개인을 직접 식별할 수 없는 검사코드만 사용하십시오.</li>
+        <li>임상 사용 시 소속기관의 개인정보 보호절차와 적법한 처리 근거를 확인하십시오.</li>
+        <li>식별 가능한 보고서를 개인 사진 보관함이나 승인되지 않은 서비스에 저장하지 마십시오.</li>
+      </ul>
+
+      <h3>7. 문의</h3>
+      <p>개인정보 관련 문의는 App Store 제품 페이지에 표시된 개발자 지원 연락처를 이용하십시오.</p>
+
+      <button id="privacyCloseBtn" class="primary privacy-close" type="button">확인</button>
+    </section>
+  </div>
+
   <script>
     "use strict";
 
@@ -738,8 +1115,24 @@
 
     const state = {
       files: { right: [], left: [] },
-      analyses: []
+      analyses: [],
+      measurement: {
+        phase: "idle",
+        activeSide: null,
+        rows: [],
+        source: null,
+        sensor: null,
+        countdownTimer: null,
+        sampleTimer: null,
+        startedAt: 0,
+        lastUiAt: 0,
+        movementSeen: false,
+        stableSince: null,
+        candidate: null,
+        pending: { right: null, left: null }
+      }
     };
+    let deferredInstallPrompt = null;
 
     const $ = (id) => document.getElementById(id);
     const els = {
@@ -754,6 +1147,10 @@
       exportBtn: $("exportBtn"),
       printBtn: $("printBtn"),
       resetBtn: $("resetBtn"),
+      privacyBtn: $("privacyBtn"),
+      installBtn: $("installBtn"),
+      privacyOverlay: $("privacyOverlay"),
+      privacyCloseBtn: $("privacyCloseBtn"),
       imageReport: $("imageReport"),
       qcPanel: $("qcPanel"),
       meanBody: $("meanBody"),
@@ -764,7 +1161,26 @@
       clinicalImpression: $("clinicalImpression"),
       consistencyQc: $("consistencyQc"),
       rightQc: $("rightQc"),
-      leftQc: $("leftQc")
+      leftQc: $("leftQc"),
+      sensorSupport: $("sensorSupport"),
+      rightMeasureBtn: $("rightMeasureBtn"),
+      leftMeasureBtn: $("leftMeasureBtn"),
+      rightMeasureStatus: $("rightMeasureStatus"),
+      leftMeasureStatus: $("leftMeasureStatus"),
+      sensorDecision: $("sensorDecision"),
+      sensorDecisionTitle: $("sensorDecisionTitle"),
+      sensorDecisionBody: $("sensorDecisionBody"),
+      confirmMeasurementBtn: $("confirmMeasurementBtn"),
+      retryNowBtn: $("retryNowBtn"),
+      retryLaterBtn: $("retryLaterBtn"),
+      recordingOverlay: $("recordingOverlay"),
+      recordingSide: $("recordingSide"),
+      recordingCountdown: $("recordingCountdown"),
+      recordingStatus: $("recordingStatus"),
+      recordingDetail: $("recordingDetail"),
+      recordingTime: $("recordingTime"),
+      stopMeasurementBtn: $("stopMeasurementBtn"),
+      cancelMeasurementBtn: $("cancelMeasurementBtn")
     };
 
     function getLocalDateString(date = new Date()) {
@@ -781,8 +1197,71 @@
     els.analyzeBtn.addEventListener("click", analyzeAll);
     els.imageBtn.addEventListener("click", saveReportAsPng);
     els.exportBtn.addEventListener("click", exportResults);
-    els.printBtn.addEventListener("click", () => window.print());
-    els.resetBtn.addEventListener("click", resetAll);
+    els.printBtn.addEventListener("click", () => {
+      if (confirmExternalUse("인쇄")) window.print();
+    });
+    els.resetBtn.addEventListener("click", requestFullReset);
+    els.privacyBtn.addEventListener("click", openPrivacyPolicy);
+    els.privacyCloseBtn.addEventListener("click", closePrivacyPolicy);
+    els.privacyOverlay.addEventListener("click", (event) => {
+      if (event.target === els.privacyOverlay) closePrivacyPolicy();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !els.privacyOverlay.classList.contains("hidden")) {
+        closePrivacyPolicy();
+      }
+    });
+    els.rightMeasureBtn.addEventListener("click", () => startMeasurement("right"));
+    els.leftMeasureBtn.addEventListener("click", () => startMeasurement("left"));
+    els.stopMeasurementBtn.addEventListener("click", () => stopMeasurement("manual"));
+    els.cancelMeasurementBtn.addEventListener("click", cancelMeasurement);
+    els.confirmMeasurementBtn.addEventListener("click", confirmMeasuredTrial);
+    els.retryNowBtn.addEventListener("click", retryMeasurementNow);
+    els.retryLaterBtn.addEventListener("click", deferMeasurementRetry);
+    $("affectedSide").addEventListener("change", () => {
+      updateMeasurementCards();
+      if (!els.imageReport.classList.contains("hidden")) renderReport();
+    });
+    setupPwaInstall();
+    updateSensorSupport();
+    updateMeasurementCards();
+
+    function setupPwaInstall() {
+      const standalone = window.matchMedia("(display-mode: standalone)").matches ||
+        window.navigator.standalone === true;
+      const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+      if (!standalone && isIos) els.installBtn.classList.remove("hidden");
+
+      window.addEventListener("beforeinstallprompt", (event) => {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        if (!standalone) els.installBtn.classList.remove("hidden");
+      });
+
+      els.installBtn.addEventListener("click", async () => {
+        if (deferredInstallPrompt) {
+          deferredInstallPrompt.prompt();
+          await deferredInstallPrompt.userChoice;
+          deferredInstallPrompt = null;
+          els.installBtn.classList.add("hidden");
+          return;
+        }
+
+        if (isIos) {
+          window.alert("Safari 아래쪽의 공유 버튼을 누른 뒤 ‘홈 화면에 추가’를 선택하십시오.");
+          return;
+        }
+
+        window.alert("브라우저 메뉴에서 ‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택하십시오.");
+      });
+
+      if ("serviceWorker" in navigator && window.isSecureContext) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js").catch(() => {});
+        });
+      }
+    }
 
     function setupUploader(side) {
       const input = side === "right" ? els.rightFileInput : els.leftFileInput;
@@ -813,21 +1292,654 @@
 
     function setFiles(side, files) {
       state.files[side] = files.filter((f) => f.name.toLowerCase().endsWith(".csv"));
+      renderFileList(side);
+      updateActionButtons();
+      updateMeasurementCards();
+    }
+
+    function renderFileList(side) {
       const target = side === "right" ? els.rightFileList : els.leftFileList;
       const label = side === "right" ? "오른쪽" : "왼쪽";
 
       target.innerHTML = state.files[side].length
         ? state.files[side].map((f, i) => `${i + 1}차: ${escapeHtml(f.name)}`).join("<br>")
         : `선택된 ${label} 파일 없음`;
+    }
 
+    function updateActionButtons() {
       els.analyzeBtn.disabled =
         state.files.right.length === 0 ||
         state.files.left.length === 0;
+
+      const valid = state.analyses.filter((item) => item.ok && item.accepted !== false);
+      const hasRight = valid.some((item) => item.side === "right");
+      const hasLeft = valid.some((item) => item.side === "left");
+      const hasBoth = hasRight && hasLeft;
+      els.imageBtn.disabled = !hasBoth;
+      els.printBtn.disabled = !hasBoth;
+      els.exportBtn.disabled = state.analyses.length === 0;
+    }
+
+    function updateSensorSupport() {
+      const nativeBridge = Boolean(
+        window.webkit &&
+        window.webkit.messageHandlers &&
+        window.webkit.messageHandlers.motionBridge
+      );
+      const secure = window.isSecureContext;
+      const hasGenericSensor = typeof window.Gyroscope === "function";
+      const hasDeviceMotion = typeof window.DeviceMotionEvent !== "undefined";
+      const supported = nativeBridge || (secure && (hasGenericSensor || hasDeviceMotion));
+
+      els.sensorSupport.className = `sensor-support ${supported ? "ok" : secure ? "bad" : "warn"}`;
+      els.sensorSupport.textContent = nativeBridge
+        ? "iPhone 자이로 연결됨"
+        : supported
+          ? "자이로 사용 가능"
+        : secure
+          ? "자이로 미지원 기기"
+          : "HTTPS 연결 필요";
+
+      els.rightMeasureBtn.disabled = !supported;
+      els.leftMeasureBtn.disabled = !supported;
+      return supported;
+    }
+
+    async function requestMotionPermission() {
+      if (
+        window.webkit &&
+        window.webkit.messageHandlers &&
+        window.webkit.messageHandlers.motionBridge
+      ) return;
+
+      if (!window.isSecureContext) {
+        throw new Error("휴대폰 직접 측정은 HTTPS 보안 연결에서만 사용할 수 있습니다.");
+      }
+
+      if (
+        typeof window.DeviceMotionEvent !== "undefined" &&
+        typeof window.DeviceMotionEvent.requestPermission === "function"
+      ) {
+        const permission = await window.DeviceMotionEvent.requestPermission();
+        if (permission !== "granted") {
+          throw new Error("동작 및 방향 센서 권한이 허용되지 않았습니다.");
+        }
+      }
+    }
+
+    async function startMeasurement(side) {
+      if (state.measurement.phase !== "idle") return;
+      if (!updateSensorSupport()) return;
+
+      try {
+        await requestMotionPermission();
+      } catch (error) {
+        showSensorError(error instanceof Error ? error.message : String(error));
+        return;
+      }
+
+      state.measurement.activeSide = side;
+      state.measurement.phase = "countdown";
+      state.measurement.candidate = null;
+      els.sensorDecision.classList.add("hidden");
+      els.recordingOverlay.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+      els.recordingSide.textContent = `${sideLabel(side)} 측정`;
+      els.recordingCountdown.textContent = "3";
+      els.recordingStatus.textContent = "측정 준비";
+      els.recordingDetail.textContent = "휴대폰을 하퇴에 단단히 고정하십시오.";
+      els.recordingTime.textContent = "0.0 s";
+      els.stopMeasurementBtn.disabled = true;
+
+      let remaining = 3;
+      vibrate(70);
+      state.measurement.countdownTimer = window.setInterval(() => {
+        remaining -= 1;
+        if (remaining > 0) {
+          els.recordingCountdown.textContent = String(remaining);
+          vibrate(70);
+          return;
+        }
+
+        window.clearInterval(state.measurement.countdownTimer);
+        state.measurement.countdownTimer = null;
+        beginSensorRecording();
+      }, 1000);
+    }
+
+    function beginSensorRecording() {
+      const measurement = state.measurement;
+      if (measurement.phase !== "countdown") return;
+
+      measurement.phase = "recording";
+      measurement.rows = [];
+      measurement.startedAt = performance.now();
+      measurement.lastUiAt = 0;
+      measurement.movementSeen = false;
+      measurement.stableSince = null;
+      els.recordingCountdown.textContent = "●";
+      els.recordingStatus.textContent = "기록 중";
+      els.recordingDetail.textContent = "1초 이상 정지한 뒤 다리를 놓으십시오. 진동이 멈추면 자동으로 종료됩니다.";
+      els.stopMeasurementBtn.disabled = false;
+      vibrate([120, 80, 120]);
+
+      if (
+        window.webkit &&
+        window.webkit.messageHandlers &&
+        window.webkit.messageHandlers.motionBridge
+      ) {
+        measurement.source = "native-coremotion";
+        window.webkit.messageHandlers.motionBridge.postMessage({
+          action: "start",
+          side: measurement.activeSide
+        });
+        return;
+      }
+
+      let genericStarted = false;
+      if (typeof window.Gyroscope === "function") {
+        try {
+          const sensor = new window.Gyroscope({ frequency: 100, referenceFrame: "device" });
+          sensor.addEventListener("reading", () => {
+            recordSensorRow(sensor.x, sensor.y, sensor.z);
+          });
+          sensor.addEventListener("error", () => {
+            if (state.measurement.phase === "recording" && state.measurement.rows.length === 0) {
+              startDeviceMotionFallback();
+            }
+          });
+          sensor.start();
+          measurement.sensor = sensor;
+          measurement.source = "generic-sensor";
+          genericStarted = true;
+        } catch (_) {
+          genericStarted = false;
+        }
+      }
+
+      if (!genericStarted) startDeviceMotionFallback();
+
+      measurement.sampleTimer = window.setTimeout(() => {
+        if (measurement.phase !== "recording" || measurement.rows.length > 0) return;
+        if (measurement.source === "generic-sensor") {
+          startDeviceMotionFallback();
+          measurement.sampleTimer = window.setTimeout(() => {
+            if (measurement.phase === "recording" && measurement.rows.length === 0) {
+              failActiveMeasurement("자이로스코프 값을 수신하지 못했습니다. 브라우저의 동작 센서 권한을 확인하십시오.");
+            }
+          }, 1800);
+        } else {
+          failActiveMeasurement("자이로스코프 값을 수신하지 못했습니다. 브라우저의 동작 센서 권한을 확인하십시오.");
+        }
+      }, 1800);
+    }
+
+    function startDeviceMotionFallback() {
+      const measurement = state.measurement;
+      if (measurement.sensor) {
+        try { measurement.sensor.stop(); } catch (_) {}
+        measurement.sensor = null;
+      }
+      window.removeEventListener("devicemotion", handleDeviceMotion);
+      window.addEventListener("devicemotion", handleDeviceMotion);
+      measurement.source = "device-motion";
+    }
+
+    function handleDeviceMotion(event) {
+      const rate = event.rotationRate;
+      if (!rate) return;
+
+      // W3C DeviceMotion 표준: alpha=x, beta=y, gamma=z (deg/s).
+      // 직접 측정은 종료 뒤 에너지가 가장 큰 축을 분석축으로 자동 정렬한다.
+      const wx = Number(rate.alpha) * Math.PI / 180;
+      const wy = Number(rate.beta) * Math.PI / 180;
+      const wz = Number(rate.gamma) * Math.PI / 180;
+      recordSensorRow(wx, wy, wz);
+    }
+
+    function recordSensorRow(wx, wy, wz) {
+      const measurement = state.measurement;
+      if (measurement.phase !== "recording") return;
+      if (![wx, wy, wz].every(Number.isFinite)) return;
+
+      const now = performance.now();
+      const time = (now - measurement.startedAt) / 1000;
+      const last = measurement.rows[measurement.rows.length - 1];
+      if (last && time <= last.time) return;
+
+      measurement.rows.push({ time, wx, wy, wz });
+
+      const angularSpeedDeg = Math.hypot(wx, wy, wz) * 180 / Math.PI;
+      if (time >= SETTINGS.minBaselineSec && angularSpeedDeg >= SETTINGS.onsetMinDeg) {
+        measurement.movementSeen = true;
+      }
+
+      if (measurement.movementSeen) {
+        if (angularSpeedDeg <= SETTINGS.stableMinDeg) {
+          if (measurement.stableSince === null) measurement.stableSince = now;
+          if (now - measurement.stableSince >= 1300 && time >= 3) {
+            stopMeasurement("auto");
+            return;
+          }
+        } else {
+          measurement.stableSince = null;
+        }
+      }
+
+      if (now - measurement.lastUiAt >= 100) {
+        measurement.lastUiAt = now;
+        els.recordingTime.textContent = `${time.toFixed(1)} s`;
+        els.recordingDetail.textContent = measurement.movementSeen
+          ? "진자운동을 기록하고 있습니다. 다리가 완전히 멈출 때까지 기다리십시오."
+          : "정지구간 기록 중 · 준비되면 다리를 놓으십시오.";
+      }
+
+      if (time >= 20) stopMeasurement("timeout");
+    }
+
+    function cleanupSensorCapture() {
+      const measurement = state.measurement;
+      if (measurement.countdownTimer !== null) {
+        window.clearInterval(measurement.countdownTimer);
+        measurement.countdownTimer = null;
+      }
+      if (measurement.sampleTimer !== null) {
+        window.clearTimeout(measurement.sampleTimer);
+        measurement.sampleTimer = null;
+      }
+      if (measurement.sensor) {
+        try { measurement.sensor.stop(); } catch (_) {}
+        measurement.sensor = null;
+      }
+      window.removeEventListener("devicemotion", handleDeviceMotion);
+      measurement.source = null;
+    }
+
+    function stopMeasurement(reason = "manual") {
+      const measurement = state.measurement;
+      if (measurement.phase !== "recording") return;
+
+      if (
+        measurement.source === "native-coremotion" &&
+        window.webkit &&
+        window.webkit.messageHandlers &&
+        window.webkit.messageHandlers.motionBridge
+      ) {
+        measurement.phase = "analyzing";
+        els.stopMeasurementBtn.disabled = true;
+        els.recordingStatus.textContent = "분석 중";
+        els.recordingDetail.textContent = "기존 Pendulum 분석 규칙을 그대로 적용하고 있습니다.";
+        window.webkit.messageHandlers.motionBridge.postMessage({ action: "stop" });
+        return;
+      }
+
+      measurement.phase = "analyzing";
+      cleanupSensorCapture();
+      els.stopMeasurementBtn.disabled = true;
+      els.recordingStatus.textContent = "분석 중";
+      els.recordingDetail.textContent = reason === "timeout"
+        ? "최대 기록시간에 도달했습니다. 현재 자료를 분석합니다."
+        : "기존 Pendulum 분석 규칙을 그대로 적용하고 있습니다.";
+
+      window.setTimeout(() => finalizeMeasuredRows(), 80);
+    }
+
+    function finalizeMeasuredRows() {
+      const measurement = state.measurement;
+      const side = measurement.activeSide;
+      const capturedRows = measurement.rows.slice();
+      const axisSelection = normalizeDirectSensorRows(capturedRows);
+      const rows = axisSelection.rows;
+      const trialNo = state.files[side].length + 1;
+      const subject = safeFilePart($("subjectId").value.trim() || "subject");
+      const date = $("testDate").value || getLocalDateString();
+      const fileName = `${subject}_${date}_${side}_${trialNo}.csv`;
+      const csv = rowsToGyroCsv(rows);
+      const file = new File([csv], fileName, { type: "text/csv;charset=utf-8" });
+      let result;
+
+      try {
+        if (rows.length < 30) throw new Error("유효한 숫자 데이터가 30행 미만입니다.");
+        result = analyzeTrial(fileName, rows, side, trialNo);
+        result.source = "direct-sensor";
+        result.accepted = false;
+        result.metadata.primaryAxis = axisSelection.axis.toUpperCase();
+        result.metadata.axisDominance = axisSelection.dominance;
+        const axisQc = result.qc.find((item) => item.item === "측정축 우세도");
+        if (axisQc) {
+          axisQc.detail = `${axisSelection.axis.toUpperCase()} 자동 선택 · ${(axisSelection.dominance * 100).toFixed(1)}%`;
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        result = {
+          ok: false,
+          side,
+          trialNo,
+          fileName,
+          error: message,
+          failure: classifyFailure(message),
+          source: "direct-sensor",
+          accepted: false
+        };
+      }
+
+      measurement.candidate = { side, file, rows, result };
+      measurement.phase = "idle";
+      measurement.activeSide = null;
+      measurement.rows = [];
+      els.recordingOverlay.classList.add("hidden");
+      document.body.style.overflow = "";
+      renderSensorDecision();
+      updateMeasurementCards();
+      vibrate(result.ok ? [100, 60, 100] : [250, 80, 250]);
+    }
+
+    function renderSensorDecision() {
+      const candidate = state.measurement.candidate;
+      if (!candidate) {
+        els.sensorDecision.classList.add("hidden");
+        return;
+      }
+
+      const { result, side } = candidate;
+      els.sensorDecisionTitle.textContent = `${sideLabel(side)} 측정 결과 확인`;
+      const decision = getRetestDecision(result);
+      els.retryNowBtn.disabled = false;
+      els.retryLaterBtn.disabled = false;
+
+      if (!result.ok) {
+        const failure = result.failure || classifyFailure(result.error);
+        els.sensorDecisionBody.innerHTML = `
+          ${renderRetestDecision(decision)}
+          <div class="sensor-error">
+            <strong>${escapeHtml(failure.category)}</strong><br>
+            ${escapeHtml(failure.cause)}<br>
+            ${escapeHtml(failure.action)}
+          </div>
+        `;
+      } else {
+        els.sensorDecisionBody.innerHTML = `
+          ${renderRetestDecision(decision)}
+          <div class="sensor-metrics">
+            ${sensorMetric("FSE", `${fmt(result.metrics.fse, 1)}°`)}
+            ${sensorMetric("Vmax", `${fmt(result.metrics.vmax, 1)}°/s`)}
+            ${sensorMetric("Plat Amp", `${fmt(result.metrics.platAmp, 1)}°`)}
+            ${sensorMetric("RI", fmt(result.metrics.ri, 2))}
+            ${sensorMetric("Ncyc", `${fmt(result.metrics.ncyc, 1)}회`)}
+            ${sensorMetric("Damping ζ", fmt(result.metrics.dampingRatio, 3))}
+            ${sensorMetric("자동 측정축", result.metadata.primaryAxis || "WZ")}
+            ${sensorMetric("실제 표본주파수", `${fmt(result.metadata.sampleRate, 1)} Hz`)}
+          </div>
+        `;
+      }
+
+      els.confirmMeasurementBtn.disabled = !result.ok || decision.level === "required";
+      els.sensorDecision.classList.remove("hidden");
+      els.sensorDecision.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function sensorMetric(label, value) {
+      return `<div class="sensor-metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+    }
+
+    function confirmMeasuredTrial() {
+      const candidate = state.measurement.candidate;
+      if (!candidate || !candidate.result.ok) return;
+
+      candidate.result.accepted = true;
+      state.files[candidate.side].push(candidate.file);
+      state.analyses.push(candidate.result);
+      state.measurement.pending[candidate.side] = null;
+      state.measurement.candidate = null;
+      renderFileList(candidate.side);
+      renderSensorDecision();
+      renderReport();
+      renderQc();
+      updateActionButtons();
+      updateMeasurementCards();
+    }
+
+    function retryMeasurementNow() {
+      const candidate = state.measurement.candidate;
+      if (!candidate) return;
+      const side = candidate.side;
+      state.measurement.candidate = null;
+      state.measurement.pending[side] = null;
+      renderSensorDecision();
+      updateMeasurementCards();
+      startMeasurement(side);
+    }
+
+    function deferMeasurementRetry() {
+      const candidate = state.measurement.candidate;
+      if (!candidate) return;
+      state.measurement.pending[candidate.side] = candidate;
+      state.measurement.candidate = null;
+      renderSensorDecision();
+      updateMeasurementCards();
+    }
+
+    function updateMeasurementCards() {
+      for (const side of ["right", "left"]) {
+        const count = state.analyses.filter(
+          (item) => item.side === side && item.ok && item.accepted !== false
+        ).length;
+        const pending = state.measurement.pending[side];
+        const status = side === "right" ? els.rightMeasureStatus : els.leftMeasureStatus;
+        const button = side === "right" ? els.rightMeasureBtn : els.leftMeasureBtn;
+        const role = measurementRole(side);
+
+        if (pending) {
+          status.textContent = `${role} · 재측정 대기`;
+          button.textContent = `${sideLabel(side)} 다시 측정`;
+        } else if (count > 0) {
+          status.textContent = `${role} · 확정 ${count}회`;
+          button.textContent = `${sideLabel(side)} 추가 측정`;
+        } else {
+          status.textContent = `${role} · 미측정`;
+          button.textContent = `${sideLabel(side)} 측정 시작`;
+        }
+      }
+    }
+
+    function measurementRole(side) {
+      const affected = $("affectedSide").value;
+      return affected === "bilateral" || affected === side ? "환측" : "건측";
+    }
+
+    function cancelMeasurement() {
+      const measurement = state.measurement;
+      if (
+        measurement.source === "native-coremotion" &&
+        window.webkit &&
+        window.webkit.messageHandlers &&
+        window.webkit.messageHandlers.motionBridge
+      ) {
+        window.webkit.messageHandlers.motionBridge.postMessage({ action: "cancel" });
+      }
+      cleanupSensorCapture();
+      measurement.phase = "idle";
+      measurement.activeSide = null;
+      measurement.rows = [];
+      els.recordingOverlay.classList.add("hidden");
+      document.body.style.overflow = "";
+      updateMeasurementCards();
+    }
+
+    function failActiveMeasurement(message) {
+      cleanupSensorCapture();
+      state.measurement.phase = "idle";
+      state.measurement.activeSide = null;
+      state.measurement.rows = [];
+      els.recordingOverlay.classList.add("hidden");
+      document.body.style.overflow = "";
+      showSensorError(message);
+      updateMeasurementCards();
+    }
+
+    function showSensorError(message) {
+      els.sensorDecisionTitle.textContent = "센서 측정 확인";
+      els.sensorDecisionBody.innerHTML = `<div class="sensor-error">${escapeHtml(message)}</div>`;
+      els.confirmMeasurementBtn.disabled = true;
+      els.retryNowBtn.disabled = true;
+      els.retryLaterBtn.disabled = true;
+      els.sensorDecision.classList.remove("hidden");
+    }
+
+    function rowsToGyroCsv(rows) {
+      return "\uFEFFtime,wx,wy,wz\n" + rows
+        .map((row) => [row.time, row.wx, row.wy, row.wz]
+          .map((value) => Number(value).toFixed(6))
+          .join(","))
+        .join("\n");
+    }
+
+    function normalizeDirectSensorRows(rows) {
+      if (!rows.length) return { rows: [], axis: "wz", dominance: 0 };
+
+      const axes = ["wx", "wy", "wz"];
+      const baselineRows = rows.filter((row) => row.time <= 0.30);
+      const reference = baselineRows.length ? baselineRows : rows.slice(0, Math.min(10, rows.length));
+      const bias = Object.fromEntries(
+        axes.map((axis) => [axis, mean(reference.map((row) => row[axis]))])
+      );
+      const energy = Object.fromEntries(
+        axes.map((axis) => [
+          axis,
+          rows.reduce((sum, row) => sum + (row[axis] - bias[axis]) ** 2, 0)
+        ])
+      );
+      const axis = axes.reduce((best, current) =>
+        energy[current] > energy[best] ? current : best
+      );
+      const total = axes.reduce((sum, current) => sum + energy[current], 0);
+      const dominance = total > 0 ? energy[axis] / total : 0;
+
+      if (axis === "wz") return { rows, axis, dominance };
+
+      return {
+        axis,
+        dominance,
+        rows: rows.map((row) => ({
+          ...row,
+          [axis]: row.wz,
+          wz: row[axis]
+        }))
+      };
+    }
+
+    function safeFilePart(value) {
+      return String(value).replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 60) || "subject";
+    }
+
+    function sideLabel(side) {
+      return side === "right" ? "오른쪽" : "왼쪽";
+    }
+
+    function vibrate(pattern) {
+      if (navigator.vibrate) navigator.vibrate(pattern);
+    }
+
+    window.nativeMotionProgress = function(elapsed, movementSeen) {
+      const measurement = state.measurement;
+      if (measurement.source !== "native-coremotion") return;
+      const value = Number(elapsed);
+      if (!Number.isFinite(value)) return;
+
+      els.recordingTime.textContent = `${value.toFixed(1)} s`;
+      els.recordingDetail.textContent = movementSeen
+        ? "진자운동을 기록하고 있습니다. 다리가 완전히 멈출 때까지 기다리십시오."
+        : "정지구간 기록 중 · 준비되면 다리를 놓으십시오.";
+    };
+
+    window.nativeMotionComplete = function(side, rows, reason) {
+      const measurement = state.measurement;
+      if (!Array.isArray(rows)) {
+        failActiveMeasurement("iPhone 자이로 자료를 전달받지 못했습니다.");
+        return;
+      }
+
+      measurement.activeSide = side;
+      measurement.phase = "analyzing";
+      measurement.rows = rows
+        .map((row) => ({
+          time: Number(row.time),
+          wx: Number(row.wx),
+          wy: Number(row.wy),
+          wz: Number(row.wz)
+        }))
+        .filter((row) => Object.values(row).every(Number.isFinite));
+
+      cleanupSensorCapture();
+      els.stopMeasurementBtn.disabled = true;
+      els.recordingStatus.textContent = "분석 중";
+      els.recordingDetail.textContent = reason === "timeout"
+        ? "최대 기록시간에 도달했습니다. 현재 자료를 분석합니다."
+        : "기존 Pendulum 분석 규칙을 그대로 적용하고 있습니다.";
+
+      window.setTimeout(() => finalizeMeasuredRows(), 80);
+    };
+
+    window.nativeMotionError = function(message) {
+      failActiveMeasurement(String(message || "iPhone 자이로 측정을 시작하지 못했습니다."));
+    };
+
+    function openPrivacyPolicy() {
+      els.privacyOverlay.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closePrivacyPolicy() {
+      els.privacyOverlay.classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
+    function confirmExternalUse(actionLabel) {
+      return window.confirm(
+        `${actionLabel}할 보고서에는 검사코드와 건강 관련 검사결과가 포함될 수 있습니다. ` +
+        "대상자가 식별되지 않는지 확인하고, 저장·공유 후 파일을 안전하게 관리할 책임이 사용자에게 있음을 확인합니다."
+      );
+    }
+
+    function requestFullReset() {
+      const approved = window.confirm(
+        "검사를 종료하면 현재 비식별 검사코드, 양측 측정값, 분석결과와 앱의 임시파일이 모두 삭제됩니다. 계속하시겠습니까?"
+      );
+      if (!approved) return;
+      resetAll();
+      window.alert("검사가 종료되었으며 앱 안의 입력값과 측정자료를 삭제했습니다.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     function resetAll() {
+      cancelMeasurement();
+      if (
+        window.webkit &&
+        window.webkit.messageHandlers &&
+        window.webkit.messageHandlers.imageBridge
+      ) {
+        window.webkit.messageHandlers.imageBridge.postMessage({ action: "clearTemporaryReports" });
+      }
       state.files = { right: [], left: [] };
       state.analyses = [];
+      Object.assign(state.measurement, {
+        phase: "idle",
+        activeSide: null,
+        rows: [],
+        source: null,
+        sensor: null,
+        countdownTimer: null,
+        sampleTimer: null,
+        startedAt: 0,
+        lastUiAt: 0,
+        movementSeen: false,
+        stableSince: null,
+        candidate: null,
+        pending: { right: null, left: null }
+      });
+      $("subjectId").value = "";
+      $("testDate").value = getLocalDateString();
+      $("affectedSide").value = "right";
       els.rightFileInput.value = "";
       els.leftFileInput.value = "";
       els.rightFileList.textContent = "선택된 오른쪽 파일 없음";
@@ -837,10 +1949,20 @@
       els.meanBody.innerHTML = "";
       els.rightQc.innerHTML = "";
       els.leftQc.innerHTML = "";
+      els.consistencyQc.innerHTML = "";
+      els.clinicalImpression.innerHTML = "";
+      els.sensorDecisionBody.innerHTML = "";
       els.analyzeBtn.disabled = true;
       els.imageBtn.disabled = true;
       els.exportBtn.disabled = true;
       els.printBtn.disabled = true;
+      els.sensorDecision.classList.add("hidden");
+      for (const canvas of [els.rightChart, els.leftChart]) {
+        const context = canvas.getContext("2d");
+        context.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      updateActionButtons();
+      updateMeasurementCards();
     }
 
     async function analyzeAll() {
@@ -877,9 +1999,8 @@
 
       els.analyzeBtn.disabled = false;
       els.analyzeBtn.textContent = "좌·우 분석 실행";
-      els.imageBtn.disabled = state.analyses.filter((a) => a.ok).length === 0;
-      els.exportBtn.disabled = state.analyses.length === 0;
-      els.printBtn.disabled = state.analyses.filter((a) => a.ok).length === 0;
+      updateActionButtons();
+      updateMeasurementCards();
     }
 
     function parseCsv(text) {
@@ -1110,6 +2231,9 @@
 
       const maxGap = Math.max(...positiveDt);
       const gapRatio = maxGap / medianDt;
+      const jitterRatio = median(
+        positiveDt.map((value) => Math.abs(value - medianDt))
+      ) / medianDt;
       const duration = time[time.length - 1];
 
       if (duration < 3) throw new Error("기록시간이 너무 짧습니다.");
@@ -1126,11 +2250,16 @@
 
       time = uniformTime;
       const fs = 1 / medianDt;
+      const timingStatus = fs < 20 || maxGap > 0.25
+        ? "실패"
+        : fs < 40 || gapRatio > 6 || maxGap > 0.12 || jitterRatio > 0.25
+          ? "주의"
+          : "통과";
 
       qc.push({
         item: "시간간격",
-        status: gapRatio <= 6 && maxGap <= 0.12 ? "통과" : "주의",
-        detail: `원자료 중앙 표본주파수 ${fs.toFixed(1)} Hz, 최대 간격 ${maxGap.toFixed(3)} s; 균일 시간축으로 재표본화`
+        status: timingStatus,
+        detail: `원자료 중앙 표본주파수 ${fs.toFixed(1)} Hz, 최대 간격 ${maxGap.toFixed(3)} s, 지터 ${(jitterRatio * 100).toFixed(1)}%; 균일 시간축으로 재표본화`
       });
 
       let omegaRaw = uniform.wz.slice();
@@ -1331,9 +2460,9 @@
 
       const energy = axisEnergy(uniform, baselineEnd);
       qc.push({
-        item: "WZ 축 우세도",
+        item: "측정축 우세도",
         status: energy.dominance >= 0.60 ? "통과" : "주의",
-        detail: `${(energy.dominance * 100).toFixed(1)}%`
+        detail: `WZ 기준 ${(energy.dominance * 100).toFixed(1)}%`
       });
 
       const failCount = qc.filter((q) => q.status === "실패").length;
@@ -1374,14 +2503,14 @@
     }
 
     function renderReport() {
-      const valid = state.analyses.filter((a) => a.ok);
-      if (!valid.length) {
+      const valid = state.analyses.filter((a) => a.ok && a.accepted !== false);
+      const right = valid.filter((a) => a.side === "right");
+      const left = valid.filter((a) => a.side === "left");
+      if (!right.length || !left.length) {
         els.imageReport.classList.add("hidden");
         return;
       }
 
-      const right = valid.filter((a) => a.side === "right");
-      const left = valid.filter((a) => a.side === "left");
       const rightMean = meanMetrics(right);
       const leftMean = meanMetrics(left);
 
@@ -1394,7 +2523,7 @@
       const date = $("testDate").value || "미입력";
       const affected = $("affectedSide").value;
 
-      $("reportMeta").textContent = `대상자 ID: ${subject}  |  측정일: ${date}`;
+      $("reportMeta").textContent = `비식별 검사코드: ${subject}  |  측정일: ${date}`;
       $("affectedBadge").textContent = `환측: ${affectedLabel(affected)}`;
       els.clinicalImpression.innerHTML = makeClinicalImpression(
         affected,
@@ -1746,23 +2875,22 @@
       let integrated;
       if (reducedKeys >= 3) {
         integrated =
-          `${affectedName}에서 첫 굴곡 범위와 최대 굴곡속도가 감소하고, RI 또는 진동주기 수도 함께 감소한 일관된 패턴이다. ` +
-          `이는 다리를 놓은 직후 무릎 굴곡이 조기에 제한되고 진자운동이 빠르게 감쇠되는 운동학적 반응을 의미한다. ` +
-          `임상적으로는 무릎 폄근의 신장에 대한 저항 증가, 이완 저하 또는 수동적 기계저항 증가와 양립할 수 있다.`;
+          `${affectedName}에서 첫 움직임 범위와 최대 움직임 속도가 감소하고, RI 또는 진동 횟수도 함께 감소하였다. ` +
+          `이번 센서 측정에서는 환측의 진자운동이 반대측보다 조기에 제한되고 빠르게 감소하는 운동학적 패턴이 관찰되었다.`;
       } else if (reducedKeys === 2) {
         integrated =
-          `${affectedName}에서 일부 초기 낙하 또는 이완 지표가 감소했지만 모든 지표가 같은 방향을 보이지 않았다. ` +
-          `부분적인 진자운동 제한은 관찰되나 단일 기전으로 설명하기보다 이완상태, 관절가동범위, 통증 및 측정 반복성을 함께 확인해야 한다.`;
+          `${affectedName}에서 일부 지표가 감소했지만 모든 지표가 같은 방향을 보이지 않았다. ` +
+          `이번 센서 측정에서는 한쪽의 일관된 진자운동 제한 패턴이 명확하지 않으므로 측정품질과 반복측정 결과를 함께 확인해야 한다.`;
       } else {
         integrated =
           `${affectedName}의 첫 움직임 범위·최대 움직임 속도·RI·진동 횟수가 반대측보다 일관되게 감소하지 않았다. ` +
-          `현재 자료에서는 환측의 진자운동이 전반적으로 조기에 제한되고 빠르게 감쇠되는 패턴이 뚜렷하지 않다.`;
+          `이번 센서 측정에서는 환측의 진자운동이 전반적으로 조기에 제한되고 빠르게 감소하는 패턴이 뚜렷하지 않았다.`;
       }
 
       const plateauMeaning = Number.isFinite(affectedMetrics.platAmp) &&
         Number.isFinite(oppositeMetrics.platAmp)
         ? (affectedMetrics.platAmp < oppositeMetrics.platAmp
-            ? `${affectedName}의 Plat Amp가 더 작아 최종 안정위치가 시작 신전자세에 더 가까웠다. 이는 지속적인 폄 방향 저항 또는 수동 굴곡범위 제한 가능성을 함께 확인할 필요가 있음을 뜻한다.`
+            ? `${affectedName}의 Plat Amp가 더 작아 최종 안정위치가 시작 신전자세에 더 가까웠다. 이 차이의 원인은 본 측정값만으로 판단할 수 없다.`
             : affectedMetrics.platAmp > oppositeMetrics.platAmp
               ? `${affectedName}의 Plat Amp가 더 커 최종 안정위치가 반대측보다 더 굴곡된 위치에 형성되었다.`
               : "Plat Amp는 좌우가 동일했다.")
@@ -1776,8 +2904,9 @@
         <p><strong>RI:</strong> 환측 ${fmt(affectedMetrics.ri, 2)}, 반대측 ${fmt(oppositeMetrics.ri, 2)} — ${escapeHtml(ri.interpretation)}</p>
         <p><strong>진동 횟수:</strong> 환측 ${fmt(affectedMetrics.ncyc, 1)}회, 반대측 ${fmt(oppositeMetrics.ncyc, 1)}회 — ${escapeHtml(ncycDirection)}</p>
         <p><strong>Damping Ratio (ζ):</strong> 환측 ${fmt(affectedMetrics.dampingRatio, 3)}, 반대측 ${fmt(oppositeMetrics.dampingRatio, 3)} — ${escapeHtml(dampingInterpretation(affectedMetrics.dampingRatio, oppositeMetrics.dampingRatio))}</p>
-        <p><strong>통합 해석:</strong> ${escapeHtml(integrated)}</p>
-        <p><strong>최종 안정위치 해석:</strong> ${escapeHtml(plateauMeaning)}</p>
+        <p><strong>측정 패턴 요약:</strong> ${escapeHtml(integrated)}</p>
+        <p><strong>최종 안정위치 비교:</strong> ${escapeHtml(plateauMeaning)}</p>
+        <p><strong>안내:</strong> 본 내용은 자이로스코프 측정값을 기준으로 자동 생성된 양측 비교 결과이며, 환자의 임상 상태와 표준화된 경직 평가 결과를 함께 고려해야 한다.</p>
       `;
     }
 
@@ -1817,7 +2946,8 @@
       return `
         <p><strong>비교 기준:</strong> 양쪽 모두 환측으로 선택되어 오른쪽과 왼쪽의 운동학적 비대칭만 비교하였다.</p>
         ${rows.map((row) => `<p>${escapeHtml(row)}</p>`).join("")}
-        <p><strong>통합 해석:</strong> ${escapeHtml(integrated)}</p>
+        <p><strong>측정 패턴 요약:</strong> ${escapeHtml(integrated)}</p>
+        <p><strong>안내:</strong> 본 내용은 자이로스코프 측정값을 기준으로 자동 생성된 양측 비교 결과이며, 환자의 임상 상태와 표준화된 경직 평가 결과를 함께 고려해야 한다.</p>
       `;
     }
 
@@ -2058,7 +3188,7 @@
         "시간간격": "측정 간격",
         "시작 정지구간": "측정 시작 전 정지 상태",
         "최종 안정구간": "진동이 끝난 뒤 정지 상태",
-        "WZ 축 우세도": "휴대전화 방향과 고정 상태"
+        "측정축 우세도": "휴대전화 방향과 고정 상태"
       };
       return names[name] || name;
     }
@@ -2090,7 +3220,7 @@
           : `진동이 끝난 뒤 정지 상태가 확인되었습니다. ${detail}`;
       }
 
-      if (item === "WZ 축 우세도") {
+      if (item === "측정축 우세도") {
         return `무릎 굽힘·폄 움직임이 휴대전화의 주 측정방향과 얼마나 일치하는지 나타냅니다. ${detail}`;
       }
 
@@ -2107,6 +3237,7 @@
         .replace("RI", "이완 비율")
         .replace("진동 횟수", "진동 횟수")
         .replace("Timestamp", "파일의 시간 순서")
+        .replace("측정축", "휴대전화 측정방향")
         .replace("WZ 축", "휴대전화 측정방향");
     }
 
@@ -2232,7 +3363,7 @@
       }
 
       const axisFailure = failedItems.find(
-        (q) => q.item === "WZ 축 우세도"
+        (q) => q.item === "측정축 우세도"
       );
       if (axisFailure) {
         return {
@@ -2240,7 +3371,7 @@
           label: "재측정 필요",
           usability: "현재 결과 사용 불가",
           reason:
-            `무릎 굴곡·신전 주축이 WZ에서 충분히 우세하지 않습니다. ${axisFailure.detail}`,
+            `무릎 굴곡·신전 움직임이 선택된 측정축에서 충분히 우세하지 않습니다. ${axisFailure.detail}`,
           action:
             "스마트폰 부착 방향과 고정상태를 확인한 뒤 다시 측정하십시오."
         };
@@ -2260,7 +3391,7 @@
       }
 
       const axisWarning = warningItems.find(
-        (q) => q.item === "WZ 축 우세도"
+        (q) => q.item === "측정축 우세도"
       );
       if (axisWarning) {
         return {
@@ -2421,7 +3552,7 @@
         return {
           category: "움직임 시작 검출 실패",
           cause: "다리를 놓은 뒤 각속도가 잡음수준을 충분히 초과하지 않았습니다.",
-          action: "스마트폰 고정과 WZ 방향을 확인하고 다리를 명확히 놓으십시오."
+          action: "스마트폰 고정 상태와 장착 방향을 확인하고 다리를 명확히 놓으십시오."
         };
       }
       if (text.includes("첫 굴곡 각속도")) {
@@ -2448,6 +3579,7 @@
 
     async function saveReportAsPng() {
       if (els.imageReport.classList.contains("hidden")) return;
+      if (!confirmExternalUse("저장·공유")) return;
 
       const originalText = els.imageBtn.textContent;
       els.imageBtn.disabled = true;
@@ -2464,7 +3596,7 @@
         const subject = $("subjectId").value.trim() || "미입력";
         const date = $("testDate").value || "미입력";
         const affected = affectedLabel($("affectedSide").value);
-        const valid = state.analyses.filter((item) => item.ok);
+        const valid = state.analyses.filter((item) => item.ok && item.accepted !== false);
         const rightMetrics = meanMetrics(valid.filter((item) => item.side === "right"));
         const leftMetrics = meanMetrics(valid.filter((item) => item.side === "left"));
 
@@ -2522,7 +3654,7 @@
         ctx.fillStyle = "#667085";
         ctx.font = "22px Arial, sans-serif";
         ctx.fillText("Gwangju365Rehabilitation Hospital", margin, y + 72);
-        ctx.fillText(`대상자 ID: ${subject}   |   측정일: ${date}   |   환측: ${affected}`, margin, y + 102);
+        ctx.fillText(`비식별 검사코드: ${subject}   |   측정일: ${date}   |   환측: ${affected}`, margin, y + 102);
 
         y += headerHeight;
         drawHorizontalRule(ctx, margin, y, width - margin);
@@ -2575,7 +3707,7 @@
         y += chartHeight + 54 + sectionSpacing;
         ctx.fillStyle = "#1f2937";
         ctx.font = "900 28px Arial, sans-serif";
-        ctx.fillText("Clinical Interpretation", margin, y);
+        ctx.fillText("측정 결과 요약", margin, y);
         y += 22;
 
         drawCanvasCard(ctx, margin, y + 12, contentWidth, interpretationHeight + 36);
@@ -2602,12 +3734,26 @@
           y = drawWrappedText(ctx, line, margin, y, contentWidth, 27) + 8;
         }
 
-        const link = document.createElement("a");
-        link.href = canvas.toDataURL("image/png");
-        link.download = `pendulum_test_${subject}_${date}.png`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+        const dataUrl = canvas.toDataURL("image/png");
+        const fileName = `pendulum_test_${safeFilePart(subject)}_${date}.png`;
+
+        if (
+          window.webkit &&
+          window.webkit.messageHandlers &&
+          window.webkit.messageHandlers.imageBridge
+        ) {
+          window.webkit.messageHandlers.imageBridge.postMessage({
+            fileName,
+            dataUrl
+          });
+        } else {
+          const link = document.createElement("a");
+          link.href = dataUrl;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        }
       } catch (error) {
         alert(`이미지 저장에 실패했습니다: ${error.message || error}`);
       } finally {
@@ -2761,8 +3907,9 @@
     }
 
     function exportResults() {
+      if (!confirmExternalUse("CSV로 저장")) return;
       const rows = [[
-        "subject_id", "test_date", "affected_side", "side", "trial",
+        "deidentified_exam_code", "test_date", "affected_side", "side", "trial",
         "file", "qc", "fse_deg", "vmax_deg_s", "plat_amp_deg", "ri",
         "ncyc", "damping_ratio_zeta", "damping_method", "damping_r2",
         "damping_reason", "failure_or_limit"
@@ -3328,6 +4475,73 @@
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
+    }
+
+    // 로컬 미리보기의 자동 검증에만 노출되는 읽기 전용 계산 진입점.
+    if (window.location.hostname === "terminal.local") {
+      try {
+        const diagnosticRows = [];
+        for (let i = 0; i <= 650; i += 1) {
+          const time = i * 0.01;
+          const elapsed = time - 0.70;
+          const primaryDeg = elapsed > 0 && elapsed < 4.0
+            ? 330 * Math.exp(-0.85 * elapsed) * Math.sin(2 * Math.PI * 1.15 * elapsed)
+            : 0;
+          diagnosticRows.push({
+            time,
+            wx: primaryDeg * Math.PI / 180,
+            wy: 0.005 * Math.sin(i * 0.1),
+            wz: 0.004 * Math.cos(i * 0.07)
+          });
+        }
+        const diagnosticAxis = normalizeDirectSensorRows(diagnosticRows);
+        const diagnosticResult = analyzeTrial(
+          "SYNTHETIC_right_1.csv",
+          diagnosticAxis.rows,
+          "right",
+          1
+        );
+        document.documentElement.dataset.pendulumSelfTest = JSON.stringify({
+          ok: diagnosticResult.ok,
+          selectedAxis: diagnosticAxis.axis,
+          axisDominance: diagnosticAxis.dominance,
+          sampleRate: diagnosticResult.metadata.sampleRate,
+          qcLevel: diagnosticResult.qcLevel,
+          metrics: diagnosticResult.metrics
+        });
+
+        if (new URLSearchParams(window.location.search).get("diagnostic") === "1") {
+          const comparisonRows = diagnosticRows.map((row) => ({
+            ...row,
+            wx: row.wx * 0.88
+          }));
+          const comparisonAxis = normalizeDirectSensorRows(comparisonRows);
+          const leftResult = analyzeTrial(
+            "SYNTHETIC_left_1.csv",
+            comparisonAxis.rows,
+            "left",
+            1
+          );
+          diagnosticResult.accepted = true;
+          leftResult.accepted = true;
+          state.analyses = [diagnosticResult, leftResult];
+          $("subjectId").value = "TEST-001";
+          $("affectedSide").value = "right";
+          renderReport();
+          renderQc();
+          updateActionButtons();
+          document.documentElement.dataset.pendulumReportTest = JSON.stringify({
+            reportVisible: !els.imageReport.classList.contains("hidden"),
+            imageEnabled: !els.imageBtn.disabled,
+            printEnabled: !els.printBtn.disabled
+          });
+        }
+      } catch (error) {
+        document.documentElement.dataset.pendulumSelfTest = JSON.stringify({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
     }
   </script>
 </body>

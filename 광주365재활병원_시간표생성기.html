@@ -1656,6 +1656,7 @@ function handlePaste(event){
 
   let rows = [];
   let colors = [];
+  let underlines = [];
 
   if(html && html.includes("<table")){
 
@@ -1664,6 +1665,7 @@ function handlePaste(event){
 
     rows = parsed.values;
     colors = parsed.colors;
+    underlines = parsed.underlines;
 
   }else{
 
@@ -1697,6 +1699,12 @@ function handlePaste(event){
 
       if(color)
         cell.style.background = color;
+
+      if((underlines[r] || [])[c]){
+
+        cell.style.textDecoration = "underline";
+        cell.dataset.acting = "1";
+      }
     });
   });
 }
@@ -1713,13 +1721,17 @@ function parseHtmlTableWithMergedCells(html){
     doc.querySelector("table");
 
   if(!table)
-    return { values:[], colors:[] };
+    return { values:[], colors:[], underlines:[] };
 
   const classColors =
     buildClassColors(doc);
 
+  const classUnderlines =
+    buildClassUnderlines(doc);
+
   const values = [];
   const colors = [];
+  const underlines = [];
   const occupied = {};
 
   const trList =
@@ -1729,6 +1741,7 @@ function parseHtmlTableWithMergedCells(html){
 
     if(!values[r]) values[r] = [];
     if(!colors[r]) colors[r] = [];
+    if(!underlines[r]) underlines[r] = [];
 
     let c = 0;
 
@@ -1746,6 +1759,9 @@ function parseHtmlTableWithMergedCells(html){
 
       const color =
         cellBackground(cell, classColors);
+
+      const underlined =
+        cellUnderline(cell, classUnderlines);
 
       const rowspan =
         parseInt(
@@ -1768,9 +1784,11 @@ function parseHtmlTableWithMergedCells(html){
 
           if(!values[targetR]) values[targetR] = [];
           if(!colors[targetR]) colors[targetR] = [];
+          if(!underlines[targetR]) underlines[targetR] = [];
 
           values[targetR][targetC] = value;
           colors[targetR][targetC] = color;
+          underlines[targetR][targetC] = underlined;
 
           occupied[
             `${targetR},${targetC}`
@@ -1782,7 +1800,7 @@ function parseHtmlTableWithMergedCells(html){
     });
   });
 
-  return { values, colors };
+  return { values, colors, underlines };
 }
 
 /* 엑셀은 배경색을 칸에 직접 쓰기도 하고
@@ -1818,6 +1836,95 @@ function buildClassColors(doc){
   });
 
   return map;
+}
+
+/* ===== 액팅선(밑줄) =====
+   시간표에서 이름에 밑줄을 그으면 "액팅선"입니다.
+   실제로 진행되는 치료가 아니므로 개인 시간표에 잡히면 안 됩니다.
+
+   가운데 줄(취소선)은 "실시선"이라 실제로 시행한 치료입니다.
+   그래서 가운데 줄은 그대로 살려 둡니다. 밑줄만 걸러냅니다. */
+function hasUnderlineStyle(styleText){
+
+  const text =
+    String(styleText || "").toLowerCase();
+
+  const match =
+    text.match(
+      /text-decoration(?:-line)?\s*:\s*([^;"']+)/
+    );
+
+  if(!match) return false;
+
+  return match[1].includes("underline");
+}
+
+function buildClassUnderlines(doc){
+
+  const map = {};
+
+  Array.from(doc.querySelectorAll("style")).forEach(styleTag=>{
+
+    styleTag.textContent.split("}").forEach(chunk=>{
+
+      const parts = chunk.split("{");
+
+      if(parts.length < 2) return;
+
+      if(!hasUnderlineStyle(parts[1])) return;
+
+      parts[0].split(",").forEach(selector=>{
+
+        const name =
+          selector.trim().replace(/^\./,"");
+
+        if(name)
+          map[name] = true;
+      });
+    });
+  });
+
+  return map;
+}
+
+function cellUnderline(cell, classUnderlines){
+
+  if(cell.querySelector("u,ins"))
+    return true;
+
+  const nodes =
+    [cell].concat(
+      Array.from(cell.querySelectorAll("*"))
+    );
+
+  for(const node of nodes){
+
+    if(hasUnderlineStyle(node.getAttribute("style")))
+      return true;
+
+    const classList =
+      (node.getAttribute("class") || "").split(/\s+/);
+
+    for(const name of classList){
+
+      if(classUnderlines[name])
+        return true;
+    }
+  }
+
+  return false;
+}
+
+/* 액팅선(밑줄)이 그어진 칸은 비어 있는 것으로 보고 읽습니다. */
+function maskActingLines(rows, underlines){
+
+  if(!underlines) return rows;
+
+  return rows.map((row, r)=>
+    row.map((cell, c)=>
+      ((underlines[r] || [])[c] ? "" : cell)
+    )
+  );
 }
 
 function cellBackground(cell, classColors){
@@ -1904,6 +2011,9 @@ function addCurrentSheet(){
   const colors =
     getGridColors();
 
+  const underlines =
+    getGridUnderlines();
+
   const layout =
     detectLayout(rows, colors);
 
@@ -1911,6 +2021,7 @@ function addCurrentSheet(){
     sheetName,
     rows,
     colors,
+    underlines,
     layout
   });
 
@@ -1964,6 +2075,30 @@ function getGridRows(){
   return rows;
 }
 
+function getGridUnderlines(){
+
+  const underlines = [];
+
+  for(let r=0;r<ROWS;r++){
+
+    const row = [];
+
+    for(let c=0;c<COLS;c++){
+
+      const cell =
+        (cellRefs[r] || [])[c];
+
+      row.push(
+        !!(cell && cell.dataset.acting === "1")
+      );
+    }
+
+    underlines.push(row);
+  }
+
+  return underlines;
+}
+
 function getGridColors(){
 
   const colors = [];
@@ -1998,6 +2133,8 @@ function clearGrid(){
 
       cell.innerText = "";
       cell.style.background = "";
+      cell.style.textDecoration = "";
+      delete cell.dataset.acting;
     });
 }
 
@@ -2114,7 +2251,9 @@ function parseSchedule(patientName){
 
   pastedSheets.forEach((sheet, sheetIndex)=>{
 
-    const rows = sheet.rows;
+    /* 액팅선(밑줄) 칸은 빈 칸으로 보고 읽습니다. */
+    const rows =
+      maskActingLines(sheet.rows, sheet.underlines);
 
     const layout =
       sheet.layout && sheet.layout.length
@@ -2275,6 +2414,12 @@ function parseWithLayout(
           treatment = "기구-" + col.name;
 
         }else{
+
+          if(
+            block.kind === "electric" &&
+            isRideAlongElectric(cellCompact, targetName)
+          )
+            return;
 
           treatment = col.name;
         }
@@ -2530,6 +2675,9 @@ function parseElectric(
       if(!nameMatches(compact(cellText), targetName))
         continue;
 
+      if(isRideAlongElectric(compact(cellText), targetName))
+        continue;
+
       results.push({
         sheetIndex,
         dayTitle,
@@ -2702,6 +2850,39 @@ function findInlineMachines(cellCompact, targetName){
   });
 
   return list;
+}
+
+/* 전기치료를 1:1 치료 시간에 함께 붙여서 하는 경우
+   전기 칸에 "이름+FES" 처럼 적습니다.
+   이때는 따로 전기치료로 잡지 않고
+   1:1(회복기재활치료)만 남깁니다. */
+const rideAlongElectricWords = ["FES"];
+
+function isRideAlongElectric(cellCompact, targetName){
+
+  let found = false;
+
+  splitPersonChunks(cellCompact).forEach(chunk=>{
+
+    const index =
+      findNameIndex(chunk, targetName);
+
+    if(index === -1) return;
+
+    const after =
+      chunk.slice(index + targetName.length);
+
+    after.split("+").slice(1).forEach(token=>{
+
+      const word =
+        token.replace(/[(].*$/,"").trim().toUpperCase();
+
+      if(rideAlongElectricWords.indexOf(word) !== -1)
+        found = true;
+    });
+  });
+
+  return found;
 }
 
 function makeTreatmentName(

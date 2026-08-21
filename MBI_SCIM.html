@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
@@ -212,6 +212,20 @@ textarea:focus.scim { border-color:#0f766e; }
 .summary-text { width:100%; border:1px solid #dce3ef; border-radius:10px; padding:12px 14px; font-size:13.5px; line-height:1.7; font-family:inherit; background:#fafbff; min-height:100px; max-height:300px; resize:vertical; }
 .copy-notice { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; font-size:12.5px; color:#78350f; font-weight:700; margin-bottom:10px; line-height:1.4; }
 .copy-notice::before { content:'⚠️'; font-size:14px; flex-shrink:0; }
+/* 진단/건측/이동 한 줄 배치 */
+.side-row-group { display:flex; flex-wrap:wrap; gap:14px 24px; align-items:center; margin:6px 0; }
+.side-row-group .side-row { margin:0; }
+
+/* summary panel 컴팩트하게 */
+.summary-panel { padding:14px 16px !important; }
+.summary-panel .summary-head { margin-bottom:8px !important; }
+.summary-panel .total-line { padding:8px 12px !important; margin-bottom:6px !important; }
+.summary-panel .total-line .label { font-size:12px !important; }
+.summary-panel .total-line .score { font-size:22px !important; }
+.summary-panel .total-line .cat { font-size:14px !important; }
+.summary-panel .copy-notice { padding:6px 10px !important; font-size:11.5px !important; margin-bottom:6px !important; }
+.summary-panel .summary-text { min-height:70px !important; max-height:150px !important; padding:8px 10px !important; font-size:12.5px !important; line-height:1.5 !important; }
+
 .copy-status { display:inline-block; margin-left:6px; font-size:12px; color:#22c55e; font-weight:900; opacity:0; transition:opacity .2s; }
 .copy-status.show { opacity:1; }
 
@@ -221,6 +235,14 @@ textarea:focus.scim { border-color:#0f766e; }
 .side-toggle button { padding:5px 10px; border:none; background:transparent; border-radius:6px; font-size:12px; font-weight:800; cursor:pointer; color:#64748b; }
 .side-toggle button.active { background:#475569; color:white; }
 .mobility-toggle button.active { background:#1e293b; color:white; }
+.diagnosis-toggle button { padding:6px 12px; border-radius:8px; border:1px solid #dce3ef; background:white; color:#475569; font-size:13px; cursor:pointer; font-weight:600; transition:all .15s; }
+.diagnosis-toggle button:hover { background:#f1f5f9; }
+.diagnosis-toggle button.active { background:#1e293b; color:white; border-color:#1e293b; }
+.hip-precautions { background:#fef3c7; padding:10px 14px; border-radius:10px; border:1px solid #fcd34d; margin-top:8px; }
+.precaution-checks { display:flex; flex-wrap:wrap; gap:8px 16px; flex:1; }
+.precaution-checks label { display:flex; align-items:center; gap:6px; font-size:13px; color:#78350f; font-weight:600; cursor:pointer; }
+.precaution-checks input[type="checkbox"] { width:15px; height:15px; cursor:pointer; accent-color:#d97706; }
+
 
 @media (max-width:800px) {
   .summary-panel { position:static; }
@@ -330,7 +352,7 @@ document.getElementById('authInput').addEventListener('keydown', function(e) {
 
     <section class="summary-panel mbi">
       <div class="summary-head">
-        <div class="summary-title mbi">📋 MBI 종합 결과 (EMR 복사용)</div>
+        <div class="summary-title mbi">📋 MBI 예상 점수 (참고용)</div>
         <div class="summary-actions">
           <button class="mini" id="mbiLangKo" onclick="mbi_setLang('ko')">한글</button>
           <button class="mini active" id="mbiLangEn" onclick="mbi_setLang('en')">영문</button>
@@ -348,18 +370,40 @@ document.getElementById('authInput').addEventListener('keydown', function(e) {
         </div>
       </div>
       <div class="copy-notice">복사 전 반드시 자동 생성된 코멘트를 검토하고 실제 관찰과 대조하여 수정해주세요.</div>
-      <div class="side-row">
-        <span class="side-label">건측:</span>
-        <div class="side-toggle">
-          <button data-mbi-side="right" class="active" onclick="mbi_setSide('right')">우측</button>
-          <button data-mbi-side="left" onclick="mbi_setSide('left')">좌측</button>
+      <div class="side-row-group">
+        <div class="side-row">
+          <span class="side-label">진단:</span>
+          <div class="side-toggle diagnosis-toggle">
+            <button data-mbi-dx="stroke" class="active" onclick="mbi_setDiagnosis('stroke')">뇌졸중</button>
+            <button data-mbi-dx="parkinson" onclick="mbi_setDiagnosis('parkinson')">파킨슨</button>
+            <button data-mbi-dx="hip" onclick="mbi_setDiagnosis('hip')">고관절</button>
+            <button data-mbi-dx="other" onclick="mbi_setDiagnosis('other')">기타</button>
+          </div>
+        </div>
+        <div class="side-row">
+          <span class="side-label">건측:</span>
+          <div class="side-toggle">
+            <button data-mbi-side="right" class="active" onclick="mbi_setSide('right')">우측</button>
+            <button data-mbi-side="left" onclick="mbi_setSide('left')">좌측</button>
+          </div>
+        </div>
+        <div class="side-row">
+          <span class="side-label">이동:</span>
+          <div class="side-toggle mobility-toggle">
+            <button data-mbi-mobility="am" class="active" onclick="mbi_setMobility('am')">보행</button>
+            <button data-mbi-mobility="wc" onclick="mbi_setMobility('wc')">의자차</button>
+          </div>
         </div>
       </div>
-      <div class="side-row">
-        <span class="side-label">이동:</span>
-        <div class="side-toggle mobility-toggle">
-          <button data-mbi-mobility="am" class="active" onclick="mbi_setMobility('am')">보행</button>
-          <button data-mbi-mobility="wc" onclick="mbi_setMobility('wc')">의자차</button>
+      <div class="side-row hip-precautions" id="hipPrecautionsRow" style="display:none;">
+        <span class="side-label">금기자세:</span>
+        <div class="precaution-checks">
+          <label><input type="checkbox" data-precaution="flexion" onchange="mbi_updatePrecautions()"> 굴곡 &gt;90°</label>
+          <label><input type="checkbox" data-precaution="adduction" onchange="mbi_updatePrecautions()"> 모음</label>
+          <label><input type="checkbox" data-precaution="internal_rotation" onchange="mbi_updatePrecautions()"> 내회전</label>
+          <label><input type="checkbox" data-precaution="external_rotation" onchange="mbi_updatePrecautions()"> 외회전</label>
+          <label><input type="checkbox" data-precaution="nwb" onchange="mbi_updatePrecautions()"> 비체중부하</label>
+          <label><input type="checkbox" data-precaution="pwb" onchange="mbi_updatePrecautions()"> 부분체중부하</label>
         </div>
       </div>
       <textarea id="mbiSummaryText" class="summary-text" placeholder="세부활동을 체크하면 코멘트가 자동으로 정리됩니다." readonly></textarea>
@@ -417,34 +461,16 @@ document.getElementById('authInput').addEventListener('keydown', function(e) {
     </header>
 
     <div class="convert-info">
-      <strong>⚠️ 자동 변환 결과는 초안이므로 반드시 실제 임상 관찰과 대조하여 최종 확인이 필요합니다.</strong><br><br>
-      <strong>정확한 변환을 위해 SCIM 채점 시 다음을 꼼꼼히 체크해주세요:</strong><br>
-      · <strong>식사</strong>: 쇠젓가락 / 에디슨 젓가락 / 포크 중 실제 사용 도구<br>
-      · <strong>목욕</strong>: 목욕의자·휠체어·손잡이 등 특별한 세팅 사용 여부<br>
-      · <strong>옷입기</strong>: 단추 / 지퍼 / 신발끈 조작 가능 여부<br>
-      · <strong>몸단장</strong>: Universal cuff / Adaptive comb 사용 여부<br>
-      · <strong>배뇨</strong>: 유치 도뇨관 / 외부 배뇨 도구(edi) 사용 여부<br>
-      · <strong>배변</strong>: 좌약 사용 여부<br>
-      · <strong>용변처리</strong>: Portable bidet / Toilet aids / 안전장치 사용 여부<br>
-      · <strong>계단</strong>: 난간 잡고 수행 / 난간 없이 수행<br>
-      · <strong>이동</strong>: '완전 독립 (감독 불필요)' 명시 체크 시에만 만점 반영<br><br>
-      <strong>※ 자동 변환의 한계:</strong><br>
-      · 배변·배뇨는 SCIM(실금 중시)과 MBI(조절 가능성) 관점 차이로 오차 발생 가능<br>
-      · 항목별 세부 상황(발톱 정리, 특정 부위 등)은 SCIM에 없어 반영 불가<br>
-      · 자동 변환 후 [MBI 탭에 반영] 클릭 → MBI 탭에서 세부 조정 필수
+      <strong>⚠️ 이 탭은 참고용 예상 점수만 제공합니다.</strong><br><br>
+      SCIM 채점 결과를 바탕으로 MBI 각 항목의 예상 점수를 계산해 참고 정보로 표시합니다.<br>
+      SCIM 채점 완료 후 이 탭의 예상 점수를 참고하여 <strong>MBI 항목에 맞게 점수를 수정해주세요.</strong><br><br>
+      <em>SCI 환자의 경우 SCIM이 주 평가 도구이며, MBI는 간호간병 통합 서비스 관련 행정 자료로 활용됩니다.</em>
     </div>
 
     <section class="summary-panel mbi">
-      <div class="summary-head">
-        <div class="summary-title mbi">📋 변환된 MBI 결과 (EMR 복사용)</div>
-        <div class="summary-actions">
-          <button class="primary" style="background:#7c2d12; color:white;" onclick="convert_applyToMbi()">MBI 탭에 반영</button>
-          <button class="primary mbi" onclick="convert_copyAll()">전체 복사<span id="convertCopyStatus" class="copy-status">✓</span></button>
-        </div>
-      </div>
       <div class="total-line mbi">
         <div>
-          <div class="label">변환된 MBI Total Score</div>
+          <div class="label">MBI 예상 총점</div>
           <div class="score"><span id="convertTotalScore">0</span> <span style="font-size:14px; opacity:.85;">/ 100</span></div>
         </div>
         <div>
@@ -452,8 +478,6 @@ document.getElementById('authInput').addEventListener('keydown', function(e) {
           <div class="cat" id="convertDependencyLabel">-</div>
         </div>
       </div>
-      <div class="copy-notice">자동 변환은 초안입니다. 반드시 실제 임상 관찰과 대조하여 점수와 코멘트를 최종 검토해주세요.</div>
-      <textarea id="convertSummaryText" class="summary-text" placeholder="SCIM 탭에서 채점을 완료하면 자동으로 변환된 결과가 표시됩니다." readonly></textarea>
     </section>
 
     <div class="convert-panel">
@@ -826,6 +850,28 @@ const MBI_DATA = [
 
 const HAND_SENSITIVE = ['ph', 'bt', 'fd', 'dr'];
 
+// 금기자세 라벨 매핑
+const PRECAUTION_LABELS = {
+  'flexion': '굴곡 >90°',
+  'adduction': '모음',
+  'internal_rotation': '내회전',
+  'external_rotation': '외회전',
+  'nwb': '비체중부하',
+  'pwb': '부분체중부하'
+};
+
+// 고관절 금기자세 참여활동을 표시할 MBI 항목 및 phrase
+const HIP_PRECAUTION_ITEMS = {
+  'ph': '금기자세로 인해 발톱 정리 시 도움이 필요함',
+  'bt': '금기자세로 인해 하체 씻기 시 도움이 필요함',
+  'dr': '금기자세로 인해 하의를 입고 벗는 시작과 마무리 단계에서 도움이 필요함',
+  'tl': '금기자세로 인해 재래식 변기 사용은 어려우며 옷 추스르기 시 도움이 필요함',
+  'st': '금기자세로 인해 계단 오르내리기가 제한됨',
+  'am': '금기자세로 인해 보행 시 도움이 필요함',
+  'wc': '금기자세로 인해 의자차 조작 시 도움이 필요함',
+  'tr': '금기자세로 인해 이동 동작 시 도움이 필요함'
+};
+
 const HAND_PREFIX = {
   ph: {
     right: '우측 손 위주로 개인위생 활동 수행 중',
@@ -867,6 +913,8 @@ const MBI_STORAGE_KEY = 'mbi_evaluation_current';
 let mbi_currentLang = 'en';
 let mbi_currentSide = 'right';
 let mbi_currentMobility = 'am';
+let mbi_currentDiagnosis = 'stroke';  // 'stroke' | 'parkinson' | 'hip' | 'other'
+let mbi_precautions = [];  // ['flexion', 'adduction', 'internal_rotation', 'external_rotation', 'nwb', 'pwb']
 
 const MbiStore = {
   load(){ try { const v = localStorage.getItem(MBI_STORAGE_KEY); return v ? JSON.parse(v) : null; } catch { return null; } },
@@ -927,6 +975,43 @@ function mbi_setMobility(m){
   mbi_scheduleSave();
 }
 
+function mbi_setDiagnosis(dx){
+  mbi_currentDiagnosis = dx;
+  document.querySelectorAll('[data-mbi-dx]').forEach(b => b.classList.toggle('active', b.dataset.mbiDx === dx));
+  // 고관절 선택 시 금기자세 체크박스 표시
+  const row = document.getElementById('hipPrecautionsRow');
+  if (row) row.style.display = (dx === 'hip') ? 'flex' : 'none';
+  // 진단이 고관절이 아니면 금기자세 초기화 및 관련 참여활동 체크 해제
+  if (dx !== 'hip') {
+    mbi_precautions = [];
+    document.querySelectorAll('[data-precaution]').forEach(cb => cb.checked = false);
+    Object.keys(HIP_PRECAUTION_ITEMS).forEach(itemId => {
+      const cb = document.querySelector(`#mbiApp input[data-item="${itemId}"][data-precaution-item="1"]`);
+      if (cb) cb.checked = false;
+    });
+  }
+  // 카드 재렌더링 (금기자세 참여활동 표시/숨김)
+  mbi_renderItems();
+  // 관련 항목 업데이트
+  Object.keys(HIP_PRECAUTION_ITEMS).forEach(id => mbi_updateItem(id));
+  mbi_updateSummary();
+  mbi_scheduleSave();
+}
+
+function mbi_updatePrecautions(){
+  mbi_precautions = Array.from(document.querySelectorAll('[data-precaution]:checked')).map(cb => cb.dataset.precaution);
+  Object.keys(HIP_PRECAUTION_ITEMS).forEach(id => mbi_updateItem(id));
+  mbi_updateSummary();
+  mbi_scheduleSave();
+}
+
+function mbi_onPrecautionCheck(itemId){
+  mbi_updateItem(itemId);
+  mbi_updateSummary();
+  mbi_scheduleSave();
+}
+
+
 function mbi_renderItems(){
   const container = document.getElementById('mbiItemsContainer');
   container.innerHTML = '';
@@ -947,7 +1032,14 @@ function mbi_renderItems(){
       </label>`;
     };
     const gradeChecks = item.items.map((c, idx) => c.commentOnly ? null : makeCheckHtml(c, idx)).filter(Boolean).join('');
-    const activityChecks = item.items.map((c, idx) => c.commentOnly ? makeCheckHtml(c, idx) : null).filter(Boolean).join('');
+    let activityChecks = item.items.map((c, idx) => c.commentOnly ? makeCheckHtml(c, idx) : null).filter(Boolean).join('');
+    // 진단이 고관절이고 관련 항목이면 금기자세 참여활동 추가
+    if (mbi_currentDiagnosis === 'hip' && HIP_PRECAUTION_ITEMS[item.id]) {
+      activityChecks += `<label class="check-item mbi-item precaution-check">
+        <input type="checkbox" data-item="${item.id}" data-precaution-item="1" onchange="mbi_onPrecautionCheck('${item.id}')" />
+        <span class="txt">금기자세 관련 제한<span class="g-tag" style="background:#fef3c7; color:#78350f;">금기</span></span>
+      </label>`;
+    }
     let checksHtml = `<div class="check-grid">${gradeChecks}</div>`;
     if (activityChecks) {
       const labelText = MBI_ACTIVITY_LABELS[item.id] || '참여 활동 · 도구';
@@ -1028,6 +1120,15 @@ function mbi_generateComment(itemId, finalGrade, isEmpty){
   if (HAND_SENSITIVE.includes(itemId) && mbi_currentSide !== 'none' && finalGrade >= 2 && finalGrade <= 4 && !isEmpty) {
     const prefix = HAND_PREFIX[itemId]?.[mbi_currentSide];
     if (prefix) mainComment = prefix + '. ' + mainComment;
+  }
+  // 진단이 고관절이고 금기자세 관련 제한이 체크되어 있으면 phrase 추가
+  if (mbi_currentDiagnosis === 'hip' && HIP_PRECAUTION_ITEMS[itemId]) {
+    const precCb = document.querySelector(`#mbiApp input[data-item="${itemId}"][data-precaution-item="1"]`);
+    if (precCb && precCb.checked) {
+      const precPhrase = HIP_PRECAUTION_ITEMS[itemId];
+      if (mainComment) mainComment = mainComment.replace(/\.$/, '') + '. ' + precPhrase + '.';
+      else mainComment = precPhrase + '.';
+    }
   }
   return mainComment;
 }
@@ -1127,7 +1228,13 @@ function mbi_updateSummary(){
   else depLabel = '최소 의존 (Minimum/No Dependence)';
   document.getElementById('mbiDependencyLabel').textContent = depLabel;
   const header = `MBI Total: ${total}/100${hasNa ? ' (일부 미평가)' : ''}\n`;
-  document.getElementById('mbiSummaryText').value = header + '\n' + lines.join('\n');
+  // 진단이 고관절이고 금기자세가 체크되어 있으면 최상단에 문구 삽입
+  let precautionNote = '';
+  if (mbi_currentDiagnosis === 'hip' && mbi_precautions.length > 0) {
+    const labels = mbi_precautions.map(p => PRECAUTION_LABELS[p]).join(', ');
+    precautionNote = `\n*금기자세(${labels})로 인해 일상 동작에서 도움이 필요함.\n`;
+  }
+  document.getElementById('mbiSummaryText').value = header + precautionNote + '\n' + lines.join('\n');
 }
 
 async function mbi_copyAll(){
@@ -1161,13 +1268,21 @@ function mbi_collectState(){
   MBI_DATA.forEach(item => {
     const checked = [];
     document.querySelectorAll(`#mbiApp input[data-item="${item.id}"]`).forEach(cb => {
-      if (cb.checked) checked.push(parseInt(cb.dataset.idx));
+      const idx = parseInt(cb.dataset.idx);
+      if (cb.checked && !isNaN(idx)) checked.push(idx);
     });
     const na = document.querySelector(`#mbiApp input[data-na="${item.id}"]`).checked;
     const ta = document.querySelector(`#mbiApp textarea[data-comment="${item.id}"]`);
     items[item.id] = { checked, na, comment: ta.value, edited: ta.dataset.edited === 'true' };
   });
-  return { items, lang: mbi_currentLang, side: mbi_currentSide, mobility: mbi_currentMobility };
+  // 금기자세 참여활동 체크 상태 저장
+  const precautionChecks = {};
+  Object.keys(HIP_PRECAUTION_ITEMS).forEach(itemId => {
+    const cb = document.querySelector(`#mbiApp input[data-item="${itemId}"][data-precaution-item="1"]`);
+    if (cb && cb.checked) precautionChecks[itemId] = true;
+  });
+  return { items, lang: mbi_currentLang, side: mbi_currentSide, mobility: mbi_currentMobility,
+           diagnosis: mbi_currentDiagnosis, precautions: mbi_precautions, precautionChecks };
 }
 
 function mbi_restoreState(data){
@@ -1175,6 +1290,23 @@ function mbi_restoreState(data){
   if (data.lang) mbi_setLang(data.lang);
   if (data.side) mbi_setSide(data.side);
   if (data.mobility) mbi_setMobility(data.mobility);
+  // 진단 복원 (금기자세 체크박스 UI 표시 위해 먼저)
+  if (data.diagnosis) mbi_setDiagnosis(data.diagnosis);
+  // 금기자세 목록 복원
+  if (data.precautions && Array.isArray(data.precautions)) {
+    data.precautions.forEach(p => {
+      const cb = document.querySelector(`[data-precaution="${p}"]`);
+      if (cb) cb.checked = true;
+    });
+    mbi_precautions = data.precautions;
+  }
+  // 금기자세 참여활동 체크 상태 복원 (mbi_setDiagnosis에서 재렌더링 후)
+  if (data.precautionChecks) {
+    Object.keys(data.precautionChecks).forEach(itemId => {
+      const cb = document.querySelector(`#mbiApp input[data-item="${itemId}"][data-precaution-item="1"]`);
+      if (cb) cb.checked = true;
+    });
+  }
   if (!data.items) return;
   MBI_DATA.forEach(item => {
     const s = data.items[item.id];
@@ -1207,6 +1339,9 @@ function resetMbi(){
   });
   mbi_setSide('right');
   mbi_setMobility('am');
+  mbi_setDiagnosis('stroke');
+  mbi_precautions = [];
+  document.querySelectorAll('[data-precaution]').forEach(cb => cb.checked = false);
   mbi_updateSummary();
 }
 
@@ -2247,18 +2382,7 @@ function convert_refresh() {
   else depLabel = '최소 의존 (Minimum/No Dependence)';
   document.getElementById('convertDependencyLabel').textContent = depLabel;
 
-  // 요약 텍스트 생성
-  const lines = [`MBI Total (변환): ${total}/100${hasNa ? ' (일부 미평가)' : ''}`, ''];
-  results.forEach(r => {
-    if (r.na) {
-      lines.push(`${r.mbiName} - (${r.note || '미평가'})`);
-    } else {
-      const item = MBI_DATA.find(x => x.id === r.mbiId);
-      const comment = item.baseComments[r.grade];
-      lines.push(`${r.mbiName} (${r.score}점) - ${comment}.`);
-    }
-  });
-  document.getElementById('convertSummaryText').value = lines.join('\n');
+  // 요약 텍스트 없음. 아래 매핑 상세 표만 표시
 
   // 매핑 상세 렌더링
   const mappingContainer = document.getElementById('convertMappingContainer');
@@ -2290,65 +2414,7 @@ function convert_refresh() {
   });
 }
 
-async function convert_copyAll() {
-  const text = document.getElementById('convertSummaryText').value;
-  try { await navigator.clipboard.writeText(text); }
-  catch(e) {
-    const ta = document.getElementById('convertSummaryText');
-    ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly', '');
-  }
-  const s = document.getElementById('convertCopyStatus');
-  s.classList.add('show');
-  setTimeout(()=>s.classList.remove('show'), 1500);
-}
 
-function convert_applyToMbi() {
-  if (!confirm('변환된 결과를 MBI 탭에 반영하시겠습니까? 기존 MBI 데이터는 덮어씌워집니다.')) return;
-  
-  // 기존 MBI 초기화
-  MBI_DATA.forEach(item => {
-    document.querySelectorAll(`#mbiApp input[data-item="${item.id}"]`).forEach(cb => cb.checked = false);
-    const na = document.querySelector(`#mbiApp input[data-na="${item.id}"]`);
-    if (na) { na.checked = false; na.disabled = false; }
-    document.querySelectorAll(`#mbiApp input[data-item="${item.id}"]`).forEach(cb => cb.disabled = false);
-    const ta = document.querySelector(`#mbiApp textarea[data-comment="${item.id}"]`);
-    if (ta) { ta.value = ''; ta.dataset.edited = 'false'; }
-  });
-
-  // 변환 결과 반영
-  let hasWheelchair = false;
-  CONVERT_MAPPING.forEach(map => {
-    const result = map.calculate();
-    if (result.na) {
-      if (map.mbiId === 'am' && result.note && result.note.includes('휠체어')) {
-        hasWheelchair = true;
-      }
-      const na = document.querySelector(`#mbiApp input[data-na="${map.mbiId}"]`);
-      if (na) na.checked = true;
-      document.querySelectorAll(`#mbiApp input[data-item="${map.mbiId}"]`).forEach(cb => cb.disabled = true);
-    } else {
-      // 해당 등급의 첫 번째 세부활동 체크
-      const item = MBI_DATA.find(x => x.id === map.mbiId);
-      const targetIdx = item.items.findIndex(c => !c.commentOnly && c.grade === result.grade);
-      if (targetIdx !== -1) {
-        const cb = document.querySelector(`#mbiApp input[data-item="${map.mbiId}"][data-idx="${targetIdx}"]`);
-        if (cb) cb.checked = true;
-      }
-    }
-    mbi_updateItem(map.mbiId);
-  });
-
-  // 보행/의자차 상호 배타 설정
-  if (hasWheelchair) mbi_setMobility('wc');
-  else mbi_setMobility('am');
-
-  mbi_updateSummary();
-  mbi_scheduleSave();
-  
-  // MBI 탭으로 전환
-  switchMode('mbi');
-  alert('MBI 탭에 반영되었습니다. 실제 임상 상황에 맞춰 세부활동을 조정해주세요.');
-}
 
 // ==================== 인쇄 페이지 ====================
 function print_renderMbi() {

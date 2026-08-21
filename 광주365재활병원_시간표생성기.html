@@ -2317,7 +2317,9 @@ function parseSchedule(patientName){
 
   const filteredResults =
     removeTherapistScheduleDuplicates(
-      removeInlineMachineDuplicates(results)
+      removeInlineMachineDuplicates(
+        removeRideAlongElectric(results)
+      )
     )
       .filter(item => !isHiddenScheduleTime(item.time));
 
@@ -2379,8 +2381,12 @@ function parseWithLayout(
           return;
 
         let treatment;
+        let hasFesNote = false;
 
         if(block.kind === "therapist"){
+
+          hasFesNote =
+            isRideAlongElectric(cellCompact, targetName);
 
           treatment =
             makeTreatmentName(
@@ -2429,7 +2435,8 @@ function parseWithLayout(
           dayTitle,
           time,
           sortTime: timeOrder(time),
-          treatment: withFloor(col.floor || block.floor, treatment)
+          treatment: withFloor(col.floor || block.floor, treatment),
+          fesRideAlong: hasFesNote
         });
       });
     }
@@ -2499,7 +2506,9 @@ function parseMainTherapies(
           dayTitle,
           time,
           sortTime: timeOrder(time),
-          treatment: withFloor(section.floor, treatment)
+          treatment: withFloor(section.floor, treatment),
+          fesRideAlong:
+            isRideAlongElectric(cellCompact, targetName)
         });
       }
     }
@@ -2693,6 +2702,37 @@ function isMachineOrElectricName(treatment){
 
   return /(^|\s)기구-/.test(treatment) ||
     /(^|\s)전기치료$/.test(treatment);
+}
+
+function isElectricName(treatment){
+
+  return /전기치료/.test(treatment);
+}
+
+/* 1:1 칸에 "이름+FES"라고 적혀 있으면
+   그 시간의 전기치료는 1:1 시간에 함께 시행한 것이므로
+   전기치료 줄을 빼고 회복기재활치료만 남깁니다.
+   전기 시간표에 이름이 따로 들어가 있어도 마찬가지입니다. */
+function removeRideAlongElectric(items){
+
+  return items.filter(item=>{
+
+    if(!isElectricName(item.treatment))
+      return true;
+
+    const hasFesNote =
+      items.some(other=>{
+
+        return (
+          other.fesRideAlong &&
+          other.sheetIndex === item.sheetIndex &&
+          other.dayTitle === item.dayTitle &&
+          other.time === item.time
+        );
+      });
+
+    return !hasFesNote;
+  });
 }
 
 /* 기구 시간표에서 제대로 찾은 기구가 있으면

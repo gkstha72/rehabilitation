@@ -395,6 +395,27 @@ document.getElementById('authInput').addEventListener('keydown', function(e) {
           </div>
         </div>
       </div>
+      <div class="side-row hip-precautions stroke-features" id="strokeFeaturesRow" style="display:flex;">
+        <span class="side-label">특성:</span>
+        <div class="precaution-checks">
+          <label><input type="checkbox" data-stroke="cognitive" onchange="mbi_updateStrokeFeatures()"> 인지기능 저하</label>
+          <label><input type="checkbox" data-stroke="consciousness" onchange="mbi_updateStrokeFeatures()"> 의식수준 저하</label>
+          <label><input type="checkbox" data-stroke="neglect" onchange="mbi_updateStrokeFeatures()"> 편측 무시</label>
+          <label><input type="checkbox" data-stroke="motivation" onchange="mbi_updateStrokeFeatures()"> 자발성 저하</label>
+          <label><input type="checkbox" data-stroke="perception" onchange="mbi_updateStrokeFeatures()"> 시·지각 기능 저하</label>
+          <label><input type="checkbox" data-stroke="pain" onchange="mbi_updateStrokeFeatures()"> 통증</label>
+        </div>
+      </div>
+      <div class="side-row hip-precautions parkinson-features" id="parkinsonFeaturesRow" style="display:none;">
+        <span class="side-label">특성:</span>
+        <div class="precaution-checks">
+          <label><input type="checkbox" data-parkinson="rigidity" onchange="mbi_updateParkinsonFeatures()"> 경직</label>
+          <label><input type="checkbox" data-parkinson="instability" onchange="mbi_updateParkinsonFeatures()"> 자세불안정</label>
+          <label><input type="checkbox" data-parkinson="initiation" onchange="mbi_updateParkinsonFeatures()"> 동작 개시의 어려움</label>
+          <label><input type="checkbox" data-parkinson="cognitive" onchange="mbi_updateParkinsonFeatures()"> 인지기능 저하</label>
+          <label><input type="checkbox" data-parkinson="motivation" onchange="mbi_updateParkinsonFeatures()"> 자발성 저하</label>
+        </div>
+      </div>
       <div class="side-row hip-precautions" id="hipPrecautionsRow" style="display:none;">
         <span class="side-label">금기자세:</span>
         <div class="precaution-checks">
@@ -860,6 +881,25 @@ const PRECAUTION_LABELS = {
   'pwb': '부분체중부하'
 };
 
+// 뇌졸중 특성 라벨
+const STROKE_FEATURE_LABELS = {
+  'cognitive': '인지기능 저하',
+  'consciousness': '의식수준 저하',
+  'neglect': '편측 무시',
+  'motivation': '자발성 저하',
+  'perception': '시·지각 기능 저하',
+  'pain': '통증'
+};
+
+// 파킨슨 특성 라벨
+const PARKINSON_FEATURE_LABELS = {
+  'rigidity': '경직',
+  'instability': '자세불안정',
+  'initiation': '동작 개시의 어려움',
+  'cognitive': '인지기능 저하',
+  'motivation': '자발성 저하'
+};
+
 // 고관절 금기자세 참여활동을 표시할 MBI 항목 및 phrase
 const HIP_PRECAUTION_ITEMS = {
   'ph': '금기자세로 인해 발톱 정리 시 도움이 필요함',
@@ -915,6 +955,8 @@ let mbi_currentSide = 'right';
 let mbi_currentMobility = 'am';
 let mbi_currentDiagnosis = 'stroke';  // 'stroke' | 'parkinson' | 'hip' | 'other'
 let mbi_precautions = [];  // ['flexion', 'adduction', 'internal_rotation', 'external_rotation', 'nwb', 'pwb']
+let mbi_strokeFeatures = [];  // 뇌졸중 특성
+let mbi_parkinsonFeatures = [];  // 파킨슨 특성
 
 const MbiStore = {
   load(){ try { const v = localStorage.getItem(MBI_STORAGE_KEY); return v ? JSON.parse(v) : null; } catch { return null; } },
@@ -978,10 +1020,22 @@ function mbi_setMobility(m){
 function mbi_setDiagnosis(dx){
   mbi_currentDiagnosis = dx;
   document.querySelectorAll('[data-mbi-dx]').forEach(b => b.classList.toggle('active', b.dataset.mbiDx === dx));
-  // 고관절 선택 시 금기자세 체크박스 표시
-  const row = document.getElementById('hipPrecautionsRow');
-  if (row) row.style.display = (dx === 'hip') ? 'flex' : 'none';
-  // 진단이 고관절이 아니면 금기자세 초기화 및 관련 참여활동 체크 해제
+  // 진단별 특성 row 표시/숨김
+  const strokeRow = document.getElementById('strokeFeaturesRow');
+  const parkRow = document.getElementById('parkinsonFeaturesRow');
+  const hipRow = document.getElementById('hipPrecautionsRow');
+  if (strokeRow) strokeRow.style.display = (dx === 'stroke') ? 'flex' : 'none';
+  if (parkRow) parkRow.style.display = (dx === 'parkinson') ? 'flex' : 'none';
+  if (hipRow) hipRow.style.display = (dx === 'hip') ? 'flex' : 'none';
+  // 다른 진단의 특성 초기화
+  if (dx !== 'stroke') {
+    mbi_strokeFeatures = [];
+    document.querySelectorAll('[data-stroke]').forEach(cb => cb.checked = false);
+  }
+  if (dx !== 'parkinson') {
+    mbi_parkinsonFeatures = [];
+    document.querySelectorAll('[data-parkinson]').forEach(cb => cb.checked = false);
+  }
   if (dx !== 'hip') {
     mbi_precautions = [];
     document.querySelectorAll('[data-precaution]').forEach(cb => cb.checked = false);
@@ -994,6 +1048,18 @@ function mbi_setDiagnosis(dx){
   mbi_renderItems();
   // 관련 항목 업데이트
   Object.keys(HIP_PRECAUTION_ITEMS).forEach(id => mbi_updateItem(id));
+  mbi_updateSummary();
+  mbi_scheduleSave();
+}
+
+function mbi_updateStrokeFeatures(){
+  mbi_strokeFeatures = Array.from(document.querySelectorAll('[data-stroke]:checked')).map(cb => cb.dataset.stroke);
+  mbi_updateSummary();
+  mbi_scheduleSave();
+}
+
+function mbi_updateParkinsonFeatures(){
+  mbi_parkinsonFeatures = Array.from(document.querySelectorAll('[data-parkinson]:checked')).map(cb => cb.dataset.parkinson);
   mbi_updateSummary();
   mbi_scheduleSave();
 }
@@ -1228,13 +1294,19 @@ function mbi_updateSummary(){
   else depLabel = '최소 의존 (Minimum/No Dependence)';
   document.getElementById('mbiDependencyLabel').textContent = depLabel;
   const header = `MBI Total: ${total}/100${hasNa ? ' (일부 미평가)' : ''}\n`;
-  // 진단이 고관절이고 금기자세가 체크되어 있으면 최상단에 문구 삽입
-  let precautionNote = '';
-  if (mbi_currentDiagnosis === 'hip' && mbi_precautions.length > 0) {
+  // 진단별 특성 문구 최상단 삽입
+  let dxNote = '';
+  if (mbi_currentDiagnosis === 'stroke' && mbi_strokeFeatures.length > 0) {
+    const labels = mbi_strokeFeatures.map(f => STROKE_FEATURE_LABELS[f]).join(' / ');
+    dxNote = `\n*${labels}(으)로 일상생활동작 수행 시 도움이 필요함.\n`;
+  } else if (mbi_currentDiagnosis === 'parkinson' && mbi_parkinsonFeatures.length > 0) {
+    const labels = mbi_parkinsonFeatures.map(f => PARKINSON_FEATURE_LABELS[f]).join(' / ');
+    dxNote = `\n*${labels}(으)로 일상생활동작 수행 시 도움이 필요함.\n`;
+  } else if (mbi_currentDiagnosis === 'hip' && mbi_precautions.length > 0) {
     const labels = mbi_precautions.map(p => PRECAUTION_LABELS[p]).join(', ');
-    precautionNote = `\n*금기자세(${labels})로 인해 일상 동작에서 도움이 필요함.\n`;
+    dxNote = `\n*금기자세(${labels})로 인해 일상 동작에서 도움이 필요함.\n`;
   }
-  document.getElementById('mbiSummaryText').value = header + precautionNote + '\n' + lines.join('\n');
+  document.getElementById('mbiSummaryText').value = header + dxNote + '\n' + lines.join('\n');
 }
 
 async function mbi_copyAll(){
@@ -1282,7 +1354,8 @@ function mbi_collectState(){
     if (cb && cb.checked) precautionChecks[itemId] = true;
   });
   return { items, lang: mbi_currentLang, side: mbi_currentSide, mobility: mbi_currentMobility,
-           diagnosis: mbi_currentDiagnosis, precautions: mbi_precautions, precautionChecks };
+           diagnosis: mbi_currentDiagnosis, precautions: mbi_precautions, precautionChecks,
+           strokeFeatures: mbi_strokeFeatures, parkinsonFeatures: mbi_parkinsonFeatures };
 }
 
 function mbi_restoreState(data){
@@ -1292,6 +1365,22 @@ function mbi_restoreState(data){
   if (data.mobility) mbi_setMobility(data.mobility);
   // 진단 복원 (금기자세 체크박스 UI 표시 위해 먼저)
   if (data.diagnosis) mbi_setDiagnosis(data.diagnosis);
+  // 뇌졸중 특성 복원
+  if (data.strokeFeatures && Array.isArray(data.strokeFeatures)) {
+    data.strokeFeatures.forEach(f => {
+      const cb = document.querySelector(`[data-stroke="${f}"]`);
+      if (cb) cb.checked = true;
+    });
+    mbi_strokeFeatures = data.strokeFeatures;
+  }
+  // 파킨슨 특성 복원
+  if (data.parkinsonFeatures && Array.isArray(data.parkinsonFeatures)) {
+    data.parkinsonFeatures.forEach(f => {
+      const cb = document.querySelector(`[data-parkinson="${f}"]`);
+      if (cb) cb.checked = true;
+    });
+    mbi_parkinsonFeatures = data.parkinsonFeatures;
+  }
   // 금기자세 목록 복원
   if (data.precautions && Array.isArray(data.precautions)) {
     data.precautions.forEach(p => {
@@ -1341,7 +1430,9 @@ function resetMbi(){
   mbi_setMobility('am');
   mbi_setDiagnosis('stroke');
   mbi_precautions = [];
-  document.querySelectorAll('[data-precaution]').forEach(cb => cb.checked = false);
+  mbi_strokeFeatures = [];
+  mbi_parkinsonFeatures = [];
+  document.querySelectorAll('[data-precaution], [data-stroke], [data-parkinson]').forEach(cb => cb.checked = false);
   mbi_updateSummary();
 }
 

@@ -3054,7 +3054,7 @@ function renderSchedule(patientName, items){
     note.className = "same-name-note";
 
     note.innerText =
-      "동명이인 확인: 표 안에 " +
+      "이름 확인: 표 안에 " +
       sameNames.join(", ") +
       " 도 있습니다. 이 시간표에는 \"" +
       compact(patientName) +
@@ -3383,6 +3383,15 @@ function isDigitChar(ch){
   return ch >= "0" && ch <= "9";
 }
 
+/* 한글 글자인지 확인합니다.
+   찾은 이름 바로 뒤에 한글이 더 붙어 있으면
+   그건 이름이 더 긴 다른 사람입니다.
+   예) "정순" 으로 찾을 때 "정순태" 는 다른 사람 */
+function isHangulChar(ch){
+
+  return /[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(ch || "");
+}
+
 function findNameIndex(haystack, needle, fromIndex){
 
   const text = haystack || "";
@@ -3403,7 +3412,13 @@ function findNameIndex(haystack, needle, fromIndex){
     const nextChar =
       text.charAt(index + name.length);
 
-    if(!isDigitChar(nextChar))
+    /* 뒤에 숫자가 붙으면 동명이인(김부영 / 김부영2),
+       뒤에 한글이 붙으면 더 긴 이름(정순 / 정순태)이라
+       둘 다 다른 사람으로 보고 건너뜁니다. */
+    if(
+      !isDigitChar(nextChar) &&
+      !isHangulChar(nextChar)
+    )
       return index;
 
     from = index + 1;
@@ -3426,11 +3441,7 @@ function findSameNameVariants(targetName){
     return list;
 
   const baseName =
-    targetName.replace(/[0-9]+$/,"");
-
-  const wantBase =
-    baseName.length > 0 &&
-    baseName !== targetName;
+    targetName.replace(/[0-9]+$/,"") || targetName;
 
   pastedSheets.forEach(sheet=>{
 
@@ -3447,27 +3458,45 @@ function findSameNameVariants(targetName){
         while(true){
 
           const index =
-            text.indexOf(baseName || targetName, from);
+            text.indexOf(baseName, from);
 
           if(index === -1) break;
 
-          let end =
-            index + (baseName || targetName).length;
+          let end = index + baseName.length;
 
-          let digits = "";
+          /* 뒤에 붙은 한글(정순 → 정순태)과
+             숫자(김부영 → 김부영2)를 모아
+             표에 실제로 적힌 이름을 만듭니다.
+             한글은 두 글자까지만 봅니다. */
+          let extra = "";
+          let hangul = 0;
 
-          while(isDigitChar(text.charAt(end))){
+          while(end < text.length){
 
-            digits += text.charAt(end);
-            end++;
+            const ch = text.charAt(end);
+
+            if(isDigitChar(ch)){
+
+              extra += ch;
+              end++;
+              continue;
+            }
+
+            if(isHangulChar(ch) && hangul < 2){
+
+              extra += ch;
+              hangul++;
+              end++;
+              continue;
+            }
+
+            break;
           }
 
-          const fullName =
-            (baseName || targetName) + digits;
+          const fullName = baseName + extra;
 
           if(
             fullName !== targetName &&
-            (digits !== "" || wantBase) &&
             list.indexOf(fullName) === -1
           ){
             list.push(fullName);

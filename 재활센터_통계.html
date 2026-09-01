@@ -4060,6 +4060,39 @@ function analyzeOrderCheckAll() {
     }
 }
 
+// 그 시각 전기(FES) 시간표의 담당 — 메디페인 책임자를 찾을 때 쓴다
+function etTherapistAtSlot(slot) {
+    var map = buildRowSlotMap("etGridTable");
+    var ec = (typeof etTherapistCol === "function") ? etTherapistCol() : 1;
+    for (var r = 1; r < ROW_COUNT; r++) {
+        if (map[r] !== slot) continue;
+        var el = document.getElementById("etGridTable-cell-"+r+"-"+ec);
+        var n = cleanTherapistName(el ? el.value.trim() : "");
+        if (n) return n;
+    }
+    return "";
+}
+
+// 개인 시간표 칸에 "메디6윤서원" 처럼 적힌 환자 — 작업치료 짝 없이 나가는 유형
+function collectSoloMediPatients() {
+    var out = {};
+    var cols = extractMembers("ptGridTable").colMapping;
+    Object.keys(cols).forEach(function(c) {
+        for (var r = 1; r < ROW_COUNT; r++) {
+            var el = document.getElementById("ptGridTable-cell-"+r+"-"+c);
+            var txt = el ? el.value.trim() : "";
+            if (!txt || cellValIsBlankOrInvalid(txt)) continue;
+            txt.split(/[\n,]+/).forEach(function(tok) {
+                var m = tok.trim().match(/^(?:메디페인|메디|페인케어)\s*(?:CR)?\s*([467])\s*(.*)$/);
+                if (!m) return;
+                var nm = m[2].split("+")[0].split("(")[0].split("[")[0].trim();
+                if (/^[가-힣]{2,4}\d?$/.test(nm)) out[nm] = true;
+            });
+        }
+    });
+    return out;
+}
+
 function analyzeCrPairLogic() {
     var area = document.getElementById("crPairArea");
     if (!globalEmrRows || globalEmrRows.length === 0 || globalEmrCodeIdx === -1) {
@@ -4084,6 +4117,7 @@ function analyzeCrPairLogic() {
     var cols = extractMembers("otGridTable").colMapping;
     var rows = [];
     var seen = {}, seenMedi = {}, seenP = {}, seenMediP = {};
+    var soloMediSet = collectSoloMediPatients();
     var MEDI_EXPECT = { "메디페인CR4":"MZ012B", "메디페인CR6":"MZ012C", "메디페인CR7":"MZ012A" };
 
     Object.keys(cols).forEach(function(c) {
@@ -4186,7 +4220,7 @@ function analyzeCrPairLogic() {
             //     (예: 절단 환자처럼 전산화인지 오더를 같이 넘기지 않는 분)
             var soloMark = /\((단독|메디만|메디단독)\)/.test(mtxtOne);
             var hasOtOrder = mCodes.some(function(c){ return /^(MM|IM)113/.test(c) || /^EX022/.test(c); });
-            var isSolo = soloMark || !hasOtOrder;
+            var isSolo = soloMark || !hasOtOrder || !!soloMediSet[mPatient];
 
             if (!isSolo) {
                 if (!seenP[mPatient]) mBad.push("작업치료 짝 없음 — 메디페인 시간표에서 빠졌어야 하는 건인지 확인");
@@ -4267,7 +4301,13 @@ function analyzeCrPairLogic() {
     });
 
     rows.sort(function(a,b){ return a.slot < b.slot ? -1 : (a.slot > b.slot ? 1 : 0); });
-    rows.forEach(function(r){ if (!r.ok) pushIssue("tDCS·CR", r.therapist, r.patient, r.slot, r.note); });
+    rows.forEach(function(r) {
+        if (r.ok) return;
+        // 메디페인이 안 넘어간 건은 작업치료사가 아니라 전기(FES) 담당 책임이다
+        var who = r.therapist;
+        if (/메디페인/.test(r.note)) who = etTherapistAtSlot(r.slot) || "전기 담당";
+        pushIssue("tDCS·CR", who, r.patient, r.slot, r.note);
+    });
 
     var bad = rows.filter(function(r){ return !r.ok; }).length;
     var html = "<h4 style='margin:6px 0 10px;'>총 " + rows.length + "건 중 <span style='color:" +

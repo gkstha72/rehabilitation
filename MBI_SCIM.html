@@ -1203,10 +1203,11 @@ function mbi_updateSummary(){
       hasNa = true;
       lines.push(`${label} - (미평가)`);
     } else {
-      total += item.scoreMap[result.grade];
-      if (comment) lines.push(`${label} - ${comment}`);
-      else if (result.empty) lines.push(`${label} - (미체크)`);
-      else lines.push(`${label} - ${item.baseComments[result.grade]}.`);
+      const score = item.scoreMap[result.grade];
+      total += score;
+      if (comment) lines.push(`${label} (${score}점) - ${comment}`);
+      else if (result.empty) lines.push(`${label} (${score}점) - (미체크)`);
+      else lines.push(`${label} (${score}점) - ${item.baseComments[result.grade]}.`);
     }
   });
   document.getElementById('mbiTotalScore').textContent = total;

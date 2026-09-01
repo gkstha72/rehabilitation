@@ -1171,7 +1171,7 @@ window.addEventListener("DOMContentLoaded", function() {
                     globalEmrTherapistIdx = row.findIndex(function(c){ return String(c).includes("세부치료사"); });
                     globalEmrHeaderRow = row;
                     if (globalEmrDurIdx === -1) globalEmrDurIdx = row.findIndex(function(c){ return String(c).includes("슬립소요시간"); });
-                    globalEmrRows = rows.slice(i+1); break;
+                    globalEmrRows = rows.slice(i+1); resetEmrTherapistAlias(); break;
                 }
             }
             emrDateText = "";
@@ -1205,8 +1205,62 @@ function isTherapistNameOnly(raw) {
     if (/치료|센터|합계|파트|구분/.test(t)) return false;
     return true;
 }
+// 치료사 이름 뒤에 붙는 파트 표기 — 김수연NDT · 이도경MAT 처럼 적히기도 한다
+var TH_PART_SUFFIX = /\s*(NDT|MAT|GAIT|COMPLEX|SSP|FES|GR|OT|PT|ST)$/i;
+// 시간표에는 짧게 적지만 EMR에는 동명이인 번호가 붙는 치료사가 있다.
+// (김수연 → 김수연1 · 김다은 → 김다은2)
+// 이름을 직접 적어두지 않고 EMR 파일의 치료사 표기를 그대로 따른다.
+var emrTherapistAlias = null;
+function buildEmrTherapistAlias() {
+    emrTherapistAlias = {};
+    if (!globalEmrRows || !globalEmrRows.length) return;
+    var byBase = {};
+    globalEmrRows.forEach(function(row) {
+        if (!row) return;
+        [globalEmrTherapistIdx, globalEmrNameIdx].forEach(function(ix) {
+            if (ix === -1) return;
+            var n = String(row[ix]||"").trim();
+            if (!/^[가-힣]{2,4}\d?$/.test(n)) return;
+            var b = n.replace(/\d+$/, "");
+            if (!byBase[b]) byBase[b] = {};
+            byBase[b][n] = true;
+        });
+    });
+    // 시간표에 번호 표기를 함께 쓰는 이름은 두 사람이라는 뜻이므로 절대 합치지 않는다.
+    // (김수현 · 김수현2 처럼 그날 한 분이 쉬어서 EMR에 한쪽만 나와도 안전하다)
+    var pairedInSched = schedNumberedBases();
+    Object.keys(byBase).forEach(function(b) {
+        if (pairedInSched[b]) return;
+        var list = Object.keys(byBase[b]);
+        // EMR에 그 이름으로 한 사람만 있을 때만 바꿔준다.
+        if (list.length === 1 && list[0] !== b) emrTherapistAlias[b] = list[0];
+    });
+}
+
+// 시간표에 "홍길동" 과 "홍길동2" 가 함께 적혀 있는 이름 모으기
+function schedNumberedBases() {
+    var plain = {}, numbered = {}, out = {};
+    ["ptGridTable","otGridTable","stGridTable","etGridTable","mtGridTable","painGridTable"].forEach(function(gid) {
+        for (var r = 0; r < ROW_COUNT; r++) {
+            for (var c = 0; c < COL_COUNT; c++) {
+                var el = document.getElementById(gid+"-cell-"+r+"-"+c);
+                var v = el ? el.value.trim() : "";
+                if (!v) continue;
+                v = v.replace(TH_PART_SUFFIX, "").trim();
+                var m = v.match(/^([가-힣]{2,4})(\d)?$/);
+                if (!m) continue;
+                if (m[2]) numbered[m[1]] = true; else plain[m[1]] = true;
+            }
+        }
+    });
+    Object.keys(numbered).forEach(function(b){ if (plain[b]) out[b] = true; });
+    return out;
+}
+function resetEmrTherapistAlias() { emrTherapistAlias = null; }
+
 function cleanTherapistName(raw) {
     var n = String(raw||"").trim();
+    n = n.replace(TH_PART_SUFFIX, "").trim();
     // 처방 접두가 붙은 환자 기입은 치료사가 아니다 (H박순희 · N김철수+런닝 등)
     if (n.indexOf("+") !== -1) return "";
     if (/^[A-Za-z]{1,2}[가-힣]{2,}/.test(n.replace(/\s/g,""))) return "";
@@ -3906,6 +3960,7 @@ function resetEmrFile() {
     globalEmrPatientIdx = -1; globalEmrDurIdx = -1; globalEmrTimeIdx = -1;
     globalEmrQtyIdx = -1; globalEmrDcIdx = -1; globalEmrTherapistIdx = -1;
     globalEmrChartIdx = -1; globalEmrRoomIdx = -1;
+    resetEmrTherapistAlias();
     globalEmrHeaderRow = null; globalEmrPatientNames = null;
     emrDateText = ""; renderDateBanner();
     var st = document.getElementById("emrStatus");

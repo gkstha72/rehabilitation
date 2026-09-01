@@ -249,90 +249,10 @@ textarea:focus.scim { border-color:#0f766e; }
   .item-head { flex-direction:column; align-items:stretch; }
   .check-grid { grid-template-columns:1fr; }
 }
-/* ========== 비밀번호 오버레이 ========== */
-#authOverlay {
-  position: fixed; inset: 0; z-index: 99999;
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px;
-}
-#authOverlay.hidden { display: none; }
-.auth-card {
-  background: white; border-radius: 20px; padding: 40px 32px;
-  max-width: 400px; width: 100%; text-align: center;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-}
-.auth-icon {
-  font-size: 44px; margin-bottom: 12px;
-}
-.auth-title {
-  font-size: 20px; font-weight: 900; color: #1e293b; margin-bottom: 24px;
-}
-.auth-subtitle {
-  font-size: 13px; color: #64748b; margin-bottom: 24px; line-height: 1.5;
-}
-.auth-form { display: flex; flex-direction: column; gap: 10px; }
-.auth-input {
-  padding: 14px 16px; font-size: 15px; border: 2px solid #e2e8f0;
-  border-radius: 12px; outline: none; font-family: inherit;
-  transition: border-color 0.15s ease;
-}
-.auth-input:focus { border-color: #1e293b; }
-.auth-submit {
-  padding: 14px; font-size: 15px; font-weight: 900;
-  background: #1e293b; color: white; border: none;
-  border-radius: 12px; cursor: pointer; font-family: inherit;
-  transition: background 0.15s ease;
-}
-.auth-submit:hover { background: #0f172a; }
-.auth-error {
-  color: #ef4444; font-size: 12px; margin-top: 6px; min-height: 16px;
-}
-.auth-info {
-  margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0;
-  font-size: 11px; color: #94a3b8; line-height: 1.6;
-}
 </style>
 </head>
 <body>
 
-<!-- ========== 비밀번호 잠금 화면 ========== -->
-<div id="authOverlay">
-  <div class="auth-card">
-    <div class="auth-icon">🔒</div>
-    <div class="auth-title">MBI · SCIM 자동채점</div>
-    <div class="auth-form">
-      <input type="password" id="authInput" class="auth-input" placeholder="비밀번호" autofocus>
-      <button class="auth-submit" onclick="checkAuth()">확인</button>
-      <div class="auth-error" id="authError"></div>
-    </div>
-  </div>
-</div>
-
-<script>
-// ========== 비밀번호 설정 ==========
-// 원하는 비밀번호로 바꾸세요
-const AUTH_PASSWORD = '9509500';
-
-function checkAuth() {
-  const input = document.getElementById('authInput');
-  const error = document.getElementById('authError');
-  if (input.value === AUTH_PASSWORD) {
-    document.getElementById('authOverlay').classList.add('hidden');
-    error.textContent = '';
-  } else {
-    error.textContent = '비밀번호가 틀렸어요';
-    input.value = '';
-    input.focus();
-  }
-}
-
-// Enter 키 지원
-document.getElementById('authInput').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') checkAuth();
-});
-</script>
-<!-- ========== 잠금 화면 끝 ========== -->
 <main class="app">
   <!-- 모드 탭 -->
   <div class="mode-tabs">
@@ -420,7 +340,9 @@ document.getElementById('authInput').addEventListener('keydown', function(e) {
         <span class="side-label">금기자세:</span>
         <div class="precaution-checks">
           <label><input type="checkbox" data-precaution="flexion" onchange="mbi_updatePrecautions()"> 굴곡 &gt;90°</label>
+          <label><input type="checkbox" data-precaution="extension" onchange="mbi_updatePrecautions()"> 폄</label>
           <label><input type="checkbox" data-precaution="adduction" onchange="mbi_updatePrecautions()"> 모음</label>
+          <label><input type="checkbox" data-precaution="abduction" onchange="mbi_updatePrecautions()"> 벌림</label>
           <label><input type="checkbox" data-precaution="internal_rotation" onchange="mbi_updatePrecautions()"> 내회전</label>
           <label><input type="checkbox" data-precaution="external_rotation" onchange="mbi_updatePrecautions()"> 외회전</label>
           <label><input type="checkbox" data-precaution="nwb" onchange="mbi_updatePrecautions()"> 비체중부하</label>
@@ -874,7 +796,9 @@ const HAND_SENSITIVE = ['ph', 'bt', 'fd', 'dr'];
 // 금기자세 라벨 매핑
 const PRECAUTION_LABELS = {
   'flexion': '굴곡 >90°',
+  'extension': '폄',
   'adduction': '모음',
+  'abduction': '벌림',
   'internal_rotation': '내회전',
   'external_rotation': '외회전',
   'nwb': '비체중부하',

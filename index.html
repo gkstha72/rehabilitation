@@ -356,6 +356,27 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
   border:1px solid var(--line-soft);
   border-radius:10px;
 }
+.newtab-open-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  margin-top:20px;
+  padding:14px 32px;
+  background:var(--ink);
+  color:white;
+  border-radius:12px;
+  text-decoration:none;
+  font-weight:700;
+  font-size:15px;
+  transition:all 0.15s ease;
+  box-shadow:0 4px 16px rgba(0,0,0,0.15);
+}
+.newtab-open-btn:hover, .newtab-open-btn:active{
+  background:#000;
+  transform:translateY(-1px);
+  box-shadow:0 6px 20px rgba(0,0,0,0.2);
+}
 
 .overlay{
   display:none;
@@ -729,10 +750,11 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
     <div class="newtab-notice" id="newTabNotice" style="display:none">
       <div class="emoji">↗</div>
       <h2 id="newTabTitle">도구</h2>
-      <p>이 도구는 새 탭에서 열려요.</p>
+      <p>이 도구는 새 탭에서 열려요</p>
+      <a id="newTabOpenBtn" href="#" target="_blank" rel="noopener" class="newtab-open-btn">🔗 새 탭에서 열기</a>
       <div class="hint">
-        새 탭이 안 열렸거나 실수로 닫으셨다면<br>
-        상단 우측 <b>↗ 새 탭</b> 버튼을 눌러주세요.
+        버튼을 눌러 새 탭에서 여세요<br>
+        원래 이 화면으로 돌아오려면 뒤로가기를 누르세요
       </div>
     </div>
 
@@ -1250,7 +1272,11 @@ function loadTool(key, isInitial){
   dashboard.style.display = 'none';
 
   if (tool.openInNewTab) {
-    if (!isInitial) window.open(tool.url, '_blank', 'noopener');
+    // 자동으로 window.open 하지 않음 (모바일에서 뒤로가기 문제 방지)
+    // 대신 사용자가 버튼을 눌러서 새 탭을 열도록 함
+    const openBtn = document.getElementById('newTabOpenBtn');
+    if (openBtn) openBtn.href = tool.url;
+
     frame.style.display = 'none';
     document.getElementById('newTabTitle').textContent = tool.title;
     newTabNotice.style.display = 'flex';

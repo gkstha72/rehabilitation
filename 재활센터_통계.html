@@ -1298,12 +1298,25 @@ window.addEventListener("DOMContentLoaded", function() {
                 if (!emrDateText && parseAnyDate(dline)) emrDateText = dline;
             }
             renderDateBanner();
+            clearResultAreas();
             var span = document.getElementById("emrStatus");
             if (span) span.innerText = globalEmrCodeIdx === -1 ? "⚠️ 슬립코드/완료자 열 못 찾음" : "✓ EMR 전산 연동 완료";
         };
         reader.readAsArrayBuffer(file);
     });
 });
+
+// EMR 파일을 바꾸면 이미 그려 둔 결과는 옛 자료 기준이라 지운다.
+// (지우지 않으면 파일만 바꾸고 결과는 그대로여서 바뀐 줄 모른다)
+function clearResultAreas() {
+    ["ptTripleArea","otTripleArea","stTripleArea","painTripleArea","evalArea",
+     "orderIssueArea","crPairArea","qtyCheckArea","robotGaitArea","overlapArea",
+     "slipDetailArea","dosuConflictArea","painTimeArea","dupNameArea",
+     "dischargeArea","evalCheckArea","excludeResultArea"].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.innerHTML = "";
+    });
+}
 
 // 치료사 헤더에서 이름만 남긴다
 //  "김수연1(NDT)" → 김수연1   "최은성(NDT)" → 최은성
@@ -4211,7 +4224,7 @@ function resetEmrFile() {
     globalEmrChartIdx = -1; globalEmrRoomIdx = -1;
     resetEmrTherapistAlias();
     globalEmrHeaderRow = null; globalEmrPatientNames = null;
-    emrDateText = ""; renderDateBanner();
+    emrDateText = ""; renderDateBanner(); clearResultAreas();
     var st = document.getElementById("emrStatus");
     if (st) { st.innerText = "엑셀 미등록"; st.style.color = "#2980b9"; }
     ["ptTripleArea","otTripleArea","stTripleArea","painTripleArea","evalArea",

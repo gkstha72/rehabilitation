@@ -1174,6 +1174,15 @@ function collectBlockCols(rows, anchor, anchorKeys){
     return cols;
   }
 
+  /* 이름칸 사이에 빈 칸이 하나둘 끼어 있어도 표는 이어집니다.
+     (예: 9/5 시트는 "PT(토)" 바로 옆 칸이 비어 있습니다.)
+     그래서 빈 칸을 만나자마자 멈추지 않고,
+     연달아 3칸 넘게 비면 그때 표가 끝난 걸로 봅니다.
+     표와 표 사이는 항상 그보다 넓게 띄어져 있습니다. */
+  const MAX_BLANK_RUN = 3;
+
+  let blankRun = 0;
+
   for(
     let c = anchor.col + 1;
     c < header.length;
@@ -1185,12 +1194,36 @@ function collectBlockCols(rows, anchor, anchorKeys){
 
     const name = normalize(header[c]);
 
-    if(!name) break;
+    if(!name){
+
+      blankRun++;
+
+      if(blankRun >= MAX_BLANK_RUN)
+        break;
+
+      cols.push({
+        col:c,
+        name:anchor.fixedName || "치료사 확인 필요",
+        blankHeader:true
+      });
+
+      continue;
+    }
+
+    blankRun = 0;
 
     cols.push({
       col:c,
       name:anchor.fixedName || name
     });
+  }
+
+  /* 표 끝에 붙은 빈 칸은 떼어냅니다. */
+  while(
+    cols.length > 0 &&
+    cols[cols.length - 1].blankHeader
+  ){
+    cols.pop();
   }
 
   return cols;

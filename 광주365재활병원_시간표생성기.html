@@ -3442,13 +3442,21 @@ function findNameIndex(haystack, needle, fromIndex){
     if(index === -1)
       return -1;
 
+    const prevChar =
+      index > 0 ? text.charAt(index - 1) : "";
+
     const nextChar =
       text.charAt(index + name.length);
 
-    /* 뒤에 숫자가 붙으면 동명이인(김부영 / 김부영2),
-       뒤에 한글이 붙으면 더 긴 이름(정순 / 정순태)이라
-       둘 다 다른 사람으로 보고 건너뜁니다. */
+    /* 이름의 앞뒤가 한글이면 사실은 다른 사람입니다.
+         뒤에 한글  → 더 긴 이름   (정순 / 정순태)
+         앞에 한글  → 성이 더 붙음 (정순 / 김정순)
+       뒤에 숫자가 붙으면 동명이인입니다. (김부영 / 김부영2)
+
+       앞에 오는 H, G, M, 숫자 등은 치료 코드라서
+       앞쪽은 한글만 확인합니다. */
     if(
+      !isHangulChar(prevChar) &&
       !isDigitChar(nextChar) &&
       !isHangulChar(nextChar)
     )
@@ -3494,6 +3502,16 @@ function findSameNameVariants(targetName){
             text.indexOf(baseName, from);
 
           if(index === -1) break;
+
+          /* 앞에 한글이 붙어 있으면 성이 더 있는 다른 사람입니다.
+             (정순 을 찾을 때 김정순2 를 "정순2" 로 읽으면 안 됩니다.) */
+          if(
+            index > 0 &&
+            isHangulChar(text.charAt(index - 1))
+          ){
+            from = index + 1;
+            continue;
+          }
 
           let end = index + baseName.length;
 

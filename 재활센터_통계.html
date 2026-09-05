@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b19</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b28</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -5604,21 +5604,22 @@ function baseEvalText(n) {
 //   한 칸에 여러 검사가 적히므로("손승주수지젭슨,푸글마이어") 전부 찾아낸다.
 //   긴 이름이 짧은 이름에 먹히지 않도록 위에서부터 순서대로 맞춘다.
 var EVAL_TOKENS = [
-    { re: /간이인지\s*(및|,|\+)?\s*치매\s*척도|MMSE\s*&?\s*GDS/i, label: "MMSE&GDS" },
-    { re: /신경인지|NCNE/i,                    label: "신경행동학적 인지기능검사" },
-    { re: /인지\s*평가|총집합|LOTCA\s*\+/i,     label: "신경인지기능검사(전체)" },
-    { re: /무시\s*(증후군)?\s*총집|무시|NEGLECT/i, label: "신경인지기능검사-무시증후군 총집" },
-    { re: /시지각|MVPT|인식력|LOTCA/i,          label: "신경인지기능검사 유형1,2" },
+    // "간이치매" 처럼 붙여 쓰거나, 간이와 치매가 한 칸에 같이 있으면 묶음 오더로 본다
+    { re: /간이[가-힣\s,，·및\+]{0,8}치매|MMSE\s*&?\s*GDS/i, label: "MMSE&GDS" },
+    { re: /신경인지\s*검사|신경인지\s*전체|인지\s*평가|총집합|LOTCA\s*\+/i,  label: "신경인지기능검사(전체)" },
+    { re: /무시\s*(증후군)?\s*총집|무시|NEGLECT/i,                            label: "신경인지기능검사-무시증후군 총집" },
+    { re: /유형\s*[1１ⅠI]\s*[,，·]?\s*[2２ⅡI]|유형\s*12|시지각|MVPT|인식력|LOTCA/i, label: "신경인지기능검사 유형1,2" },
+    { re: /NCSE/i,                                                            label: "신경행동학적 인지기능검사" },
     { re: /간이\s*인지|MMSE/i,                 label: "간이정신진단검사" },
     { re: /치매\s*척도|GDS/i,                  label: "치매척도검사" },
     { re: /척수\s*척도|SCIM/i,                 label: "일상생활동작검사" },
     { re: /일상|MBI/i,                         label: "일상생활동작검사" },
     { re: /수지\s*젭슨|젭슨/i,                 label: "수지기능검사(젭슨)" },
     { re: /수지\s*상지|MFT/i,                  label: "수지기능검사(MFT)" },
-    { re: /푸글\s*마이어|푸글|후글/i,           label: "후글-마이어-평가" },
+    { re: /후글|푸글/,                         label: "후글-마이어-평가" },
     { re: /섭식|GUSS/i,                        label: "섭식장애평가" },
     { re: /경직\s*진자/,                       label: "경직진자검사" },
-    { re: /\[?\s*균형\s*\]?|버그/,              label: "버그균형검사" },
+    { re: /버그|균형/,                         label: "버그균형검사" },
     { re: /동적\s*체평형/,                     label: "동적체평형검사" },
     { re: /동적\s*족저압/,                     label: "동적족저압측정" },
     { re: /동작\s*분석/,                       label: "동작분석(생역학검사)" },
@@ -5642,6 +5643,13 @@ function evalIsFree(text) { return /\(\s*(프리|FREE|F)\s*\)|프리/i.test(Stri
 // "김재현님 경직진자" 처럼 성함 뒤에 붙는 호칭을 떼어낸다
 // EMR 수진자명 중에서 성(첫 글자)이 같고 한 글자만 다른 이름을 찾는다.
 //   시간표 "강명훈" · EMR "강영훈" 같은 오타를 잡기 위함.
+// "김정순2" 처럼 시간표에만 붙는 동명이인 번호를 떼어 EMR 성함으로 맞춘다
+function baseEmrPatientName(seg) {
+    if (!globalEmrPatientNames || !seg) return "";
+    if (globalEmrPatientNames[seg]) return seg;
+    var b = seg.replace(/\d+$/, "");
+    return (b && b !== seg && globalEmrPatientNames[b]) ? b : "";
+}
 function nearEmrPatientName(seg) {
     if (!globalEmrPatientNames || !seg || seg.length < 3) return "";
     var hit = "";
@@ -5754,6 +5762,12 @@ function evalPatientsIn(text) {
             seen[nm] = 1; found.push({ name: nm, typo: "", idx: t.indexOf(nm) });
         }
     });
+    // "김정순2" 처럼 동명이인 번호가 붙어 EMR 성함과 안 맞는 경우를 살린다
+    var numM, numRe = /([가-힣]{2,4})(\d+)/g;
+    while ((numM = numRe.exec(t)) !== null) {
+        var bn = baseEmrPatientName(numM[1]);
+        if (bn && !seen[bn]) { seen[bn] = 1; found.push({ name: bn, typo: "", idx: numM.index }); }
+    }
     if (found.length) { found.sort(function(a,b){ return a.idx - b.idx; }); return found; }
 
     // 한 글자 오타 찾기 — 글자 수가 같고 딱 한 자만 다른 성함
@@ -5832,7 +5846,7 @@ function analyzeEvalCheck() {
     });
 
     // ② 시간표의 평가 메모 수집 — 담당 열만 훑는다
-    var schedList = [], unreadable = [], newPtList = [], newPtSeen = {};
+    var schedList = [], unreadable = [], newPtList = [], newPtSeen = {}, ambigList = [];
     ["ptGridTable","otGridTable","stGridTable"].forEach(function(gid) {
         var cols = extractMembers(gid).colMapping;
         var slotMap = buildRowSlotMap(gid);
@@ -5857,9 +5871,20 @@ function analyzeEvalCheck() {
                 var pats   = evalPatientsIn(vv);
                 var who    = dischargeWhoOf(gid, r, c, cols) || "";
                 var slot   = slotMap[r] || "";
+                // "신경인지" 라고만 적으면 어떤 검사인지 알 수 없다.
+                // 조용히 엉뚱한 코드로 보내지 않고 오류로 띄운다.
+                //   신경인지검사(FB000) · 무시(FB004030) · 유형1,2(FB001) · NCSE(FX704)
+                if (/신경인지/.test(vv) &&
+                    !/신경인지\s*검사|무시|유형|NCSE/i.test(vv)) {
+                    ambigList.push({ patient: (pats[0] ? pats[0].name : "-"),
+                                     who: who, slot: slot, raw: v });
+                    continue;
+                }
                 if (!groups.length && !isNew) {
-                    if (!pats.length) continue;                 // 순수 업무 메모 — 조용히 넘김
-                    if (pats.every(function(x){ return outPat[x]; })) { outSkipped++; continue; }
+                    // 평가·검사 표기가 전혀 없는 칸은 평가가 아니다 (예: "고민식" 만 적힌 시행 칸)
+                    if (!/평가|검사/.test(vv)) continue;
+                    if (!pats.length) continue;
+                    if (pats.every(function(x){ return outPat[x.name]; })) { outSkipped++; continue; }
                     unreadable.push({ gid:gid, who:who, slot:slot, raw:v, why:"검사명을 못 읽음" });
                     continue;
                 }
@@ -5876,6 +5901,12 @@ function analyzeEvalCheck() {
                     //   "정재희팀회의 강명훈수지젭슨" → 수지젭슨 앞에 붙은 강명훈
                     // 성함 목록에서 못 찾은 이름이라도 여기서 건져내고,
                     // 한 글자 오타(강명훈 → 강영훈)까지 맞춰 본다.
+                    // 성함 뒤에 동명이인 번호가 붙기도 한다 — "김정순2 치매척도"
+                    var numHit = vvN.slice(0, idx).match(/([가-힣]{2,4})\d+\s*$/);
+                    if (numHit) {
+                        var bn = baseEmrPatientName(numHit[1]);
+                        if (bn) return { name: bn, typo: "", idx: idx - numHit[0].length };
+                    }
                     var before = vvN.slice(0, idx).match(/[가-힣]{2,4}$/);
                     if (before) {
                         var seg = before[0], nearName = "", nearSeg = "";
@@ -5992,6 +6023,12 @@ function analyzeEvalCheck() {
         n.orders = mine.map(function(e){ return e.label + "(" + e.code + ")"; });
     });
 
+    ambigList.forEach(function(a) {
+        rows.push({ kind:"ambig", level:"bad", patient:a.patient, label:"신경인지",
+                    schedWho:a.who, emrWho:"-", slot:a.slot, code:"-",
+                    note:"검사명 확인 필요", raw:a.raw });
+    });
+
     emrList.forEach(function(e) {
         if (e.used) return;
         rows.push({ kind:"noSched", level:"bad", patient:e.patient, label:e.label,
@@ -6006,12 +6043,14 @@ function analyzeEvalCheck() {
         return r.schedWho || "-";
     }
     function reasonOf(r) {
+        if (r.kind === "ambig")   return "신경인지 — 신경인지검사 · 무시 · 유형1,2 · NCSE 중 무엇인지 확인 필요";
         if (r.kind === "noSlip")  return r.label + " — EMR 평가 슬립 없음";
         if (r.kind === "noSched") return r.label + " — 시간표에 평가 표기 없음";
         if (r.kind === "who")     return r.label + " — 담당 불일치";
         return r.label + " — 시간표 성함 오타 \"" + (r.typoText||"") + "\" → \"" + r.patient + "\"";
     }
-    var KIND_ORDER = { noSlip:0, noSched:1, who:2, typo:3 };
+    var KIND_ORDER = { noSlip:1, noSched:2, ambig:3, who:4, typo:5 };
+    function kindRank(k) { return KIND_ORDER[k] || 9; }
 
     var wrap = document.createElement("div");
     wrap.classList.add("section-box");
@@ -6023,7 +6062,7 @@ function analyzeEvalCheck() {
                 : " · 외래 환자 " + outSkipped + "건 제외") + "</p>";
 
     // 본 표(왼쪽)와 신환평가·못 읽은 메모(오른쪽)를 한 줄에 나란히 놓는다
-    var hasSide = (newPtList.length || unreadable.length);
+    var hasSide = newPtList.length > 0;
     html += "<div style='display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;'>";
     html += "<div style='flex:2 1 460px;min-width:0;'>";
 
@@ -6036,7 +6075,7 @@ function analyzeEvalCheck() {
         ["환자","담당","오류 이유"].forEach(function(x){ html += "<th class='th-sub-label'>" + x + "</th>"; });
         html += "</tr></thead><tbody>";
         rows.slice().sort(function(a,b) {
-            var d = (KIND_ORDER[a.kind]||9) - (KIND_ORDER[b.kind]||9);
+            var d = kindRank(a.kind) - kindRank(b.kind);
             if (d) return d;
             return a.patient < b.patient ? -1 : (a.patient > b.patient ? 1 : 0);
         }).forEach(function(r) {
@@ -6080,21 +6119,6 @@ function analyzeEvalCheck() {
             });
             html += "</tbody></table></div></div>";
         }
-        if (unreadable.length) {
-            html += "<div>";
-            html += "<h3 style='border-left-color:#e67e22;margin-top:0;'>읽지 못한 메모 " + unreadable.length + "건</h3>";
-            html += "<p style='font-size:12.5px;color:#555;margin-bottom:6px;'>평가 메모 같은데 검사명이나 성함을 읽지 못해 대조에서 빠졌습니다.</p>";
-            html += "<div style='max-height:260px;overflow:auto;border:1px solid #ccc;border-radius:6px;'>";
-            html += "<table class='result-table' style='table-layout:auto;margin-bottom:0;'><thead><tr>";
-            ["담당","시간","시간표 표기","사유"].forEach(function(x){ html += "<th class='th-sub-label'>" + x + "</th>"; });
-            html += "</tr></thead><tbody>";
-            unreadable.forEach(function(u) {
-                html += "<tr style='background:#fdf5ea;'><td>" + (u.who||"-") + "</td><td>" + (u.slot||"-") +
-                        "</td><td style='text-align:left;'>" + u.raw +
-                        "</td><td style='text-align:left;color:#a04000;'>" + u.why + "</td></tr>";
-            });
-            html += "</tbody></table></div></div>";
-        }
         html += "</div>";   // 오른쪽 칸 끝
     }
     html += "</div>";       // 가로 배치 끝
@@ -6103,7 +6127,7 @@ function analyzeEvalCheck() {
     (function() {
         var map = {}, order = [];
         rows.slice().sort(function(a,b) {
-            return (KIND_ORDER[a.kind]||9) - (KIND_ORDER[b.kind]||9);
+            return kindRank(a.kind) - kindRank(b.kind);
         }).forEach(function(r) {
             var w = whoOf(r) || "담당 미상";
             if (!map[w]) { map[w] = []; order.push(w); }

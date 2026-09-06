@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b40</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b43</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -3673,7 +3673,11 @@ function buildDupNameSchedule(groups) {
                             if (!idx[k]) idx[k] = { slots:{}, names:{} };
                             var g = idx[k];
                             if (!g.slots[rowSlot[r]]) g.slots[rowSlot[r]] = [];
-                            g.slots[rowSlot[r]].push({ name: cd });
+                            // 로봇(GR 표기)은 한 칸에서 액팅이 두 개 나간다
+                            var isRobot = txt.split(/[\s\/,\n]+/).some(function(tk) {
+                                return /^GR/i.test(tk) && dupNameHasPatient(tk, cd);
+                            });
+                            g.slots[rowSlot[r]].push({ name: cd, robot: isRobot });
                             g.names[cd] = (g.names[cd]||0) + 1;
                         });
                     });
@@ -3763,7 +3767,8 @@ function analyzeDupNameLogic() {
             g.slots[slot].forEach(function(x) {
                 if (seenN[x.name]) return;
                 seenN[x.name] = 1;
-                schedCnt[b][x.name] = (schedCnt[b][x.name]||0) + 1;
+                // 로봇은 시간표 한 칸당 액팅이 두 개이므로 배정도 2로 센다
+                schedCnt[b][x.name] = (schedCnt[b][x.name]||0) + (x.robot ? 2 : 1);
             });
         });
         Object.keys(g.slots).forEach(function(slot) {
@@ -4472,6 +4477,49 @@ function collectSoloMediPatients() {
     return out;
 }
 
+// ── 전기(F) 배정 점검 ─────────────────────────────────────────────────
+// 시간표에 "F이다혜" 처럼 F 로 적힌 자리는 그 칸 담당이 전기 담당이고,
+// 기능적전기자극치료로 넘어가야 한다. 매트·보행 등 다른 치료로 넘기면
+// 같은 회복기 등급이라 건수로는 상쇄돼 안 잡히므로 여기서 따로 본다.
+function checkFesOrders() {
+    if (!globalEmrRows || globalEmrPatientIdx === -1) return;
+    var fesPat = {};
+    globalEmrRows.forEach(function(row) {
+        if (!row) return;
+        if (globalEmrDcIdx !== -1 && String(row[globalEmrDcIdx]||"").trim() !== "") return;
+        var slip = globalEmrSlipNameIdx !== -1 ? String(row[globalEmrSlipNameIdx]||"") : "";
+        var code = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
+        if (!/기능적\s*전기\s*자극/.test(slip) && code !== "MM1511" && code !== "MM1512") return;
+        var nm = String(row[globalEmrPatientIdx]||"").trim();
+        if (nm) fesPat[nm] = true;
+    });
+
+    var cols = extractMembers("ptGridTable").colMapping;
+    var rowSlot = buildRowSlotMap("ptGridTable");
+    var seen = {};
+    Object.keys(cols).forEach(function(ck) {
+        var c = parseInt(ck, 10);
+        for (var r = 1; r < ROW_COUNT; r++) {
+            var el = document.getElementById("ptGridTable-cell-"+r+"-"+c);
+            var txt = el ? el.value.trim() : "";
+            if (!txt || cellValIsBlankOrInvalid(txt)) continue;
+            txt.split(/[\s\/,\n]+/).forEach(function(tk) {
+                // "F" + 한글 성함 형태만 전기 자리다. "(F)" 는 Free 특수작업치료라 제외.
+                if (!/^F[가-힣]{2,4}\d?/.test(tk)) return;
+                var nm = extractPatientName(tk);
+                if (!nm || nm.length < 2 || fesPat[nm]) return;
+                var who = ownersAt("ptGridTable", r, c, cols).join("·") || "전기 담당";
+                var slot = rowSlot[r] || "";
+                var k = who + "|" + nm + "|" + slot;
+                if (seen[k]) return;
+                seen[k] = true;
+                pushIssue("전기", who, nm, slot,
+                          "시간표는 전기(" + tk + ") 배정인데 기능적전기자극치료 액팅 없음");
+            });
+        }
+    });
+}
+
 function analyzeCrPairLogic() {
     var area = document.getElementById("crPairArea");
     if (!globalEmrRows || globalEmrRows.length === 0 || globalEmrCodeIdx === -1) {
@@ -4752,6 +4800,8 @@ function analyzeCrPairLogic() {
         }
     });
 
+    checkFesOrders();
+
     var bad = rows.filter(function(r){ return !r.ok; }).length;
     var html = "<h4 style='margin:6px 0 10px;'>총 " + rows.length + "건 중 <span style='color:" +
                (bad?"#c0392b":"#27ae60") + ";font-weight:900;'>" + bad + "건 불일치</span></h3>";
@@ -4998,8 +5048,9 @@ function isEvalMemoCell(text) {
     var body = t.replace(/\([^)]*\)/g, "").trim();
     if (body === "") return true;                                  // "(성기용 기립성 혈압검사-단순)"
     if (/[+＋]/.test(body)) return false;                          // "H김태식+알봇"
-    if (/^(GR|RS|[HGNMSADV])[가-힣]/.test(body)) return false;      // "H최망월/"
-    if (/[가-힣]\s*(GR|RS|[HGNMSADV])\s*\/?\s*$/.test(body)) return false;  // "마정욱S /" · "차광철V"
+    // F 는 전기 자리 표기다 (F윤샛별). 빠져 있으면 그 칸이 평가 메모로 잘못 분류된다.
+    if (/^(GR|RS|[HGNMSADVF])[가-힣]/.test(body)) return false;      // "H최망월/" · "F윤샛별"
+    if (/[가-힣]\s*(GR|RS|[HGNMSADVF])\s*\/?\s*$/.test(body)) return false;  // "마정욱S /" · "차광철V"
     // 치료 이름으로 시작하는 칸도 배정이다 — "메디6윤서원" · "페인10김난영"
     if (/^(메디페인|메디|페인|전기|도수|기구|로봇|보행|매트|신장|견인|온열|한냉|CR\d|FES|SSP|ICT|TENS)\s*\d*/i.test(body)) return false;
     return true;

@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b28</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b40</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -784,6 +784,7 @@ function handleGridPaste(e, tableId) {
     var cb = e.clipboardData || window.clipboardData;
     var parsed = null;
     try { parsed = parsePastedHtml(cb.getData("text/html")); } catch (err) { parsed = null; }
+    resetHeaderRowCache();
     if (parsed) distributeMatrix(parsed.matrix, tableId, e.target, parsed.fmt);
     else distributeMatrix(parsePastedText(cb.getData("Text")), tableId, e.target, null);
 }
@@ -1316,6 +1317,7 @@ window.addEventListener("DOMContentLoaded", function() {
 // EMR 파일을 바꾸면 이미 그려 둔 결과는 옛 자료 기준이라 지운다.
 // (지우지 않으면 파일만 바꾸고 결과는 그대로여서 바뀐 줄 모른다)
 function clearResultAreas() {
+    resetHeaderRowCache();
     ["ptTripleArea","otTripleArea","stTripleArea","painTripleArea","evalArea",
      "orderIssueArea","crPairArea","qtyCheckArea","robotGaitArea","overlapArea",
      "slipDetailArea","dosuConflictArea","painTimeArea","dupNameArea",
@@ -1398,6 +1400,14 @@ function resetEmrTherapistAlias() {
     if (globalEmrRows && globalEmrRows.length) buildEmrPatientNames();
     emrTherapistAlias = null; }
 
+// 퇴사 등으로 한쪽 이름이 더는 쓰이지 않아, 시간표 표기를 EMR 표기로 항상 바꿔야 하는 경우.
+// 자동 판정(EMR에 한 사람만 있을 때만 합침)으로는 안 잡히는 건을 여기에 적어 둔다.
+//   좌: 시간표 표기 → 우: EMR 표기
+// ※ 김수현 · 김수현2 처럼 두 분 다 재직 중인 이름은 절대 넣지 말 것 (합쳐지면 실적이 섞인다)
+var THERAPIST_FIXED_ALIAS = {
+    "김다은": "김다은2"
+};
+
 function cleanTherapistName(raw) {
     var n = String(raw||"").trim();
     n = n.replace(TH_PART_SUFFIX, "").trim();
@@ -1414,6 +1424,7 @@ function cleanTherapistName(raw) {
     // 시간표에는 "김수진" 이라고만 적어도 EMR에는 "김수진1" 로 들어간다.
     // EMR 표기를 기준으로 맞춰 준다.
     if (emrTherapistAlias === null) buildEmrTherapistAlias();
+    if (THERAPIST_FIXED_ALIAS[n]) return THERAPIST_FIXED_ALIAS[n];
     return emrTherapistAlias[n] || n;
 }
 
@@ -1461,6 +1472,46 @@ function countComplexFromPainGrid(members, stats, dbg) {
     }
 }
 
+// ── 한 열에 담당이 세로로 여러 명 쌓인 시트 ───────────────────────────
+// 토요일 시간표처럼 물리·작업이 같은 열에 위아래로 붙어 있으면
+// 열 머리글을 맨 윗줄에서만 읽어서는 아래쪽 담당을 놓친다.
+// 열 중간에 다시 나오는 담당 머리글 행을 찾아 둔다.
+var _hdrRowsCache = {};
+function resetHeaderRowCache() { _hdrRowsCache = {}; }
+function headerRowsOf(tableId) {
+    if (_hdrRowsCache[tableId]) return _hdrRowsCache[tableId];
+    var rows = [0];
+    for (var r = 1; r < ROW_COUNT; r++) {
+        // 시간 칸이 비어 있어야 머리글 행이다 (치료 배정 행에는 시간이 있다)
+        var t0 = document.getElementById(tableId+"-cell-"+r+"-0");
+        if (t0 && /\d{1,2}:\d{2}/.test(t0.value)) continue;
+        var nameCnt = 0, otherCnt = 0;
+        for (var c = 1; c < COL_COUNT; c++) {
+            var el = document.getElementById(tableId+"-cell-"+r+"-"+c);
+            var v = el ? el.value.trim() : "";
+            if (!v) continue;
+            // 사람 이름만 있는 칸인지 — 치료 배정에는 등급 표기나 + 가 붙는다
+            if (/^[가-힣]{2,4}\d?(\([^)]*\))?$/.test(v) && cleanTherapistName(v)) nameCnt++;
+            else otherCnt++;
+        }
+        if (nameCnt >= 3 && nameCnt > otherCnt) rows.push(r);
+    }
+    _hdrRowsCache[tableId] = rows;
+    return rows;
+}
+// (행, 열) 자리의 담당 — 그 행 위쪽에서 가장 가까운 머리글 행을 쓴다
+function ownersAt(tableId, r, c, cols) {
+    var hdrs = headerRowsOf(tableId);
+    var use = 0;
+    for (var i = 0; i < hdrs.length; i++) { if (hdrs[i] < r) use = hdrs[i]; else break; }
+    if (use === 0) return (cols && cols[c]) ? cols[c] : [];
+    var el = document.getElementById(tableId+"-cell-"+use+"-"+c);
+    var v = el ? el.value.trim() : "";
+    var nm = v.split(/[\s\/,\-]+/).map(function(n){ return cleanTherapistName(n); })
+              .filter(function(n){ return n.length >= 2; });
+    return nm.length ? nm : ((cols && cols[c]) ? cols[c] : []);
+}
+
 function extractMembers(tableId) {
     var colMapping = {}; var members = [];
     for (var c = 1; c < COL_COUNT; c++) {
@@ -1474,6 +1525,21 @@ function extractMembers(tableId) {
             rawNames.forEach(function(name){ if (!members.includes(name)) members.push(name); });
         }
     }
+    // 열 중간에 다시 나오는 머리글의 담당도 명단에 넣는다 (토요일 시간표)
+    headerRowsOf(tableId).forEach(function(hr) {
+        if (hr === 0) return;
+        for (var c2 = 1; c2 < COL_COUNT; c2++) {
+            var e2 = document.getElementById(tableId+"-cell-"+hr+"-"+c2);
+            var v2 = e2 ? e2.value.trim() : "";
+            if (!v2) continue;
+            v2.split(/[\s\/,\-]+/).map(function(n){ return cleanTherapistName(n); })
+              .filter(function(n){ return n.length >= 2; })
+              .forEach(function(name){
+                  if (!members.includes(name)) members.push(name);
+                  if (!colMapping[c2]) colMapping[c2] = [];
+              });
+        }
+    });
     return { colMapping: colMapping, members: members };
 }
 
@@ -1543,7 +1609,7 @@ function analyzePtEtMtCombinedMasterLogic() {
 
     for (var r = 1; r < ROW_COUNT; r++) {
         Object.keys(colMapping).forEach(function(colIdx) {
-            var therapists = colMapping[colIdx];
+            var therapists = ownersAt("ptGridTable", r, colIdx, colMapping);
             var cellText = document.getElementById("ptGridTable-cell-"+r+"-"+colIdx).value.trim();
             if (!cellText || cellValIsBlankOrInvalid(cellText)) return;
             var tokens = cellText.replace(/\r?\n|\r/g," ").split(/[\s,]+/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>0; });
@@ -1645,7 +1711,7 @@ function analyzeOtMasterLogic() {
     members.forEach(function(m){ timeStats[m] = {}; otOrder.forEach(function(o){ timeStats[m][o] = 0; }); });
     for (var r = 1; r < ROW_COUNT; r++) {
         Object.keys(colMapping).forEach(function(colIdx) {
-            var therapists = colMapping[colIdx];
+            var therapists = ownersAt("otGridTable", r, colIdx, colMapping);
             var cellText = document.getElementById("otGridTable-cell-"+r+"-"+colIdx).value.trim();
             if (!cellText || cellValIsBlankOrInvalid(cellText)) return;
             var items = cellText.replace(/\r?\n|\r/g," ").trim().split(/[\s,]+/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>0; });
@@ -1738,7 +1804,7 @@ function analyzeStMasterLogic() {
     members.forEach(function(m){ timeStats[m] = {}; stOrder.forEach(function(s){ timeStats[m][s] = 0; }); });
     for (var r = 1; r < ROW_COUNT; r++) {
         Object.keys(colMapping).forEach(function(colIdx) {
-            var therapists = colMapping[colIdx];
+            var therapists = ownersAt("stGridTable", r, colIdx, colMapping);
             var cellText = document.getElementById("stGridTable-cell-"+r+"-"+colIdx).value.trim();
             if (!cellText || cellValIsBlankOrInvalid(cellText)) return;
             function logST(th, label) { var k=th+"||"+label; if(!debugLog[k])debugLog[k]=[]; debugLog[k].push(cellText); } // 같은 환자 다른 시간 허용
@@ -2257,7 +2323,7 @@ function analyzePtOnlyLogic() {
 
     for (var r = 1; r < ROW_COUNT; r++) {
         Object.keys(colMapping).forEach(function(colIdx) {
-            var therapists = colMapping[colIdx];
+            var therapists = ownersAt("ptGridTable", r, colIdx, colMapping);
             var cellText = document.getElementById("ptGridTable-cell-"+r+"-"+colIdx).value.trim();
             if (!cellText || cellValIsBlankOrInvalid(cellText)) return;
             function logCellPt(th, label) {
@@ -2526,8 +2592,9 @@ function showPrescriptionDesc(label) {
 
     document.getElementById("detailModal").classList.add("active");
 }
-function showDetail(therapist, label, count, room) {
-    if (count === 0) return;
+// 환자 단위로 시간표와 EMR을 맞춰 본다.
+// 상세 창과 "액팅 틀린 치료사 명단 복사" 가 같은 계산을 쓰도록 따로 뺐다.
+function computeDetailDiff(therapist, label, room) {
     var key = therapist + "||" + label;
     // pt룸은 pt/et/mt 세 로그를 합산해서 조회
     var schedItems = [];
@@ -2721,8 +2788,13 @@ function showDetail(therapist, label, count, room) {
         else if (upper[0] === "M" || upper[0] === "G" || upper[0] === "N" || upper[0] === "F" || upper[0] === "C") t = t.substring(1);
         // + 이후, ( 이후, 공백 이후 제거
         t = t.split("+")[0].split("(")[0].split(" ")[0].trim();
+        // 성함 뒤에 붙는 치료 표기 제거 (오미자RBOT · 정현정MW · 김선자AR · 이기섭GAIT)
+        //   한글 성함이 2자 이상 남을 때만 떼어낸다
+        var cut = t.replace(/[A-Za-z]+\d*$/, "");
+        if (/[가-힣]{2,}$/.test(cut)) t = cut;
         // V로 끝나면 V 제거 (VITAL STIM)
         if (t.toUpperCase().endsWith("V") && t.length > 1) t = t.slice(0,-1);
+        // 성함 뒤 숫자 표기는 동명이인 번호이므로 남긴다 (김영재2)
         // 숫자만 남으면 이름 추출 실패 → 원래 토큰 첫 단어 반환
         if (!t || /^\d+$/.test(t)) t = token.split(" ")[0].split("(")[0].trim();
         return t;
@@ -2772,6 +2844,33 @@ function showDetail(therapist, label, count, room) {
         }
     });
 
+    return { sched: filteredSched, emr: emrItems,
+             schedMatched: schedMatched, emrMatched: emrMatched,
+             nameOf: extractPatientName };
+}
+
+// 한쪽에만 있는 환자 성함을 뽑아 준다
+function detailDiffNames(therapist, label, room) {
+    var d = computeDetailDiff(therapist, label, room);
+    var emrOnly = [], schedOnly = [], dupes = [];
+    // 짝이 맞은 EMR 환자 — 같은 사람이 또 나오면 같은 액팅을 두 번 넘긴 것이다
+    var matchedNames = {};
+    d.emr.forEach(function(it, i){ if (d.emrMatched[i] && it.patient) matchedNames[it.patient] = true; });
+    d.emr.forEach(function(it, i){
+        if (d.emrMatched[i] || !it.patient) return;
+        if (matchedNames[it.patient]) dupes.push(it.patient);   // 중복 액팅
+        else emrOnly.push(it.patient);                          // 시간표에 없는 환자
+    });
+    d.sched.forEach(function(tk, i){ if (!d.schedMatched[i]) { var n = d.nameOf(tk); if (n) schedOnly.push(n); } });
+    function uniq(a){ var o=[]; a.forEach(function(x){ if(o.indexOf(x)===-1) o.push(x); }); return o; }
+    return { emrOnly: uniq(emrOnly), schedOnly: uniq(schedOnly), dupes: uniq(dupes) };
+}
+
+function showDetail(therapist, label, count, room) {
+    if (count === 0) return;
+    var d = computeDetailDiff(therapist, label, room);
+    var filteredSched = d.sched, emrItems = d.emr,
+        schedMatched = d.schedMatched, emrMatched = d.emrMatched;
     var title = "[" + therapist + "] " + label + " (시간표 " + filteredSched.length + "건 / EMR " + emrItems.length + "건)";
     document.getElementById("detailModalTitle").innerText = title;
     var body = document.getElementById("detailModalBody");
@@ -3522,7 +3621,16 @@ function dupNameHasPatient(text, name) {
     while (i !== -1) {
         var prev = i > 0 ? t.charAt(i-1) : "";
         var rest = t.slice(i + name.length);
-        var ok = !/[가-힣]/.test(prev) && !/^[0-9]/.test(rest);
+        var ok = !/[가-힣]/.test(prev);
+        if (ok) {
+            var digits = rest.match(/^[0-9]+/);
+            if (digits) {
+                // 뒤에 숫자가 붙으면 원칙적으로 다른 사람이다 (김영재 ≠ 김영재2).
+                // 다만 그 번호 붙은 이름이 EMR 에 실제로 없으면
+                // 시간표에만 붙인 동명이인 번호이므로 같은 사람으로 본다 (김다은2 → 김다은).
+                ok = !(globalEmrPatientNames && globalEmrPatientNames[name + digits[0]]);
+            }
+        }
         if (ok) {
             var run = rest.match(/^[가-힣]+/);
             if (run && run[0].length === 1) ok = false;
@@ -3861,8 +3969,9 @@ function dischargeWhoOf(gid, r, c, cols) {
         var en = cleanTherapistName(ee ? ee.value.trim() : "");
         return en || "";
     }
-    // 열 머리글이 담당인 그리드 — 머리글이 비어 있으면 담당 미상으로 둔다
-    return (cols[c] && cols[c].length) ? cols[c].join("·") : "";
+    // 열 머리글이 담당인 그리드 — 열 중간에 머리글이 다시 나오면 그 담당을 쓴다
+    var own = ownersAt(gid, r, c, cols);
+    return own.length ? own.join("·") : "";
 }
 
 // 작업치료 칸의 처방 접두 판정 (교차 검증 집계와 같은 규칙)
@@ -4826,7 +4935,16 @@ function textHasPatient(text, name) {
     while (i !== -1) {
         var prev = i > 0 ? t.charAt(i-1) : "";
         var rest = t.slice(i + name.length);
-        var ok = !/[가-힣]/.test(prev) && !/^[0-9]/.test(rest);
+        var ok = !/[가-힣]/.test(prev);
+        if (ok) {
+            var digits = rest.match(/^[0-9]+/);
+            if (digits) {
+                // 뒤에 숫자가 붙으면 원칙적으로 다른 사람이다 (김영재 ≠ 김영재2).
+                // 다만 그 번호 붙은 이름이 EMR 에 실제로 없으면
+                // 시간표에만 붙인 동명이인 번호이므로 같은 사람으로 본다 (김다은2 → 김다은).
+                ok = !(globalEmrPatientNames && globalEmrPatientNames[name + digits[0]]);
+            }
+        }
         if (ok) {
             var run = rest.match(/^[가-힣]+/);
             if (run) {
@@ -5502,14 +5620,50 @@ function copyMismatchList() {
         return;
     }
 
-    // 치료사별로 처방명 묶기
-    var therapistMap = {};
+    // 치료사별로 처방명 묶기 — 어긋난 환자 성함도 같이 뽑는다
+    var ROOM_OF = { "물리+전기+메디페인":"pt", "작업치료":"ot", "언어치료":"st", "통증치료":"pain" };
+    var therapistMap = {}, wrongCode = {};
     result.details.forEach(function(item) {
         if (!therapistMap[item.therapist]) therapistMap[item.therapist] = [];
-        // 처방명 중복 방지
-        if (!therapistMap[item.therapist].includes(item.prescription)) {
-            therapistMap[item.therapist].push(item.prescription);
+        var line = item.prescription;
+        try {
+            var d = detailDiffNames(item.therapist, item.prescription, ROOM_OF[item.roomLabel] || "pt");
+            var parts = [];
+            // 시간표엔 있는데 액팅이 없는 환자 / EMR엔 있는데 시간표에 없는 환자
+            if (d.schedOnly.length) parts.push("액팅없음 " + d.schedOnly.join("·"));
+            if (d.dupes.length)     parts.push("중복액팅 " + d.dupes.join("·"));
+            if (d.emrOnly.length)   parts.push("시간표없음 " + d.emrOnly.join("·"));
+            if (parts.length) line += " → " + parts.join(" / ");
+            // 처방을 잘못 골라 넘긴 건을 찾기 위해 환자별로 모아 둔다
+            if (!wrongCode[item.therapist]) wrongCode[item.therapist] = {};
+            d.schedOnly.forEach(function(n) {
+                if (!wrongCode[item.therapist][n]) wrongCode[item.therapist][n] = { miss:[], extra:[] };
+                if (wrongCode[item.therapist][n].miss.indexOf(item.prescription) === -1)
+                    wrongCode[item.therapist][n].miss.push(item.prescription);
+            });
+            d.emrOnly.forEach(function(n) {
+                if (!wrongCode[item.therapist][n]) wrongCode[item.therapist][n] = { miss:[], extra:[] };
+                if (wrongCode[item.therapist][n].extra.indexOf(item.prescription) === -1)
+                    wrongCode[item.therapist][n].extra.push(item.prescription);
+            });
+        } catch (err) { /* 환자 성함을 못 뽑아도 처방명만으로 보낸다 */ }
+        if (!therapistMap[item.therapist].includes(line)) {
+            therapistMap[item.therapist].push(line);
         }
+    });
+
+    // 같은 환자가 한 처방에선 액팅이 없고 다른 처방으로는 넘어갔다면
+    // 처방을 잘못 골라 넘긴 것이다 (예: 회Ⅱ 를 회Ⅲ 로)
+    var wrongLines = {};
+    Object.keys(wrongCode).forEach(function(th) {
+        Object.keys(wrongCode[th]).forEach(function(nm) {
+            var w = wrongCode[th][nm];
+            if (w.miss.length && w.extra.length) {
+                if (!wrongLines[th]) wrongLines[th] = [];
+                wrongLines[th].push("[확인] " + nm + " — " + w.miss.join("·") + " 로 넘겨야 하는데 " +
+                                    w.extra.join("·") + " 로 넘어갔습니다");
+            }
+        });
     });
 
     // 치료사 이름 가나다순 정렬
@@ -5520,11 +5674,16 @@ function copyMismatchList() {
     var dateStr = now.getFullYear() + "년 " + (now.getMonth()+1) + "월 " + now.getDate() + "일";
 
     var msg = "📋 액팅 틀린 치료사 명단입니다. (" + dateStr + ")\n";
-    msg += "액팅 확인해주세요.\n\n";
+    msg += "괄호 안 환자만 확인하시면 됩니다.\n\n";
 
     therapists.forEach(function(therapist) {
-        var prescriptions = therapistMap[therapist].join(", ");
-        msg += "@" + therapist + " - " + prescriptions + "\n";
+        msg += "@" + therapist + "\n";
+        therapistMap[therapist].forEach(function(line) {
+            msg += "  · " + line + "\n";
+        });
+        (wrongLines[therapist] || []).forEach(function(line) {
+            msg += "  " + line + "\n";
+        });
     });
 
     msg += "\n총 " + therapists.length + "명 / " + result.total + "건 불일치";
@@ -6023,6 +6182,13 @@ function analyzeEvalCheck() {
         n.orders = mine.map(function(e){ return e.label + "(" + e.code + ")"; });
     });
 
+    // 검사명이나 성함을 못 읽은 메모도 조용히 넘기지 않고 본 표에 올린다
+    unreadable.forEach(function(u) {
+        rows.push({ kind:"unread", level:"bad", patient:"-", label:"-",
+                    schedWho:u.who, emrWho:"-", slot:u.slot, code:"-",
+                    note:u.why, raw:u.raw, why:u.why });
+    });
+
     ambigList.forEach(function(a) {
         rows.push({ kind:"ambig", level:"bad", patient:a.patient, label:"신경인지",
                     schedWho:a.who, emrWho:"-", slot:a.slot, code:"-",
@@ -6043,13 +6209,14 @@ function analyzeEvalCheck() {
         return r.schedWho || "-";
     }
     function reasonOf(r) {
+        if (r.kind === "unread")  return "평가 메모 같은데 " + r.why + " — 대조에서 빠짐";
         if (r.kind === "ambig")   return "신경인지 — 신경인지검사 · 무시 · 유형1,2 · NCSE 중 무엇인지 확인 필요";
         if (r.kind === "noSlip")  return r.label + " — EMR 평가 슬립 없음";
         if (r.kind === "noSched") return r.label + " — 시간표에 평가 표기 없음";
         if (r.kind === "who")     return r.label + " — 담당 불일치";
         return r.label + " — 시간표 성함 오타 \"" + (r.typoText||"") + "\" → \"" + r.patient + "\"";
     }
-    var KIND_ORDER = { noSlip:1, noSched:2, ambig:3, who:4, typo:5 };
+    var KIND_ORDER = { noSlip:1, noSched:2, ambig:3, unread:4, who:5, typo:6 };
     function kindRank(k) { return KIND_ORDER[k] || 9; }
 
     var wrap = document.createElement("div");

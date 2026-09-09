@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b49</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b51</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -803,14 +803,18 @@ function parsePastedHtml(html) {
     buildClassDeco(doc);
     var trs = table.querySelectorAll("tr");
     if (!trs.length) return null;
+    // 엑셀은 병합 셀을 colspan 으로 내보낸다. 펼치지 않으면 열이 밀린다.
     var matrix = [], fmt = [];
     for (var i = 0; i < trs.length; i++) {
         var tds = trs[i].querySelectorAll("td,th");
         var mr = [], fr = [];
         for (var j = 0; j < tds.length; j++) {
             var txt = (tds[j].innerText !== undefined ? tds[j].innerText : tds[j].textContent) || "";
-            mr.push(txt.replace(/\u00a0/g, " ").trim());
-            fr.push(tdDecoration(tds[j]));
+            var val = txt.replace(/\u00a0/g, " ").trim();
+            var dec = tdDecoration(tds[j]);
+            var span = parseInt(tds[j].getAttribute("colspan") || "1", 10);
+            if (!span || span < 1) span = 1;
+            for (var k = 0; k < span; k++) { mr.push(k === 0 ? val : ""); fr.push(dec); }
         }
         matrix.push(mr); fmt.push(fr);
     }
@@ -1179,10 +1183,18 @@ else { initOnLoad(); }
             var matrix = parsePastedText(raw);
             // 취소선·밑줄은 글자에는 없고 HTML 에만 있다.
             // HTML 표가 있으면 그쪽을 쓰면 좌표가 정확히 맞는다.
+            // 글자 쪽을 원본으로 그대로 쓰고, HTML 은 서식만 가져온다.
+            // 행 수와 열 수가 맞을 때만 얹어서 열이 밀리는 일이 없게 한다.
             var fmtMatrix = null;
             try {
                 var ph = parsePastedHtml(cbB.getData("text/html"));
-                if (ph && ph.matrix && ph.matrix.length) { matrix = ph.matrix; fmtMatrix = ph.fmt; }
+                if (ph && ph.fmt && matrix && ph.fmt.length === matrix.length) {
+                    var shapeOk = true;
+                    for (var fi = 0; fi < matrix.length; fi++) {
+                        if ((ph.fmt[fi]||[]).length < (matrix[fi]||[]).length) { shapeOk = false; break; }
+                    }
+                    if (shapeOk) fmtMatrix = ph.fmt;
+                }
             } catch (errH) { fmtMatrix = null; }
             if (!matrix || matrix.length === 0) { setStatus("⚠️ 붙여넣기 데이터가 없습니다.", "#e74c3c"); return; }
 
@@ -1803,7 +1815,8 @@ function analyzeOtMasterLogic() {
                 if (crHit) return;
                 // 작업치료에서 (F) 는 보행로봇이 아니라 "Free" — (Free)특수작업치료(MM113A) 다.
                 // 단, (F)C고민식+CPM 처럼 (F) 뒤에 처방 접두가 붙으면 그 접두로 판정한다.
-                if (u.includes("(F)") || u.includes("(필")) {
+                // "(필라테스-상지)" 같은 치료 메모가 Free 표기로 잘못 잡히지 않게 제외한다
+                if (u.includes("(F)") || (u.includes("(필") && !u.includes("(필라"))) {
                     var afterF = u.replace(/^\(F\)|^\(필[^)]*\)/, "").replace(/\(F\)|\(필[^)]*\)/g, "");
                     if (!/^[CSADVH]/.test(afterF.trim())) {
                         therapists.forEach(function(th){ timeStats[th]["CR6(F),CR7(F)"] += 1; logCell(th,"CR6(F),CR7(F)"); });

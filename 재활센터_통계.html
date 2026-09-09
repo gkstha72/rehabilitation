@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b51</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b55</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -769,7 +769,10 @@ function tdDecoration(td) {
         if (!node) return;
         if (node.nodeType === 3) {          // 글자
             var t = node.nodeValue || "";
-            if (t.replace(/\u00a0|\s/g, "")) { cur.u = cur.u || u; cur.s = cur.s || st; }
+            // 선이 성함에 그어져야 그 사람 건이다.
+            //   "D차광철+V" 에서 V 에만 선이 있으면 V(비타루스팀)만 취소한 것이지
+            //   차광철 배정 자체가 취소된 게 아니다.
+            if (/[가-힣]/.test(t)) { cur.u = cur.u || u; cur.s = cur.s || st; }
             cur.text += t;
             return;
         }
@@ -1188,12 +1191,32 @@ else { initOnLoad(); }
             var fmtMatrix = null;
             try {
                 var ph = parsePastedHtml(cbB.getData("text/html"));
-                if (ph && ph.fmt && matrix && ph.fmt.length === matrix.length) {
-                    var shapeOk = true;
-                    for (var fi = 0; fi < matrix.length; fi++) {
-                        if ((ph.fmt[fi]||[]).length < (matrix[fi]||[]).length) { shapeOk = false; break; }
+                if (ph && ph.fmt && ph.matrix && matrix) {
+                    // 행 수가 같으면 그대로, 앞쪽에 빈 행이 더 있으면 맞춰서 밀어 준다.
+                    var off = ph.matrix.length - matrix.length;
+                    if (off === 0) fmtMatrix = ph.fmt;
+                    else if (off > 0 && off <= 5) fmtMatrix = ph.fmt.slice(off);
+                    else if (off < 0) {
+                        var pad = [];
+                        for (var pi = 0; pi < -off; pi++) pad.push([]);
+                        fmtMatrix = pad.concat(ph.fmt);
                     }
-                    if (shapeOk) fmtMatrix = ph.fmt;
+                    // 열이 밀렸는지 글자로 확인 — 서식 있는 칸의 글자가 실제와 다르면 쓰지 않는다
+                    if (fmtMatrix) {
+                        var chk = 0, bad = 0;
+                        for (var ri = 0; ri < matrix.length && chk < 40; ri++) {
+                            var hrow = (off >= 0 ? ph.matrix[ri + off] : ph.matrix[ri + off]) || [];
+                            var trow = matrix[ri] || [];
+                            for (var ci = 0; ci < trow.length && chk < 40; ci++) {
+                                var tv = String(trow[ci]||"").replace(/\s+/g,"");
+                                if (!tv) continue;
+                                chk++;
+                                var hv = String(hrow[ci]||"").replace(/\s+/g,"");
+                                if (hv !== tv) bad++;
+                            }
+                        }
+                        if (chk > 0 && bad / chk > 0.3) fmtMatrix = null;
+                    }
                 }
             } catch (errH) { fmtMatrix = null; }
             if (!matrix || matrix.length === 0) { setStatus("⚠️ 붙여넣기 데이터가 없습니다.", "#e74c3c"); return; }
@@ -3736,11 +3759,7 @@ function buildDupNameSchedule(groups) {
                             if (!idx[k]) idx[k] = { slots:{}, names:{} };
                             var g = idx[k];
                             if (!g.slots[rowSlot[r]]) g.slots[rowSlot[r]] = [];
-                            // 로봇(GR 표기)은 한 칸에서 액팅이 두 개 나간다
-                            var isRobot = txt.split(/[\s\/,\n]+/).some(function(tk) {
-                                return /^GR/i.test(tk) && dupNameHasPatient(tk, cd);
-                            });
-                            g.slots[rowSlot[r]].push({ name: cd, robot: isRobot });
+                            g.slots[rowSlot[r]].push({ name: cd });
                             g.names[cd] = (g.names[cd]||0) + 1;
                         });
                     });
@@ -3830,8 +3849,7 @@ function analyzeDupNameLogic() {
             g.slots[slot].forEach(function(x) {
                 if (seenN[x.name]) return;
                 seenN[x.name] = 1;
-                // 로봇은 시간표 한 칸당 액팅이 두 개이므로 배정도 2로 센다
-                schedCnt[b][x.name] = (schedCnt[b][x.name]||0) + (x.robot ? 2 : 1);
+                schedCnt[b][x.name] = (schedCnt[b][x.name]||0) + 1;
             });
         });
         Object.keys(g.slots).forEach(function(slot) {
@@ -5349,8 +5367,14 @@ function analyzeQtyCheckLogic() {
         if (assigned.length === 0) return;   // 시간표에 없는 건은 대조하지 않음
         var assignedTxt = assigned.slice().sort().join("·");
 
+        // 로봇(GR) 칸은 한 시간에 액팅이 두 건 나간다.
+        //   보행치료(로봇 선별) MM304 + [회Ⅲ]보행치료 가 같은 시간에 함께 청구된다.
+        // 그래서 그 시간만 두 건까지 정상으로 본다.
         var remain = {};
-        assigned.forEach(function(sl){ remain[sl] = (remain[sl]||0) + 1; });
+        mineHit.forEach(function(x) {
+            var isRobot = /(^|[\s\/,])GR/i.test(x.text || "");
+            remain[x.slot] = (remain[x.slot]||0) + (isRobot ? 2 : 1);
+        });
 
         var leftovers = [];
         group.forEach(function(e) {

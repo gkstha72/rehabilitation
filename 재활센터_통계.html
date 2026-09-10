@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b55</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b57</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -711,6 +711,14 @@ function cellFmt(gid, r, c) {
 }
 // 칸을 줄 단위로 쪼개 각 줄의 밑줄·취소선과 함께 돌려준다.
 // 서식 정보가 없으면(글자만 붙여넣기) 칸 전체를 한 줄로 본다.
+// 취소선이 그어진 줄을 뺀 글자. 액팅이 안 나가는 자리라 EMR 과 대조할 실적이 아니다.
+function liveCellText(gid, r, c, txt) {
+    var f = cellFmt(gid, r, c);
+    if (!f.s) return txt;                       // 선이 없으면 그대로
+    if (!f.lines || !f.lines.length) return ""; // 칸 전체가 취소선
+    var keep = f.lines.filter(function(ln){ return !ln.s; }).map(function(ln){ return ln.text; });
+    return keep.join(" ");
+}
 function cellLines(gid, r, c, txt) {
     var f = cellFmt(gid, r, c);
     if (f.lines && f.lines.length) return f.lines;
@@ -1637,7 +1645,7 @@ function etTherapistCol() {
         var n = 0;
         for (var r = 1; r < ROW_COUNT; r++) {
             var el = document.getElementById("etGridTable-cell-"+r+"-"+c);
-            var v = el ? el.value.trim() : "";
+            var v = el ? liveCellText("etGridTable", r, c, el.value.trim()) : "";
             if (!v || cellValIsBlankOrInvalid(v)) continue;
             if (cleanTherapistName(v)) n++;
         }
@@ -1695,7 +1703,8 @@ function analyzePtEtMtCombinedMasterLogic() {
     for (var r = 1; r < ROW_COUNT; r++) {
         Object.keys(colMapping).forEach(function(colIdx) {
             var therapists = ownersAt("ptGridTable", r, colIdx, colMapping);
-            var cellText = document.getElementById("ptGridTable-cell-"+r+"-"+colIdx).value.trim();
+            var cellText = liveCellText("ptGridTable", r, colIdx,
+                    document.getElementById("ptGridTable-cell-"+r+"-"+colIdx).value.trim());
             if (!cellText || cellValIsBlankOrInvalid(cellText)) return;
             var tokens = cellText.replace(/\r?\n|\r/g," ").split(/[\s,]+/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>0; });
             var classified = tokens.map(function(t){ return { token:t, type:classifyPtToken(t) }; });
@@ -1755,7 +1764,8 @@ function analyzePtEtMtCombinedMasterLogic() {
     for (var r = 1; r < ROW_COUNT; r++) {
         var etTherapist = etRowTherapistMap[r] || ""; if (!etTherapist) continue;
         for (var c = etStartCol; c < COL_COUNT; c++) {
-            var ct = document.getElementById("etGridTable-cell-"+r+"-"+c).value.trim();
+            var ct = liveCellText("etGridTable", r, c,
+                    document.getElementById("etGridTable-cell-"+r+"-"+c).value.trim());
             if (!ct || cellValIsBlankOrInvalid(ct)) continue;
             if (masterTherapists.includes(ct)) continue;
             var cu = ct.toUpperCase();
@@ -1768,7 +1778,8 @@ function analyzePtEtMtCombinedMasterLogic() {
             }
         }
         for (var c = 0; c < COL_COUNT; c++) {
-            var ct = document.getElementById("mtGridTable-cell-"+r+"-"+c).value.trim();
+            var ct = liveCellText("mtGridTable", r, c,
+                    document.getElementById("mtGridTable-cell-"+r+"-"+c).value.trim());
             if (!ct || cellValIsBlankOrInvalid(ct)) continue;
             // 한 칸에 "H김성열70(화목)" "H박창규60(화목)" 처럼 두 명 이상 적히기도 한다.
             // 줄바꿈 · 쉼표로 갈라 각각 따로 센다.
@@ -1797,7 +1808,8 @@ function analyzeOtMasterLogic() {
     for (var r = 1; r < ROW_COUNT; r++) {
         Object.keys(colMapping).forEach(function(colIdx) {
             var therapists = ownersAt("otGridTable", r, colIdx, colMapping);
-            var cellText = document.getElementById("otGridTable-cell-"+r+"-"+colIdx).value.trim();
+            var cellText = liveCellText("otGridTable", r, colIdx,
+                    document.getElementById("otGridTable-cell-"+r+"-"+colIdx).value.trim());
             if (!cellText || cellValIsBlankOrInvalid(cellText)) return;
             var items = cellText.replace(/\r?\n|\r/g," ").trim().split(/[\s,]+/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>0; });
             var localHCount = 0;
@@ -1891,7 +1903,8 @@ function analyzeStMasterLogic() {
     for (var r = 1; r < ROW_COUNT; r++) {
         Object.keys(colMapping).forEach(function(colIdx) {
             var therapists = ownersAt("stGridTable", r, colIdx, colMapping);
-            var cellText = document.getElementById("stGridTable-cell-"+r+"-"+colIdx).value.trim();
+            var cellText = liveCellText("stGridTable", r, colIdx,
+                    document.getElementById("stGridTable-cell-"+r+"-"+colIdx).value.trim());
             if (!cellText || cellValIsBlankOrInvalid(cellText)) return;
             function logST(th, label) { var k=th+"||"+label; if(!debugLog[k])debugLog[k]=[]; debugLog[k].push(cellText); } // 같은 환자 다른 시간 허용
             // 언어치료는 치료시간에 평가를 넣기도 한다. "이다혜 평가" 처럼 적힌 칸은
@@ -2178,7 +2191,8 @@ function analyzePainMasterLogic() {
             var currentTherapist = (oc !== -1 && rowThByCol[r] && rowThByCol[r][oc])
                                  ? rowThByCol[r][oc] : rowFallback;
             if (!currentTherapist || !members.includes(currentTherapist)) continue;
-            var cellText = document.getElementById("painGridTable-cell-"+r+"-"+c).value.trim();
+            var cellText = liveCellText("painGridTable", r, c,
+                    document.getElementById("painGridTable-cell-"+r+"-"+c).value.trim());
             if (!cellText || cellValIsBlankOrInvalid(cellText)) continue;
             var upperCell = cellText.toUpperCase();
             var searchText = upperCell.replace(/\([^)]*\)/g," ");
@@ -2410,7 +2424,8 @@ function analyzePtOnlyLogic() {
     for (var r = 1; r < ROW_COUNT; r++) {
         Object.keys(colMapping).forEach(function(colIdx) {
             var therapists = ownersAt("ptGridTable", r, colIdx, colMapping);
-            var cellText = document.getElementById("ptGridTable-cell-"+r+"-"+colIdx).value.trim();
+            var cellText = liveCellText("ptGridTable", r, colIdx,
+                    document.getElementById("ptGridTable-cell-"+r+"-"+colIdx).value.trim());
             if (!cellText || cellValIsBlankOrInvalid(cellText)) return;
             function logCellPt(th, label) {
                 var key = th + "||" + label;
@@ -2498,7 +2513,8 @@ function analyzeEtOnlyLogic() {
     for (var r = 1; r < ROW_COUNT; r++) {
         var etTherapist = etRowTherapistMap[r] || ""; if (!etTherapist) continue;
         for (var c = etThCol + 1; c < COL_COUNT; c++) { // 담당 열 오른쪽부터
-            var ct = document.getElementById("etGridTable-cell-"+r+"-"+c).value.trim();
+            var ct = liveCellText("etGridTable", r, c,
+                    document.getElementById("etGridTable-cell-"+r+"-"+c).value.trim());
             if (!ct || cellValIsBlankOrInvalid(ct)) continue;
             var cu = ct.toUpperCase();
             if (cu.includes("H2") || cu.startsWith("H")) {
@@ -2546,7 +2562,8 @@ function analyzeMtOnlyLogic() {
     for (var r = 1; r < ROW_COUNT; r++) {
         var etTherapist = etRowTherapistMap[r] || ""; if (!etTherapist) continue;
         for (var c = 0; c < COL_COUNT; c++) {
-            var ct = document.getElementById("mtGridTable-cell-"+r+"-"+c).value.trim();
+            var ct = liveCellText("mtGridTable", r, c,
+                    document.getElementById("mtGridTable-cell-"+r+"-"+c).value.trim());
             if (!ct || cellValIsBlankOrInvalid(ct)) continue;
             splitMedipainCell(ct).forEach(function(one) {
                 mtPartStats[etTherapist]["메디페인"] += 1;

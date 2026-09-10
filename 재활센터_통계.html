@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b57</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b60</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -767,20 +767,25 @@ function classDecoOf(node) {
     return out;
 }
 function tdDecoration(td) {
-    var lines = [], cur = { text:"", u:false, s:false };
+    var lines = [], cur = { text:"", u:false, s:false, nameSeen:false };
     function push() {
         var t = cur.text.replace(/\u00a0/g, " ").trim();
         if (t) lines.push({ text:t, u:cur.u, s:cur.s });
-        cur = { text:"", u:false, s:false };
+        cur = { text:"", u:false, s:false, nameSeen:false };
     }
     function walk(node, u, st) {
         if (!node) return;
         if (node.nodeType === 3) {          // 글자
             var t = node.nodeValue || "";
-            // 선이 성함에 그어져야 그 사람 건이다.
-            //   "D차광철+V" 에서 V 에만 선이 있으면 V(비타루스팀)만 취소한 것이지
-            //   차광철 배정 자체가 취소된 게 아니다.
-            if (/[가-힣]/.test(t)) { cur.u = cur.u || u; cur.s = cur.s || st; }
+            // 선이 "성함" 에 그어져야 그 사람 배정이 취소·확정된 것이다.
+            //   "D차광철+V"     → V 에만 선 → 비타루스팀만 취소, 차광철 배정은 살아 있음
+            //   "N이종례+풋센서" → 풋센서에만 선 → 풋센서만 시행, 이종례 배정은 살아 있음
+            //   "차광철V"       → 성함까지 선 → 그 배정 자체가 대상
+            // 그래서 줄에서 처음 나오는 한글 덩어리(=성함)의 서식만 본다.
+            if (/[가-힣]/.test(t) && !cur.nameSeen) {
+                cur.nameSeen = true;
+                cur.u = u; cur.s = st;
+            }
             cur.text += t;
             return;
         }
@@ -1315,17 +1320,18 @@ else { initOnLoad(); }
             // ③ 메디페인 별도 탐지
             var mpSeg = findMedipainRegion(matrix, sections, totalCols);
             if (mpSeg) {
-                var mpRows = [];
+                var mpRows = [], mpFmt = [];
                 for (var r = mpSeg.headerRow; r <= mpSeg.rowEnd; r++) {
-                    var mpRow = [];
+                    var mpRow = [], mpF = [];
                     for (var col = mpSeg.start; col <= mpSeg.end; col++) {
                         mpRow.push((matrix[r]||[])[col] !== undefined ? (matrix[r]||[])[col] : "");
+                        mpF.push(fmtMatrix ? ((fmtMatrix[r]||[])[col] || null) : null);
                     }
-                    mpRows.push(mpRow);
+                    mpRows.push(mpRow); mpFmt.push(mpF);
                 }
                 if (!gridBuffers[MEDIPAIN_GRID]) gridBuffers[MEDIPAIN_GRID] = { name:"메디페인", cols:[], fmts:[] };
                 gridBuffers[MEDIPAIN_GRID].cols.push(mpRows);
-                gridBuffers[MEDIPAIN_GRID].fmts.push(null);
+                gridBuffers[MEDIPAIN_GRID].fmts.push(mpFmt);
             }
 
             // ④ 각 그리드에 배분
@@ -1706,7 +1712,9 @@ function analyzePtEtMtCombinedMasterLogic() {
             var cellText = liveCellText("ptGridTable", r, colIdx,
                     document.getElementById("ptGridTable-cell-"+r+"-"+colIdx).value.trim());
             if (!cellText || cellValIsBlankOrInvalid(cellText)) return;
-            var tokens = cellText.replace(/\r?\n|\r/g," ").split(/[\s,]+/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>0; });
+            // "도수 고민식" 처럼 띄어 쓴 것도 한 덩어리로 본다 (공백이 있으면 이름을 못 찾는다)
+            var tokens = cellText.replace(/\r?\n|\r/g," ").replace(/(도수)\s+(?=[가-힣])/g, "$1")
+                                 .split(/[\s,]+/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>0; });
             var classified = tokens.map(function(t){ return { token:t, type:classifyPtToken(t) }; });
             var hItems  = classified.filter(function(x){ return x.type === "H"; });
             var grItems = classified.filter(function(x){ return x.type === "GR"; });
@@ -2432,7 +2440,9 @@ function analyzePtOnlyLogic() {
                 if (!debugLog[key]) debugLog[key] = [];
                 debugLog[key].push(cellText);
             }
-            var tokens = cellText.replace(/\r?\n|\r/g," ").split(/[\s,]+/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>0; });
+            // "도수 고민식" 처럼 띄어 쓴 것도 한 덩어리로 본다 (공백이 있으면 이름을 못 찾는다)
+            var tokens = cellText.replace(/\r?\n|\r/g," ").replace(/(도수)\s+(?=[가-힣])/g, "$1")
+                                 .split(/[\s,]+/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>0; });
             var classified = tokens.map(function(t){ return { token:t, type:classifyPtToken(t) }; });
             var hItems  = classified.filter(function(x){ return x.type === "H"; });
             var grItems = classified.filter(function(x){ return x.type === "GR"; });

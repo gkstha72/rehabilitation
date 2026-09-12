@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b60</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b61</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -4578,7 +4578,7 @@ function collectSoloMediPatients() {
     Object.keys(cols).forEach(function(c) {
         for (var r = 1; r < ROW_COUNT; r++) {
             var el = document.getElementById("ptGridTable-cell-"+r+"-"+c);
-            var txt = el ? el.value.trim() : "";
+            var txt = el ? liveCellText("ptGridTable", r, c, el.value.trim()) : "";
             if (!txt || cellValIsBlankOrInvalid(txt)) continue;
             txt.split(/[\n,]+/).forEach(function(tok) {
                 var m = tok.trim().match(/^(?:메디페인|메디|페인케어)\s*(?:CR)?\s*([467])\s*(.*)$/);
@@ -4615,7 +4615,7 @@ function checkFesOrders() {
         var c = parseInt(ck, 10);
         for (var r = 1; r < ROW_COUNT; r++) {
             var el = document.getElementById("ptGridTable-cell-"+r+"-"+c);
-            var txt = el ? el.value.trim() : "";
+            var txt = el ? liveCellText("ptGridTable", r, c, el.value.trim()) : "";
             if (!txt || cellValIsBlankOrInvalid(txt)) continue;
             txt.split(/[\s\/,\n]+/).forEach(function(tk) {
                 // "F" + 한글 성함 형태만 전기 자리다. "(F)" 는 Free 특수작업치료라 제외.
@@ -4669,7 +4669,7 @@ function analyzeCrPairLogic() {
     Object.keys(cols).forEach(function(c) {
         for (var r = 1; r < ROW_COUNT; r++) {
             var el = document.getElementById("otGridTable-cell-"+r+"-"+c);
-            var txt = el ? el.value.trim() : "";
+            var txt = el ? liveCellText("otGridTable", r, c, el.value.trim()) : "";
             if (!txt || cellValIsBlankOrInvalid(txt)) continue;
             var u = txt.toUpperCase();
 
@@ -4760,7 +4760,7 @@ function analyzeCrPairLogic() {
     for (var mr = 1; mr < ROW_COUNT; mr++) {
         for (var mc = 0; mc < COL_COUNT; mc++) {
             var mel = document.getElementById("mtGridTable-cell-"+mr+"-"+mc);
-            var mtxt = mel ? mel.value.trim() : "";
+            var mtxt = mel ? liveCellText("mtGridTable", mr, mc, mel.value.trim()) : "";
             if (!mtxt || cellValIsBlankOrInvalid(mtxt)) continue;
             // 한 칸에 "H김성열70(화목) H박창규60(화목)" 처럼 두 명 이상 적히기도 한다
             var mParts = splitMedipainCell(mtxt);

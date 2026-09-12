@@ -288,6 +288,18 @@ table.sched .col-time{min-width:56px;width:56px}
 }
 .cell.conflict::after{content:'⚡'}
 
+/* 붙여넣기 입력창 */
+.paste-overlay{position:fixed;inset:0;background:rgba(20,28,40,.45);z-index:9000;display:flex;align-items:center;justify-content:center}
+.paste-box{background:#fff;border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.28);width:min(760px,92vw);padding:18px 20px}
+.paste-title{font-weight:800;font-size:15px;margin-bottom:8px;color:#22303f}
+.paste-help{font-size:12.5px;color:#5b6b7f;line-height:1.6;margin-bottom:10px}
+.paste-area{border:2px dashed #a9c1e6;border-radius:8px;min-height:130px;max-height:38vh;overflow:auto;
+  padding:10px;font-size:12px;color:#33404f;background:#fafcff;outline:none;white-space:pre-wrap}
+.paste-area:empty::before{content:attr(data-ph);color:#9aabc0}
+.paste-area:focus{border-color:#3f77c8;background:#fff}
+.paste-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+.paste-status{font-size:12.5px;color:#5b6b7f}
+
 /* 버튼 인디케이터 - 불러옴 표시 */
 .ind{
   display:inline-block;
@@ -595,11 +607,13 @@ table.sched .col-time{min-width:56px;width:56px}
     <!-- 2. 신경계 -->
     <div class="tb-group step" data-step="2" data-label="신경계" title="3층 환자 자동입력">
       <button class="btn" onclick="document.getElementById('neuro-input').click()" style="background:linear-gradient(180deg,#fff,#fff0dc)">🧠 신경계 자동입력<span class="ind" id="ind-neuro"></span></button>
+      <button class="btn subtle" onclick="openPasteBox('3층')" title="엑셀에서 전체 선택(Ctrl+A) 후 복사(Ctrl+C) → 여기에 붙여넣기">📋 붙여넣기</button>
     </div>
 
     <!-- 3. 근골 -->
     <div class="tb-group step" data-step="3" data-label="근골" title="1층 환자 자동입력">
       <button class="btn" onclick="document.getElementById('muscle-input').click()" style="background:linear-gradient(180deg,#fff,#fde6ea)">💪 근골 자동입력<span class="ind" id="ind-muscle"></span></button>
+      <button class="btn subtle" onclick="openPasteBox('1층')" title="엑셀에서 전체 선택(Ctrl+A) 후 복사(Ctrl+C) → 여기에 붙여넣기">📋 붙여넣기</button>
     </div>
 
     <!-- 4. 검증 -->
@@ -628,6 +642,24 @@ table.sched .col-time{min-width:56px;width:56px}
     <input type="file" id="neuro-input" class="hidden-input" accept=".xlsx,.xls" onchange="autoFillDaily(event,'3층')">
     <input type="file" id="muscle-input" class="hidden-input" accept=".xlsx,.xls" onchange="autoFillDaily(event,'1층')">
     <input type="file" id="backup-input" class="hidden-input" accept=".xlsx,.xls,.json" onchange="importBackup(event)">
+  </div>
+
+  <!-- 붙여넣기 입력창 -->
+  <div id="paste-overlay" class="paste-overlay" style="display:none" onclick="if(event.target===this)closePasteBox()">
+    <div class="paste-box">
+      <div class="paste-title" id="paste-title">붙여넣기</div>
+      <div class="paste-help">
+        엑셀에서 <b>Ctrl+A</b>(전체 선택) → <b>Ctrl+C</b>(복사) 한 뒤,
+        아래 칸을 클릭하고 <b>Ctrl+V</b> 를 누르세요.<br>
+        시트 전체를 그대로 붙여넣으면 됩니다 — 필요한 구역만 알아서 골라냅니다.
+      </div>
+      <div id="paste-area" class="paste-area" contenteditable="true"
+           data-ph="여기를 클릭하고 Ctrl+V"></div>
+      <div class="paste-foot">
+        <span id="paste-status" class="paste-status"></span>
+        <button class="btn subtle" onclick="closePasteBox()">닫기</button>
+      </div>
+    </div>
   </div>
 
   <div class="sched-wrap">
@@ -739,6 +771,12 @@ function initState(){
 // 신경계·근골 기록을 합쳐, 같은 호실·같은 자리·같은 시간에 '서로 다른 구분'이 들어온 칸을 찾는다.
 //   → 어느 쪽이 맞는지 프로그램이 임의로 정하지 않고 그 칸을 비워둔 뒤 검증에 올린다.
 //   (같은 구분이 두 번 들어온 건 결과가 같으므로 중복으로 보지 않음)
+// 이동반 입장에서 '실제로 데려가는 곳'. 통증치료실은 1층에 있으므로
+//   통증과 1층은 같은 목적지 → 두 파일이 하나는 통증, 하나는 1층으로 적었어도
+//   환자는 어차피 1층으로 내려간다. 이건 겹침이 아니다.
+const DEST_OF = { '3층':'3층', '1층':'1층', '통증':'1층', '병동':'병동', '외래':'외래' };
+const destOf = cat => DEST_OF[cat] || cat;
+
 function applyConflictBlanks(){
   state.cellConflicts = {};
   const merged = {};
@@ -757,6 +795,31 @@ function applyConflictBlanks(){
   Object.keys(merged).forEach(key=>{
     const it = merged[key];
     if(it.entries.length < 2) return;
+    // 데려가는 곳이 같으면(1층 vs 통증) 겹침이 아니다 — 더 구체적인 '통증'으로 적어둔다
+    const dests = new Set(it.entries.map(e=>destOf(e.cat)));
+    if(dests.size === 1){
+      // 같은 곳으로 내려가는데 표기만 다른 경우(1층 vs 통증).
+      //   개인 치료 배정(근골격계 등)이 주 시간표이고 통증 표는 통증치료실 배정이므로,
+      //   둘 다 있으면 실제로 받는 치료가 적힌 쪽(통증이 아닌 쪽)을 남긴다.
+      //   예) 구분임 10:10 — 근골격계 "H구분임+패시브"(1층) + 통증표 → 1층으로 표기
+      const main = it.entries.find(e=>e.cat !== '통증');
+      if(main && it.entries.some(e=>e.cat === '통증')){
+        const roomObj0 = state.rooms[it.room];
+        if(roomObj0 && roomObj0.cells[key] && state.cellSource[key] !== 'rtms') roomObj0.cells[key] = main.cat;
+      }
+      return;
+    }
+    // 한쪽만 이름 옆 태그로 명시돼 있으면(예: "(병동)") 그게 근거가 확실하므로 채택한다.
+    const tagged = it.entries.filter(e=>e.isOverride);
+    if(tagged.length === 1){
+      const roomObjT = state.rooms[it.room];
+      if(roomObjT && state.cellSource[key] !== 'rtms'){
+        roomObjT.cells[key] = tagged[0].cat;
+        state.cellSource[key] = 'override';
+      }
+      console.log(`[태그우선] ${it.room}호 ${it.slot} "${it.name}" → ${tagged[0].cat} (태그 명시)`);
+      return;
+    }
     state.cellConflicts[key] = it;
     n++;
     // rTMS 고정 자리는 rTMS가 우선 (별도 알림이 이미 있음)
@@ -1420,6 +1483,19 @@ function parseFormatB(rows, headerRowIdx, sheetName){
   updatedRooms.forEach(r=>wards.add(r < 500 ? '4병동' : '5병동'));
   const wardTxt = [...wards].join('·');
   showStatus(`병실현황 불러옴: ${namesImported}명 (${updatedRooms.size}개 호실, ${wardTxt})`);
+
+  // 이미 자동입력을 한 뒤에 명단이 바뀌면, 새로 들어온 환자는 빈 칸으로 남는다.
+  //   (자동입력은 그때의 명단과 이름이 맞는 환자만 채우기 때문)
+  //   → 검증에서 '누락'으로 잔뜩 잡히기 전에 바로 안내한다.
+  const _filledBefore = (state.loadCounts.neuro || 0) + (state.loadCounts.muscle || 0);
+  if(_filledBefore > 0){
+    alert(
+      `📋 명단이 바뀌었습니다 — 자동입력을 다시 해주세요.\n\n`+
+      `이미 신경계·근골을 불러온 상태에서 병실현황을 다시 불러왔습니다.\n`+
+      `이번에 새로 들어온 환자는 시간표가 비어 있습니다.\n\n`+
+      `신경계·근골 자동입력(또는 붙여넣기)을 한 번 더 실행하면 채워집니다.`
+    );
+  }
 }
 
 // 형식 C: EMR 명단 — 환자별 세로 1행, '수진자명'+'병실' 컬럼
@@ -1726,6 +1802,48 @@ function parseTimeValue(rawVal, formattedVal){
 //   예: "정재희평가" → "정재희"(명단 매칭) + "평가"(치료 설명, 무시)
 //   원본 시트에서 자주 이름과 붙여서 쓰이는 단어들만 넣음. (긴 접미사부터 우선 매칭)
 //   ※ 매칭은 접미사를 뗀 이름이 실제 명단에 있을 때만 적용 → 짧게 잘라내는 오작동은 안 남.
+// A열 라벨이 이 목록에 걸리면 그 아래는 '이동반과 무관한 구역'으로 보고 건너뛴다.
+//   예) '1층 기구', '1층 FES' 배정표, 처방 건수 집계표 등.
+//   ※ '전기' 표는 제외가 아니라 '보조'로 다룬다(WEAK_SECTION) — 개인 섹션과 겹치는
+//     환자도 있고, 전기표에만 있는 환자도 있기 때문. 아래 규칙 참고.
+
+// 보조 구역: 개인 시간표를 보충만 하는 표.
+//   · 이미 채워진 칸은 절대 건드리지 않는다 (개인 섹션의 (병동) 태그 등이 우선)
+//   · 시간 중복 판정에도 넣지 않는다 (같은 환자가 여기 또 나오는 건 정상)
+//   · 비어 있는 칸만 채운다 → 전기치료만 있는 환자도 빠지지 않는다
+const WEAK_SECTION = /^전기/;
+//   다음 정식 섹션 라벨(NDT/OT/통증/ST/근골격계 …)이 나오면 다시 읽기 시작한다.
+const SKIP_SECTION = /(갯수|개수|합계|총계|통계|집계|비고|메모|참고|대기|명단|기타|기구|FES)/i;
+//   ※ '1층 기구', '1층 FES' 같은 기구·FES 배정표는 위 섹션에 이미 나온 환자를
+//     기구별로 다시 늘어놓은 표라 그대로 읽으면 같은 사람이 두 번 채워진다.
+//     그래서 '1층'으로 시작해도 '기구'가 들어 있으면 제외가 우선한다.
+
+// ===== 요일 조건이 붙은 층 표기 =====
+// 예) "H김성진+SSP ⏎ (월수금(1층)" → 월·수·금에만 1층, 나머지 요일은 섹션 기본값(3층).
+//   시간표 날짜의 요일과 대조해서 해당될 때만 층 태그를 적용한다.
+const WD_CHARS = ['일','월','화','수','목','금','토'];
+function todayWeekdayChar(){
+  const d = (typeof state !== 'undefined' && state && state.date) ? state.date : '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
+  if(!m) return null;
+  return WD_CHARS[new Date(+m[1], +m[2]-1, +m[3]).getDay()];
+}
+// 줄에서 요일 조건 뽑기 — 괄호 뒤가 요일 글자만으로 이어지는 경우
+//   "(월수금(1층)" → '월수금' / "(화목)" → '화목' / "(화목-외래)" → '화목'
+function dayCondOf(line){
+  const m = /[（(]([월화수목금토일]{2,7})/.exec(line || '');
+  return m ? m[1] : null;
+}
+// 이 줄의 층 태그를 오늘 적용해야 하는가
+//   조건이 없거나, 날짜를 모르거나, 오늘 요일이 조건에 포함되면 적용.
+function dayCondApplies(line){
+  const cond = dayCondOf(line);
+  if(!cond) return true;
+  const wd = todayWeekdayChar();
+  if(!wd) return true;
+  return cond.indexOf(wd) >= 0;
+}
+
 const TRAILING_SUFFIXES = [
   '음악치료실','음악치료','인지치료','언어치료','연하치료','호흡치료','호흡훈련',
   '도수중재','열전기치료','전기자극','상지운동','하지운동','안면운동',
@@ -1832,7 +1950,13 @@ function extractPatientNames(content, nameMap){
     // (외래)는 자동입력에서 제외 — 사용자가 셀 클릭으로 직접 표시
     let lineOverride = null;
     let lineExclude = false;
+    // 요일 조건이 붙은 층 표기는 태그로 보지 않는다.
+    //   예) "H김성진+SSP ⏎ (월수금(1층)" — 월수금에만 1층이라는 메모지 그 날의 층이 아니다.
+    //   괄호가 어긋나 있어 사람이 쓴 메모에 가깝고, 요일 판단은 도구가 할 수 없다.
+    //   (침상)·(HOLD)·(외래) 같은 '제외' 태그는 요일과 무관하므로 그대로 적용한다.
+    //   층 태그는 요일 조건이 붙어 있으면 오늘 요일에 해당할 때만 적용한다.
     if(/\(침상\)|\(HOLD\)|\(외래\)/i.test(line)){ lineExclude = true; }
+    else if(!dayCondApplies(line)){ /* 오늘은 해당 요일이 아님 → 층 태그 무시, 섹션 기본값 */ }
     else if(/\(병동\s*[→\->]+\s*치료실\)/.test(line)){ lineOverride = '병동'; }
     else if(/\(치료실\s*[→\->]+\s*병동\)/.test(line)){ lineOverride = '3층'; }
     else if(/\(병동\)/.test(line)){ lineOverride = '병동'; }
@@ -1989,8 +2113,12 @@ let homonymAssignLog = {};
 
 // 동명이인 배정 결과 패널 (읽기 전용 — 확인용)
 function renderHomonymSummary(){
+  // 동명이인 배정 결과는 화면 패널로 띄우지 않는다 — '검증'의
+  //   '👥 동명이인 배정 결과 — 참고' 항목에서 한 번에 확인한다.
+  //   (판정 기록 homonymAssignLog 자체는 그대로 쌓여 검증에서 쓰인다)
   const panel = document.getElementById('homonym-panel');
-  if(!panel) return;
+  if(panel) panel.style.display = 'none';
+  if(true) return;
   const keys = Object.keys(homonymAssignLog).sort();
   if(keys.length === 0){ panel.style.display = 'none'; return; }
 
@@ -2057,16 +2185,30 @@ function wbFileText(wb, path){
 // 취소선(strike)은 대상이 아님: 이름 위 선 그어진 환자도 자동입력 대상.
 //   (예) 셀에 "(F)M정정임+슬라(GJ003)\nH김양수+리포머" 가 있고 첫 줄만 취소선 →
 //        정정임·김양수 둘 다 자동입력에 잡혀야 함. 밑줄만 제외 신호.
-function buildUnderlineSet(wb, sheetName){
+function buildUnderlineSet(wb, sheetName){ return buildFmtSet(wb, sheetName, 'u'); }
+
+// 취소선(실시선) 셀 목록 — 전기표에서 '이미 실시함' 표시로 쓰인다.
+//   전기 구역에서만 제외에 쓰고, 다른 섹션에서는 쓰지 않는다.
+//   (한 칸에 여러 줄이 있고 한 줄만 취소선인 경우가 있어 전체 적용은 위험)
+function buildStrikeSet(wb, sheetName){ return buildFmtSet(wb, sheetName, 's'); }
+
+// kind: 'u' 밑줄 / 's' 취소선
+function buildFmtSet(wb, sheetName, kind){
   const set = new Set();
+  // 붙여넣기로 들어온 시트는 원본 XML이 없다 — 붙여넣을 때 뽑아둔 목록을 그대로 쓴다
+  const ws0 = wb && wb.Sheets && wb.Sheets[sheetName];
+  const pasted = ws0 && (kind === 'u' ? ws0['!pastedUnderlines'] : ws0['!pastedStrikes']);
+  if(pasted) return pasted;
   try{
     const styles = wbFileText(wb, 'xl/styles.xml');
     if(!styles) return set;
 
-    // 폰트별 밑줄 여부 (취소선은 제외 신호 아님)
+    // 폰트별 밑줄/취소선 여부
     const fontsBlock = (styles.match(/<fonts[^>]*>([\s\S]*?)<\/fonts>/)||[])[1] || '';
     const fonts = fontsBlock.match(/<font>[\s\S]*?<\/font>|<font\/>/g) || [];
-    const fontExclude = fonts.map(f => /<u\/>|<u /.test(f));
+    const fontExclude = (kind === 'u')
+      ? fonts.map(f => /<u\/>|<u /.test(f))
+      : fonts.map(f => /<strike\/>|<strike /.test(f));
 
     // 셀 스타일(cellXfs) 인덱스 → 제외 여부
     const xfsBlock = (styles.match(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/)||[])[1] || '';
@@ -2099,7 +2241,7 @@ function buildUnderlineSet(wb, sheetName){
       if(styleUnderline[sIdx]) set.add(m[1]);
     }
   }catch(e){
-    console.warn('밑줄 감지 실패:', e);
+    console.warn('서식 감지 실패:', e);
   }
   return set;
 }
@@ -2612,10 +2754,75 @@ const EQUIP_WORDS = new Set([
 //     (예: "전기", "전기(14)"는 매칭 / "전기자극"은 매칭 안 됨 → 다른 단어와 헷갈리지 않음)
 //   ② 라벨 행 검사 — 같은 행에 SECTION_LABEL 라벨 2개 이상이 나란히 있고, 그 중 하나가 keyword
 //     (예: 신경계 시트에서 OT/로봇OT/ST가 같은 행에 붙어 있는 헤더 행에서 OT를 찾음)
+// 메모 셀 판정 — 시간표 오른쪽 끝에 적어두는 인수인계 메모.
+//   예) "박명희 13:30, 14:05 정리 ⏎ 김봉남 14:05,14:40 정리 ⏎ 김춘엽 15:15 정리"
+//   그대로 읽으면 그 시간대에 여러 환자가 잘못 배정되고 '시간 중복'까지 뜬다.
+//   한 칸 안에 시각 표기가 2개 이상이면 배정이 아니라 메모로 본다.
+// 메모 단어 — 치료 배정이 아니라 전달사항으로 적어둔 칸.
+//   ※ '전동상지' 같은 치료명과 겹치지 않게 단어를 고른다. (전동은 넣지 않음)
+//   ※ '보호자상주' 처럼 치료 칸 안에 들어가는 말은 넣지 않는다.
+const MEMO_WORDS_RE = /(미용|외출|귀원|외박|면회|퇴원|귀가|조퇴|정리했|정리 했|확인바|부탁드|취소됨)/;
+function isMemoCell(txt){
+  if(!txt) return false;
+  const t = String(txt);
+  const times = t.match(/\d{1,2}:\d{2}/g);
+  if(times && times.length >= 2) return true;      // 시각이 여러 개 = 인수인계 메모
+  if(MEMO_WORDS_RE.test(t)) return true;           // 미용·외출·귀원 등 메모
+  return false;
+}
+
+// 세로 명단 열 찾기 — 시간표 옆에 이름만 죽 적어둔 참고 열.
+//   예) 어느 열 위쪽에 "회복기 리스트"라 써두고 그 아래로 환자 이름만 나열.
+//   그대로 읽으면 옆 행의 시간을 물려받아 엉뚱한 시간·층으로 배정된다.
+//   위치가 날마다 바뀌므로 제목 글자로 찾아서 그 열 아래 전체를 건너뛴다.
+// 제외할 "블록" 찾기 — 시트 맨 윗줄(치료사/구분 이름이 적힌 줄)에서
+//   방문재활·재택/방문·재택교육·회복기 리스트 같은 머리글을 찾아,
+//   그 머리글부터 다음 머리글 직전까지의 열 전체를 제외한다.
+//   ※ '열전기'는 실제 치료 배정이므로 제외하지 않는다.
+const SKIP_BLOCK_RE = /(방문|재택)/;
+//   '…리스트' / '…명단' 은 시트 중간에도 나오므로 위치 제한 없이 그 열만 제외한다.
+const LIST_HEADER_RE = /(리스트|명단)\s*$/;
+function buildListColumns(ws, range){
+  const map = {};   // 열번호 → 제외 시작 행
+  const topEnd = Math.min(range.e.r, range.s.r + 3);   // 윗줄 4줄만 머리글로 본다
+  for(let r = range.s.r; r <= topEnd; r++){
+    // 이 줄의 머리글 위치들
+    const cols = [];
+    for(let c = range.s.c; c <= range.e.c; c++){
+      const cell = ws[XLSX.utils.encode_cell({r, c})];
+      if(cell && typeof cell.v === 'string' && cell.v.trim()) cols.push({c, v: cell.v.trim()});
+    }
+    cols.forEach((h, i)=>{
+      if(h.v.length > 12 || !SKIP_BLOCK_RE.test(h.v)) return;
+      //   블록 폭은 넉넉히 3열까지만 — 다음 머리글이 멀리 있어도 시트 끝까지 지우지 않는다.
+      const nextC = (i + 1 < cols.length) ? cols[i+1].c - 1 : range.e.c;
+      const end = Math.min(nextC, h.c + 2);
+      for(let c = h.c; c <= end; c++){
+        if(map[c] === undefined) map[c] = r;
+      }
+      console.log(`[제외블록] "${h.v}" ${XLSX.utils.encode_col(h.c)}~${XLSX.utils.encode_col(end)}열`);
+    });
+  }
+  // 세로 명단 열(회복기 리스트 등) — 시트 어디에 있든 그 열 아래를 제외
+  for(let r = range.s.r; r <= range.e.r; r++){
+    for(let c = range.s.c; c <= range.e.c; c++){
+      const cell = ws[XLSX.utils.encode_cell({r, c})];
+      if(!cell || typeof cell.v !== 'string') continue;
+      const v = cell.v.trim();
+      if(v.length <= 12 && LIST_HEADER_RE.test(v) && map[c] === undefined){
+        map[c] = r;
+        console.log(`[명단열] ${XLSX.utils.encode_col(c)}열 "${v}" — 아래 제외`);
+      }
+    }
+  }
+  return map;
+}
+
 function hasSectionHeader(ws, range, keyword){
   const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // 단어 경계: keyword 뒤가 공백/괄호/숫자/문자열끝 이어야 함 (한글/영문이 이어지면 다른 단어)
-  const kwRe = new RegExp('^' + escaped + '(?:\\s|$|\\(|[0-9])', 'i');
+  //   '근골격계PT' 처럼 뒤에 글자가 붙는 경우도 있어 접두 일치로 본다.
+  const kwRe = new RegExp('^' + escaped, 'i');
   const KNOWN_LABELS_RE = /^(NDT|OT|PT|ST|MAT|FES|GAIT|RAT|로봇\s*OT|로봇|매트|회복기|통증|언어|스피치|speech|전기)(?:\s|$|\(|[0-9])/i;
 
   // 1) A열 검사
@@ -2650,6 +2857,8 @@ function computeExpectedFills(wb, sheetName, defaultCategory){
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:AZ300');
   const nameMap = buildNameMap();
   const underlineSet = buildUnderlineSet(wb, sheetName);
+  const strikeSet = buildStrikeSet(wb, sheetName);
+  const listCols = buildListColumns(ws, range);
   const colHeaders = buildColHeaders(ws, range);
 
   // ST 컬럼 사전 스캔 (autoFillDaily와 동일)
@@ -2678,18 +2887,29 @@ function computeExpectedFills(wb, sheetName, defaultCategory){
   const homonymNotes = {};     // 동명이인 판정 결과 (검증 리포트용)
   const TAG_ONLY = /^\s*(\(침상\)|\(HOLD\)|\(병동\)|\(1층\)|\(3층\)|\(외래\)|\(음악치료실\)|\(치료실\s*[→\->]+\s*병동\)|\(병동\s*[→\->]+\s*치료실\))\s*$/;
   let currentCategory = defaultCategory;
+  let skipZone = false;   // 집계표 등 이동반과 무관한 구역
+  let weakZone = false;   // 전기표 등 보조 구역 (빈 칸만 채움)
 
   for(let r = range.s.r; r <= range.e.r; r++){
     const cellA = ws[XLSX.utils.encode_cell({r, c: range.s.c})];
     if(cellA && cellA.v != null && typeof cellA.v === 'string'){
       const label = String(cellA.v).trim();
       if(label){
-        if(/^통증/.test(label)){ currentCategory = '통증'; continue; }
-        else if(/^(ST|언어|스피치|speech)/i.test(label)){ currentCategory = '1층'; continue; }
-        else if(/^(NDT|PT|OT|MAT|GAIT|FES|매트|로봇|회복기|신경계|근골|1층|기구)/.test(label)){ currentCategory = defaultCategory; continue; }
+        if(SKIP_SECTION.test(label)){ skipZone = true; continue; }   // 기구·전기·집계표 등
+        if(/^통증/.test(label)){
+          // 통증 시간표는 근골 파일 것만 사용. 신경계 파일의 통증 구역은 통째로 무시.
+          weakZone = false;
+          if(defaultCategory === '3층'){ skipZone = true; }
+          else { currentCategory = '통증'; skipZone = false; }
+          continue;
+        }
+        else if(/^(ST|언어|스피치|speech)/i.test(label)){ currentCategory = '1층'; skipZone = false; weakZone = false; continue; }
+        else if(WEAK_SECTION.test(label)){ currentCategory = defaultCategory; skipZone = false; weakZone = true; continue; }
+        else if(/^(NDT|PT|OT|MAT|GAIT|매트|로봇|회복기|신경계|근골|1층)/.test(label)){ currentCategory = defaultCategory; skipZone = false; weakZone = false; continue; }
         if(!/^[\d.:~ ]+$/.test(label)) continue;
       }
     }
+    if(skipZone) continue;   // 집계표 구역 — 이동반 시간표에 반영하지 않음
     let timeSlot = null;
     for(let c = range.s.c; c <= Math.min(range.s.c + 20, range.e.c); c++){
       const cell = ws[XLSX.utils.encode_cell({r, c})]; if(!cell) continue;
@@ -2702,6 +2922,9 @@ function computeExpectedFills(wb, sheetName, defaultCategory){
       const cell = ws[ref];
       if(!cell || cell.v == null || cell.v === '') continue;
       if(parseTimeValue(cell.v, cell.w)) continue;
+      if(listCols[c] !== undefined && r > listCols[c]) continue;   // 세로 명단 열
+      if(isMemoCell(cell.v)) continue;               // 인수인계 메모 칸
+      if(weakZone && strikeSet.has(ref)) continue;   // 전기표 실시선 → 이미 실시함
       if(underlineSet.has(ref)) continue;
       const colOv = getColOverride(colHeaders, r, c);
       if(colOv && colOv.exclude) continue;
@@ -2795,7 +3018,7 @@ function computeExpectedFills(wb, sheetName, defaultCategory){
         targets.forEach(({room, p, tag})=>{
           const cat = effOverride || tag || colCategory;
           const isOverride = !!(effOverride || tag || (colOv && colOv.cat));
-          fills.push({ name, room, p, slot: timeSlot, cat, ref, isOverride });
+          fills.push({ name, room, p, slot: timeSlot, cat, ref, isOverride, weak: weakZone });
         });
       });
     }
@@ -2877,9 +3100,11 @@ function runVerification(){
 
     // (3) 예상 섹션 검사 — 신경계=NDT/OT/전기, 근골=근골격계/통증
     //     시간표가 통째로 누락됐거나 시트를 잘못 골랐을 때(예: 전기 파트 없음) 잡아냄.
+    //   전기 표는 날마다 있을 수도 없을 수도 있으므로 필수 섹션에서 뺀다.
+    //   (없는 날 경고가 떠서 검증이 통째로 멈추던 문제)
     const expectedSections = expectCat === '3층'
-      ? ['NDT','OT','전기']
-      : ['근골격계','통증'];
+      ? ['NDT','OT']
+      : ['근골격계'];
     const missingSections = expectedSections.filter(s => !hasSectionHeader(ws, range, s));
     if(missingSections.length > 0){
       fileIssues.push({
@@ -2927,10 +3152,17 @@ function runVerification(){
     fills.forEach(f=>{
       expectedNames[f.name] = true;
       const key = `${f.room}-${f.p}-${f.slot}`;
+      // 보조 구역(전기표)은 빈 칸만 채우고 중복 판정에서 빠진다 — 자동입력과 같은 규칙
+      if(f.weak){
+        if(!expected[key]) expected[key] = { cat:f.cat, source:tag, ref:f.ref, name:f.name, isOverride:false, weak:true };
+        return;
+      }
       if(!seenFills[key]) seenFills[key] = [];
       if(!seenFills[key].some(e=>e.cat === f.cat)){
-        seenFills[key].push({cat:f.cat, file:tag, ref:f.ref, name:f.name, p:f.p, room:f.room, slot:f.slot});
+        seenFills[key].push({cat:f.cat, file:tag, ref:f.ref, name:f.name, p:f.p, room:f.room, slot:f.slot, isOverride:f.isOverride});
       }
+      const prev0 = expected[key];
+      if(prev0 && prev0.weak) delete expected[key];
       const prev = expected[key];
       // 우선순위: override(태그/컬럼) > 일반. 나중 파일이 이기되, 기존이 override면 일반은 못 덮음.
       if(!prev){
@@ -2951,6 +3183,15 @@ function runVerification(){
   Object.keys(seenFills).forEach(key=>{
     const list = seenFills[key];
     if(list.length < 2) return;
+    // 데려가는 곳이 같으면(1층 vs 통증) 겹침 아님.
+    //   표기는 통증이 아닌 쪽(실제 치료가 적힌 주 시간표)을 기준으로 맞춘다.
+    if(new Set(list.map(e=>destOf(e.cat))).size === 1){
+      const main = list.find(e=>e.cat !== '통증');
+      if(main && expected[key] && expected[key].cat === '통증') expected[key].cat = main.cat;
+      return;
+    }
+    const taggedV = list.filter(e=>e.isOverride);
+    if(taggedV.length === 1){ if(expected[key]) expected[key].cat = taggedV[0].cat; return; }
     timeConflicts[key] = {
       room:list[0].room, p:list[0].p, slot:list[0].slot,
       name:list[0].name, entries:list
@@ -3045,21 +3286,13 @@ function runVerification(){
     shortHits: nameSimilarNotes.hits[pr.short] || 0,
     longHits: nameSimilarNotes.hits[pr.long] || 0
   }));
-  const similarSuspects = Object.keys(nameSimilarNotes.suspects).map(t=>({
-    token:t,
-    // 후보 이름에 호실까지 붙여서 어느 분인지 바로 보이게
-    peers: nameSimilarNotes.suspects[t].map(n=>{
-      const rooms = ((vNameMap)[n] || []).map(x=>x.room+'호').join('·');
-      return rooms ? `${n}(${rooms})` : n;
-    })
-  }));
   if(similarPairs.length) fileChecks.push(`이름이 겹치는 환자 ${similarPairs.length}쌍 확인 (정확히 일치할 때만 채움)`);
   const _hm = Object.values(allHomonym);
   if(_hm.length) fileChecks.push(`동명이인 판정 ${_hm.length}건 확인 (번호 일치 ${_hm.filter(x=>x.kind==='exact').length} · 번호없는 분 ${_hm.filter(x=>x.kind==='plain').length} · 번호 불일치 ${_hm.filter(x=>x.kind==='numMismatch').length} · 제외 ${_hm.filter(x=>x.kind==='skip').length})`);
 
   showVerificationReport(problems, {
     checkedCells, checks: fileChecks, unmatchedCount: allUnmatched.size,
-    rtmsConflicts, similarPairs, similarSuspects,
+    rtmsConflicts, similarPairs,
     ambiguous: Object.values(allAmbiguous),
     homonym: Object.values(allHomonym)
   });
@@ -3168,15 +3401,6 @@ function showVerificationReport(problems, meta){
     html += `<div class="vf-row" style="color:#8a97ab;font-size:12px">※ 근거가 확실한 배정입니다. 맞는지 눈으로만 확인해주세요.</div>`;
     html += `</div>`;
   }
-  if(meta.similarSuspects && meta.similarSuspects.length){
-    html += `<div class="vf-sec"><div class="vf-sec-title" style="color:#9a6a20">👥 명단에 없는 이름 — 참고 (${meta.similarSuspects.length}건)</div>`;
-    meta.similarSuspects.slice(0, 30).forEach(m=>{
-      html += `<div class="vf-row">원본 <span class="vf-nm">${m.token}</span> <span class="vf-slot">— 명단엔 ${m.peers.join('·')} (이름 일부만 겹침)</span></div>`;
-    });
-    if(meta.similarSuspects.length > 30) html += `<div class="vf-more">…외 ${meta.similarSuspects.length-30}건</div>`;
-    html += `<div class="vf-row" style="color:#8a97ab;font-size:12px">※ <b>다른 병동·외래 환자면 정상입니다.</b> 우리 병동 분인데 이름이 다르게 적힌 경우에만, 표에서 환자명을 원본과 똑같이 고친 뒤 치료 파일을 다시 불러오세요.</div>`;
-    html += `</div>`;
-  }
   if(meta.similarPairs && meta.similarPairs.length){
     html += `<div class="vf-sec"><div class="vf-sec-title" style="color:#9a6a20">👥 헷갈리기 쉬운 이름 — 참고 (${meta.similarPairs.length}쌍)</div>`;
     meta.similarPairs.slice(0, 30).forEach(pr=>{
@@ -3224,6 +3448,139 @@ function showVerificationReport(problems, meta){
   panel.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
+
+// ===== 붙여넣기로 시간표 넣기 =====
+// 엑셀에서 시트 전체를 복사하면 클립보드에 <table> HTML이 담긴다.
+// 그 표를 엑셀과 똑같은 격자로 복원해 워크북을 만들고,
+// 파일로 불러올 때와 '완전히 같은' 처리(autoFillFromWorkbook)를 태운다.
+//   → 섹션 감지·제외 구역·시간 슬롯·태그·동명이인·검증이 전부 동일하게 동작.
+let pasteTargetCategory = '3층';
+
+function openPasteBox(cat){
+  if(Object.keys(buildNameMap()).length === 0){
+    alert('먼저 환자명을 입력해주세요.\n방법: 병실현황 불러오기 또는 시간표에 직접 타이핑');
+    return;
+  }
+  pasteTargetCategory = cat;
+  const t = document.getElementById('paste-title');
+  if(t) t.textContent = (cat === '3층' ? '🧠 신경계' : '💪 근골') + ' 시간표 붙여넣기';
+  const st = document.getElementById('paste-status');
+  if(st) st.textContent = '';
+  const area = document.getElementById('paste-area');
+  if(area) area.innerHTML = '';
+  document.getElementById('paste-overlay').style.display = 'flex';
+  setTimeout(()=>{ if(area) area.focus(); }, 30);
+}
+function closePasteBox(){
+  const o = document.getElementById('paste-overlay');
+  if(o) o.style.display = 'none';
+  const area = document.getElementById('paste-area');
+  if(area) area.innerHTML = '';
+}
+
+// 클립보드 HTML의 <table>을 2차원 배열로 편다.
+//   rowspan/colspan을 실제로 자리를 차지하게 처리해야 열이 밀리지 않는다.
+//   셀 안 줄바꿈(<br>)은 \n 으로 되살린다 — "H박명숙+슬라⏎H이리온+슬라" 같은 칸 때문에 꼭 필요.
+//   밑줄(액팅 처리)도 함께 뽑아 파일로 불러올 때와 같은 '제외' 규칙을 적용한다.
+function parsePastedTable(html){
+  if(!html) return null;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const table = doc.querySelector('table');
+  if(!table) return null;
+
+  const grid = [];       // grid[r][c] = 문자열
+  const under = [];      // under[r][c] = true (밑줄)
+  const strike = [];     // strike[r][c] = true (취소선 = 실시선)
+  const occupied = {};   // "r,c" → true (rowspan/colspan이 미리 찜한 자리)
+  const put = (r,c,v,u,st)=>{
+    while(grid.length <= r){ grid.push([]); under.push([]); strike.push([]); }
+    grid[r][c] = v; under[r][c] = u; strike[r][c] = st;
+  };
+
+  const rows = table.querySelectorAll('tr');
+  for(let r = 0; r < rows.length; r++){
+    const cells = rows[r].children;
+    let c = 0;
+    for(let i = 0; i < cells.length; i++){
+      const td = cells[i];
+      if(!/^(TD|TH)$/.test(td.tagName)) continue;
+      while(occupied[r+','+c]) c++;                 // 위에서 내려온 자리 건너뛰기
+      const rs = Math.max(1, parseInt(td.getAttribute('rowspan')||'1'));
+      const cs = Math.max(1, parseInt(td.getAttribute('colspan')||'1'));
+
+      // 줄바꿈 보존: <br>·<div>·<p> 를 \n 으로 바꾼 뒤 글자만 꺼낸다
+      const tmp = td.cloneNode(true);
+      tmp.querySelectorAll('br').forEach(b=>b.replaceWith('\n'));
+      tmp.querySelectorAll('div,p').forEach(d=>{ d.insertAdjacentText('beforebegin','\n'); });
+      const text = (tmp.textContent || '').replace(/\u00a0/g,' ').replace(/\r/g,'').trim();
+
+      // 밑줄·취소선 판정 — 태그 또는 인라인 스타일
+      const style = (td.getAttribute('style')||'') + ' ' + (td.innerHTML.match(/text-decoration[^;"']*/gi)||[]).join(' ');
+      const isU = !!td.querySelector('u') || /underline/i.test(style);
+      const isS = !!td.querySelector('s,strike,del') || /line-through/i.test(style);
+
+      for(let rr = 0; rr < rs; rr++){
+        for(let cc = 0; cc < cs; cc++){
+          if(rr === 0 && cc === 0) put(r, c, text, isU, isS);
+          else occupied[(r+rr)+','+(c+cc)] = true;
+        }
+      }
+      c += cs;
+    }
+  }
+  if(grid.length === 0) return null;
+  return { grid, under, strike };
+}
+
+// 2차원 배열 → SheetJS 워크북 (파일로 읽은 것과 같은 모양)
+function pastedToWorkbook(parsed){
+  const aoa = parsed.grid.map(row=>{
+    const out = [];
+    const n = row.length;
+    for(let c = 0; c < n; c++) out.push(row[c] == null ? null : row[c]);
+    return out;
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa, {cellDates:false});
+  // 붙여넣기에는 원본 XML이 없으므로, 밑줄 목록을 워크시트에 직접 달아둔다
+  const uset = new Set();
+  parsed.under.forEach((row, r)=>{
+    if(!row) return;
+    row.forEach((u, c)=>{ if(u) uset.add(XLSX.utils.encode_cell({r, c})); });
+  });
+  ws['!pastedUnderlines'] = uset;
+  const sset = new Set();
+  (parsed.strike || []).forEach((row, r)=>{
+    if(!row) return;
+    row.forEach((v, c)=>{ if(v) sset.add(XLSX.utils.encode_cell({r, c})); });
+  });
+  ws['!pastedStrikes'] = sset;
+  return { SheetNames:['붙여넣기'], Sheets:{ '붙여넣기': ws } };
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  const area = document.getElementById('paste-area');
+  if(!area) return;
+  area.addEventListener('paste', (e)=>{
+    e.preventDefault();
+    const cb = e.clipboardData || window.clipboardData;
+    const st = document.getElementById('paste-status');
+    let parsed = null;
+    try{ parsed = parsePastedTable(cb.getData('text/html')); }catch(err){ parsed = null; }
+    if(!parsed){
+      if(st) st.textContent = '표 형태를 찾지 못했습니다. 엑셀에서 셀 범위를 선택해 복사했는지 확인해주세요.';
+      return;
+    }
+    const rows = parsed.grid.length;
+    const cols = parsed.grid.reduce((m,r)=>Math.max(m, r ? r.length : 0), 0);
+    if(st) st.textContent = `${rows}행 × ${cols}열 읽음 — 처리 중…`;
+    let wb;
+    try{ wb = pastedToWorkbook(parsed); }
+    catch(err){ if(st) st.textContent = '읽기 실패: '+err.message; return; }
+    closePasteBox();
+    autoFillFromWorkbook(wb, pasteTargetCategory, { target:{ value:'' } });
+  });
+});
+
 function autoFillDaily(ev, defaultCategory){
   const file = ev.target.files[0];
   if(!file) return;
@@ -3238,8 +3595,9 @@ function autoFillDaily(ev, defaultCategory){
 
   const reader = new FileReader();
   reader.onload = e=>{
+    let wb;
     try{
-      const wb = XLSX.read(new Uint8Array(e.target.result), {
+      wb = XLSX.read(new Uint8Array(e.target.result), {
         type:'array',
         cellFormula:false,
         cellStyles:false,
@@ -3250,7 +3608,24 @@ function autoFillDaily(ev, defaultCategory){
         bookSheets:false,
         bookFiles:true  // 원본 XML 접근용 (밑줄 서식 감지)
       });
+    }catch(err){
+      console.error('엑셀 읽기 에러:', err);
+      alert('엑셀 읽기 실패: '+err.message);
+      ev.target.value = '';
+      return;
+    }
+    autoFillFromWorkbook(wb, defaultCategory, ev);
+  };
+  reader.readAsArrayBuffer(file);
+  ev.target.value = '';
+}
 
+// 엑셀 파일이든 붙여넣기든, 워크북 하나를 받아 시간표를 채우는 공통 처리.
+//   ev는 파일 input을 비우기 위한 것 — 붙여넣기에서는 껍데기를 넘긴다.
+function autoFillFromWorkbook(wb, defaultCategory, ev){
+  const nameMap = buildNameMap();
+  {
+    try{
       // 사용자 날짜에 맞는 시트 자동 선택 (없으면 데이터 가장 많은 시트)
       const sheetName = pickBestSheet(wb, state.date);
       console.log('[자동입력] 사용 시트:', sheetName, '/ 전체 시트:', wb.SheetNames);
@@ -3311,6 +3686,9 @@ function autoFillDaily(ev, defaultCategory){
 
       // 밑줄 친 셀 = 액팅 처리 → 이동반 제외 대상
       const underlineSet = buildUnderlineSet(wb, sheetName);
+      // 취소선(실시선) — 전기표에서만 '이미 실시함' 표시로 보고 제외한다
+      const strikeSet = buildStrikeSet(wb, sheetName);
+      const listCols = buildListColumns(ws, range);
       if(underlineSet.size > 0) console.log('[자동입력] 밑줄(제외) 셀:', underlineSet.size, '개');
 
       // 컬럼 헤더 분석 (CPM→1층, 시행(3층)→3층, 외래/재택→제외)
@@ -3362,6 +3740,9 @@ function autoFillDaily(ev, defaultCategory){
       const homonymHits = {};
       const plainHits = {};   // 번호 없이 매칭된 이름 (한쪽만 번호 붙은 모호 감지용)
       let currentCategory = defaultCategory;  // 섹션에 따라 변경됨
+      let skipZone = false;          // 집계표 등 이동반과 무관한 구역
+      let weakZone = false;          // 전기표 등 보조 구역 (빈 칸만 채움)
+      const skippedZones = [];       // 건너뛴 구역 라벨 (알림용)
       const sectionCounts = {};  // 디버깅용
 
       for(let r = range.s.r; r <= range.e.r; r++){
@@ -3371,23 +3752,53 @@ function autoFillDaily(ev, defaultCategory){
           const label = String(cellA.v).trim();
           if(label){
             // 시간 표기가 아닌 문자열 → 섹션 헤더로 간주
+            if(SKIP_SECTION.test(label)){
+              // 기구·전기·집계표 등 — 이동반 시간표에 반영하지 않음
+              skipZone = true;
+              skippedZones.push(label);
+              sectionCounts[label] = '(제외)';
+              continue;
+            }
             if(/^통증/.test(label)){
-              currentCategory = '통증';
-              sectionCounts[label] = '통증';
+              // 통증 시간표는 근골 파일 것만 사용.
+              //   신경계 파일에도 통증 표가 있지만 같은 내용이 중복돼 있어 무시한다.
+              if(defaultCategory === '3층'){
+                skipZone = true;
+                skippedZones.push(label + '(신경계)');
+                sectionCounts[label] = '(제외: 근골 통증표 사용)';
+              }else{
+                currentCategory = '통증';
+                sectionCounts[label] = '통증';
+                skipZone = false;
+              }
+              weakZone = false;
               continue;
             }else if(/^(ST|언어|스피치|speech)/i.test(label)){
               currentCategory = '1층';  // 신경계 ST/언어 → 1층 (단 이름에 (3층) 있으면 3층 override)
               sectionCounts[label] = '1층';
+              skipZone = false;
+              weakZone = false;
               continue;
-            }else if(/^(NDT|PT|OT|MAT|GAIT|FES|매트|로봇|회복기|신경계|근골|1층|기구)/.test(label)){
+            }else if(WEAK_SECTION.test(label)){
+              // 전기표 = 보조 구역. 빈 칸만 채우고 시간 중복 판정에서 뺀다.
+              currentCategory = defaultCategory;
+              sectionCounts[label] = defaultCategory + '(보조)';
+              skipZone = false;
+              weakZone = true;
+              continue;
+            }else if(/^(NDT|PT|OT|MAT|GAIT|매트|로봇|회복기|신경계|근골|1층)/.test(label)){
               currentCategory = defaultCategory;
               sectionCounts[label] = defaultCategory;
+              skipZone = false;
+              weakZone = false;
               continue;
             }
             // 점심시간/공지 등 그 외 문자열은 그냥 건너뛰기 (currentCategory 유지)
             if(!/^[\d.:~ ]+$/.test(label)) continue;
           }
         }
+
+        if(skipZone) continue;   // 집계표 구역 — 이동반 시간표에 반영하지 않음
 
         // 이 행의 시간 슬롯 찾기 (A열 또는 그 근처)
         let timeSlot = null;
@@ -3418,6 +3829,10 @@ function autoFillDaily(ev, defaultCategory){
           if(!cell || cell.v == null || cell.v === '') continue;
           // 시간 셀은 건너뜀
           if(parseTimeValue(cell.v, cell.w)) continue;
+          // 전기표에서 취소선(실시선) 그어진 칸 → 이미 실시함 → 이동반 제외
+          if(listCols[c] !== undefined && r > listCols[c]) continue;   // 세로 명단 열
+          if(isMemoCell(cell.v)) continue;   // 인수인계 메모 칸
+          if(weakZone && strikeSet.has(ref)) continue;
           // 밑줄 친 셀(액팅 처리) → 이동반 제외
           if(underlineSet.has(ref)){
             console.log(`[밑줄제외] ${ref} "${String(cell.v).replace(/\n/g,'⏎').slice(0,20)}" → 이동반 제외`);
@@ -3581,11 +3996,23 @@ function autoFillDaily(ev, defaultCategory){
                 const finalCat = effOverride || tag || colCategory;
                 const key = makeCellKey(room, p, timeSlot);
 
+                // 보조 구역(전기표): 이미 값이 있으면 그대로 두고, 빈 칸만 채운다.
+                //   중복 판정에도 넣지 않는다 — 개인 섹션에 또 나오는 게 정상이라서.
+                if(weakZone){
+                  const cellsW = state.rooms[room].cells;
+                  if(!cellsW[key]){
+                    cellsW[key] = finalCat;
+                    filledCount++;
+                  }
+                  matched.add(name);
+                  return;
+                }
+
                 // 같은 자리·같은 시간에 서로 다른 구분이 들어오는지 기록해 둔다.
                 //   (2개 이상이면 아래 applyConflictBlanks가 그 칸을 비우고 검증에 올림)
                 if(!fileLog[key]) fileLog[key] = {room, p, slot:timeSlot, name, entries:[]};
                 if(!fileLog[key].entries.some(e=>e.cat === finalCat)){
-                  fileLog[key].entries.push({cat:finalCat, file:fileLabel, ref});
+                  fileLog[key].entries.push({cat:finalCat, file:fileLabel, ref, isOverride: !!(effOverride || tag)});
                 }
 
                 // 태그/명단태그/컬럼헤더로 정해진 값은 '우선'으로 보호 (일반 섹션값이 덮어쓰지 못함)
@@ -3656,7 +4083,8 @@ function autoFillDaily(ev, defaultCategory){
         ? ` · 🔀 파일 자동감지: ${defaultCategory==='3층'?'신경계(3층)':'근골(1층)'}으로 분류함`
         : '';
       const _confNote = conflictCount > 0 ? ` · ⚡ 시간중복 ${conflictCount}칸 비움` : '';
-      let msg = `자동 채움: ${filledCount}개 셀 (${matched.size}명 매칭, 시트: ${sheetName})${_dateNote}${_homNote}${_detectNote}${_confNote}`;
+      const _skipNote = skippedZones.length > 0 ? ` · 제외구역 ${[...new Set(skippedZones)].join('·')}` : '';
+      let msg = `자동 채움: ${filledCount}개 셀 (${matched.size}명 매칭, 시트: ${sheetName})${_dateNote}${_homNote}${_detectNote}${_confNote}${_skipNote}`;
       console.log('[자동입력] 인식한 섹션:', sectionCounts);
       if(unmList.length > 0){
         console.log('[미매칭 환자명 — 다른 병동이거나 이름 차이일 수 있음]', unmList);
@@ -3711,9 +4139,7 @@ function autoFillDaily(ev, defaultCategory){
       console.error('자동 채우기 에러:', err);
       alert('자동 채우기 실패: '+err.message+'\n\n환자명을 직접 입력하시거나 다른 방식을 사용해주세요.');
     }
-  };
-  reader.readAsArrayBuffer(file);
-  ev.target.value = '';
+  }
 }
 
 // ===== RBCLR 엑셀 불러오기 (환자명만) =====

@@ -169,6 +169,12 @@ textarea{resize:vertical;line-height:1.5}
 .ok b{display:block;font-size:16px;margin-bottom:4px}
 
 [hidden]{display:none !important}
+.linkonly{display:none}
+body.linkmode .linkonly{display:block}
+body.linkmode .modes,
+body.linkmode #pasteCard,
+body.linkmode #btnCancel,
+body.linkmode #btnNext{display:none !important}
 @media (max-width:640px){
   body{font-size:16px}
   header.top{flex-wrap:wrap}
@@ -234,6 +240,11 @@ textarea{resize:vertical;line-height:1.5}
 
 <!-- ============ 서명 (병동) ============ -->
 <section id="viewSign" hidden>
+  <div class="card" id="linkMsg" hidden>
+    <div class="warn">이 링크로는 서명할 수 없습니다.</div>
+    <p class="note">이미 서명이 끝났거나 링크가 잘못 전달되었습니다. 치료실에 새 링크를 요청하세요.</p>
+  </div>
+
   <div class="card" id="pasteCard">
     <h2>전달 코드 붙여넣기</h2>
     <p>치료실에서 받은 코드를 아래에 붙여넣으세요.</p>
@@ -291,6 +302,7 @@ textarea{resize:vertical;line-height:1.5}
       <button type="button" class="btn ghost" id="btnAgain">다시 내려받기</button>
       <button type="button" class="btn" id="btnNext">다음 환자</button>
     </div>
+    <p class="note linkonly" style="margin-top:14px">서명이 끝났습니다. 이 창은 닫으셔도 됩니다. 다음 환자는 새 링크로 열어주세요.</p>
   </div>
 </section>
 
@@ -486,7 +498,7 @@ function copyText(t, okMsg){
 function signLink(code){
   var u = location.href.split("#")[0].split("?")[0];
   if(location.protocol === "file:") return null;
-  return u + "#s=" + code;
+  return u + "?m=sign#s=" + code;
 }
 
 $("btnLink").addEventListener("click", function(){
@@ -525,7 +537,7 @@ $("btnReset").addEventListener("click", function(){
 });
 
 /* ---------- 서명 화면 ---------- */
-var current = null, lastBlob = null, lastFile = "";
+var current = null, lastBlob = null, lastFile = "", LINK_MODE = false;
 
 $("btnLoad").addEventListener("click", function(){
   var raw = $("codeIn").value;
@@ -650,6 +662,9 @@ $("btnDone").addEventListener("click", function(){
   $("doneName").textContent = lastFile;
   $("signCard").hidden = true;
   $("doneCard").hidden = false;
+  if(LINK_MODE){
+    try { history.replaceState(null, "", location.pathname + "?m=sign"); } catch(e){}
+  }
   window.scrollTo(0,0);
 });
 $("btnAgain").addEventListener("click", function(){ if(lastBlob) saveBlob(lastBlob, lastFile); });
@@ -983,16 +998,21 @@ function buildPDF(jpegBin, iw, ih){
 })();
 
 (function openFromLink(){
-  var h = location.hash || "";
-  var m = h.match(/^#s=(.+)$/);
-  if(!m) return;
-  $("codeIn").value = decodeURIComponent(m[1]);
+  var byFlag = /[?&]m=sign(&|$)/.test(location.search);
+  var m = (location.hash || "").match(/^#s=(.+)$/);
+  if(!byFlag && !m) return;
+
+  LINK_MODE = true;
+  document.body.classList.add("linkmode");
   setMode("mSign");
+
+  if(!m){ $("linkMsg").hidden = false; return; }
+  $("codeIn").value = decodeURIComponent(m[1]);
   $("btnLoad").click();
-  try { history.replaceState(null, "", location.href.split("#")[0]); } catch(e){}
+  if($("signCard").hidden) $("linkMsg").hidden = false;
 })();
 
-setMode("mWrite");
+if(!LINK_MODE) setMode("mWrite");
 </script>
 </body>
 </html>

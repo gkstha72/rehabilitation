@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>재활센터 비급여 치료 동의서</title>
+<style>
+:root{
+  --paper:#ffffff;
+  --shell:#eef1f5;
+  --ink:#152232;
+  --ink-soft:#5a6b7e;
+  --rule:#c8d3df;
+  --rule-soft:#e3e9f0;
+  --mark:#1b4b8f;
+  --mark-soft:#e8eefa;
+  --pending:#a45a06;
+  --pending-soft:#fdf2e2;
+  --done:#0f6a4a;
+  --done-soft:#e4f3ec;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--shell);
+  color:var(--ink);
+  font-family:"Apple SD Gothic Neo","Malgun Gothic","맑은 고딕",-apple-system,"Noto Sans KR",sans-serif;
+  font-size:17px;
+  line-height:1.55;
+  -webkit-text-size-adjust:100%;
+}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px 64px}
+
+header.top{
+  display:flex;align-items:center;gap:14px;
+  padding:20px 0 16px;
+}
+header.top h1{
+  margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;
+}
+header.top h1 span{display:block;font-size:13px;font-weight:500;color:var(--ink-soft);letter-spacing:0}
+
+.modes{display:flex;gap:8px;margin-left:auto}
+.modes button{
+  font:inherit;font-size:15px;font-weight:600;
+  border:1px solid var(--rule);background:var(--paper);color:var(--ink-soft);
+  padding:9px 16px;border-radius:8px;cursor:pointer;
+}
+.modes button[aria-pressed="true"]{background:var(--mark);border-color:var(--mark);color:#fff}
+.modes button:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
+
+.card{
+  background:var(--paper);border:1px solid var(--rule);border-radius:12px;
+  padding:22px;margin-bottom:16px;
+}
+.card > h2{
+  margin:0 0 4px;font-size:16px;font-weight:700;
+}
+.card > h2 + p{margin:0 0 18px;font-size:14px;color:var(--ink-soft)}
+
+.field-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+.field{flex:1 1 150px;min-width:0}
+.field label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:5px}
+input[type=text],input[type=date],textarea,select{
+  width:100%;font:inherit;color:var(--ink);background:var(--paper);
+  border:1px solid var(--rule);border-radius:8px;padding:11px 12px;
+}
+input[type=text]:focus,input[type=date]:focus,textarea:focus,select:focus{outline:2px solid var(--mark);outline-offset:-1px;border-color:var(--mark)}
+textarea{resize:vertical;line-height:1.5}
+
+.seg{display:flex;gap:8px}
+.seg label{
+  flex:1;text-align:center;border:1px solid var(--rule);border-radius:8px;
+  padding:11px 6px;cursor:pointer;font-size:15px;font-weight:600;color:var(--ink-soft);
+  margin:0;
+}
+.seg input{position:absolute;opacity:0;width:0;height:0}
+.seg input:checked + span{color:#fff}
+.seg label:has(input:checked){background:var(--mark);border-color:var(--mark);color:#fff}
+.seg label:has(input:focus-visible){outline:2px solid var(--mark);outline-offset:2px}
+
+.group{margin-bottom:22px}
+.group > h3{
+  margin:0 0 8px;font-size:13px;font-weight:700;color:var(--mark);
+  padding-bottom:6px;border-bottom:1px solid var(--rule-soft);
+}
+.item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:11px 10px;border-radius:8px;
+}
+.item + .item{border-top:1px solid var(--rule-soft)}
+.item:has(input.pick:checked){background:var(--mark-soft)}
+.item input.pick{
+  width:26px;height:26px;flex:none;margin:3px 0 0;accent-color:var(--mark);
+}
+.item .body{flex:1;min-width:0}
+.item .nm{font-size:15px;line-height:1.4}
+.item .meta{font-size:13px;color:var(--ink-soft);margin-top:2px}
+.item .freq{
+  display:flex;align-items:center;gap:6px;margin-top:9px;font-size:14px;
+}
+.item .freq[hidden]{display:none}
+.item .freq input{width:74px;padding:7px 8px;text-align:center}
+.item .fhint{font-size:12px;color:var(--ink-soft);margin-left:4px}
+
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.btn{
+  font:inherit;font-size:16px;font-weight:700;border-radius:9px;cursor:pointer;
+  padding:14px 22px;border:1px solid var(--mark);background:var(--mark);color:#fff;
+}
+.btn.ghost{background:var(--paper);color:var(--mark)}
+.btn.quiet{background:var(--paper);color:var(--ink-soft);border-color:var(--rule);font-weight:600}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+.code-out{
+  margin-top:16px;padding:16px;border-radius:10px;
+  background:var(--pending-soft);border:1px solid #efd8b4;
+}
+.code-out[hidden]{display:none}
+.code-out p{margin:0 0 10px;font-size:14px;color:var(--pending);font-weight:600}
+.code-out textarea{
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;
+  height:110px;background:var(--paper);word-break:break-all;
+}
+
+.recap{border:1px solid var(--rule);border-radius:10px;overflow:hidden;margin-bottom:20px}
+.recap table{width:100%;border-collapse:collapse;font-size:15px}
+.recap th,.recap td{padding:11px 12px;text-align:left;border-bottom:1px solid var(--rule-soft)}
+.recap th{background:#f5f8fc;font-size:13px;color:var(--ink-soft);font-weight:600}
+.recap td.num{text-align:right;white-space:nowrap}
+.recap tr:last-child td{border-bottom:0}
+
+.patient-line{
+  display:flex;flex-wrap:wrap;gap:6px 20px;margin-bottom:16px;
+  padding:14px 16px;background:#f5f8fc;border-radius:10px;font-size:15px;
+}
+.patient-line b{font-weight:700}
+.patient-line span{color:var(--ink-soft)}
+
+.consent-text{
+  font-size:14px;line-height:1.7;color:var(--ink);
+  padding:16px;border-left:3px solid var(--mark);background:#f7fafd;border-radius:0 8px 8px 0;
+  margin-bottom:20px;
+}
+
+.sigbox{border:1px solid var(--rule);border-radius:10px;background:var(--paper);overflow:hidden}
+.sigbox canvas{display:block;width:100%;height:210px;touch-action:none;cursor:crosshair}
+.sigbox .bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:9px 14px;border-top:1px solid var(--rule-soft);background:#fafbfd;font-size:13px;color:var(--ink-soft);
+}
+.sigbox .bar button{font:inherit;font-size:13px;font-weight:600;background:none;border:0;color:var(--mark);cursor:pointer;padding:4px 6px}
+
+.note{font-size:13px;color:var(--ink-soft);margin:10px 0 0}
+.warn{
+  padding:14px 16px;border-radius:9px;font-size:14px;font-weight:600;
+  background:var(--pending-soft);color:var(--pending);border:1px solid #efd8b4;margin-bottom:16px;
+}
+.warn[hidden]{display:none}
+.ok{
+  padding:16px;border-radius:9px;font-size:15px;
+  background:var(--done-soft);color:var(--done);border:1px solid #bfe0d1;margin-bottom:16px;
+}
+.ok[hidden]{display:none}
+.ok b{display:block;font-size:16px;margin-bottom:4px}
+
+[hidden]{display:none !important}
+@media (max-width:640px){
+  body{font-size:16px}
+  header.top{flex-wrap:wrap}
+  .modes{margin-left:0;width:100%}
+  .modes button{flex:1}
+  .card{padding:18px 15px}
+}
+@media print{body{background:#fff}.modes,.actions{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>재활센터 비급여 치료 동의서<span>광주365재활병원</span></h1>
+  <nav class="modes">
+    <button type="button" id="mWrite" aria-pressed="true">작성</button>
+    <button type="button" id="mSign" aria-pressed="false">서명</button>
+  </nav>
+</header>
+
+<!-- ============ 작성 (치료사) ============ -->
+<section id="viewWrite">
+  <div class="card">
+    <h2>환자 정보</h2>
+    <p>치료실에서 입력한 뒤 아래 전달 코드를 병동으로 보내세요.</p>
+    <div class="field-row">
+      <div class="field" style="flex:0 0 100%">
+        <label>구분</label>
+        <div class="seg">
+          <label><input type="radio" name="ptype" value="입원" checked><span>입원</span></label>
+          <label><input type="radio" name="ptype" value="외래"><span>외래</span></label>
+        </div>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>등록번호</label><input type="text" id="pno" inputmode="numeric" autocomplete="off"></div>
+      <div class="field"><label>환자 성명</label><input type="text" id="pname" autocomplete="off"></div>
+      <div class="field"><label>병실 / 호</label><input type="text" id="proom" autocomplete="off"></div>
+      <div class="field"><label>작성일 (치료 시작일)</label><input type="date" id="pdate"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>적용 항목</h2>
+    <p>실제 적용되는 항목만 선택하세요. 동의서에는 전체 항목이 인쇄되고, 선택한 항목의 신청 칸에만 표시가 들어갑니다.</p>
+    <div id="itemList"></div>
+    <div class="actions">
+      <button type="button" class="btn" id="btnMake">전달 코드 만들기</button>
+      <button type="button" class="btn quiet" id="btnReset">전체 지우기</button>
+    </div>
+    <div class="code-out" id="codeOut" hidden>
+      <p>이 코드를 사내 메신저로 병동에 보내세요.</p>
+      <textarea id="codeText" readonly></textarea>
+      <div class="actions" style="margin-top:10px">
+        <button type="button" class="btn ghost" id="btnLink">서명 링크 복사</button>
+        <button type="button" class="btn quiet" id="btnCopy">코드만 복사</button>
+      </div>
+      <p class="note" id="linkNote">링크를 보내면 병동에서 누르는 즉시 서명 화면이 열립니다. 코드만 보낸 경우에는 <b>서명</b> 탭에 붙여넣으면 됩니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 서명 (병동) ============ -->
+<section id="viewSign" hidden>
+  <div class="card" id="pasteCard">
+    <h2>전달 코드 붙여넣기</h2>
+    <p>치료실에서 받은 코드를 아래에 붙여넣으세요.</p>
+    <textarea id="codeIn" rows="4" placeholder="여기에 코드를 붙여넣습니다"></textarea>
+    <div class="warn" id="codeErr" hidden></div>
+    <div class="actions" style="margin-top:12px">
+      <button type="button" class="btn" id="btnLoad">동의서 불러오기</button>
+    </div>
+  </div>
+
+  <div id="signCard" hidden>
+    <div class="card">
+      <h2>동의 내용 확인</h2>
+      <p>보호자께 아래 내용을 보여드리고 확인받으세요.</p>
+      <div class="patient-line" id="recapPatient"></div>
+      <div class="recap"><table id="recapTable"></table></div>
+      <div class="consent-text">
+        상기 치료 내용은 의료보험 적용 예외 항목으로 전액 비급여임을 확인하며,
+        치료 신청으로 발생하는 비급여 치료비 전액을 본인 또는 보호자가 수납할 것을 동의합니다.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>서명</h2>
+      <p>서명하신 화면 그대로 문서로 저장됩니다.</p>
+      <div class="field-row">
+        <div class="field" style="flex:0 0 100%">
+          <label>서명자</label>
+          <div class="seg">
+            <label><input type="radio" name="signer" value="본인" checked><span>환자 본인</span></label>
+            <label><input type="radio" name="signer" value="보호자"><span>보호자 / 대리인</span></label>
+          </div>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>서명자 성명</label><input type="text" id="sname" autocomplete="off"></div>
+        <div class="field" id="relWrap" hidden><label>환자와의 관계</label><input type="text" id="srel" placeholder="예: 배우자, 자녀" autocomplete="off"></div>
+      </div>
+      <div class="sigbox">
+        <canvas id="sig"></canvas>
+        <div class="bar"><span>위 칸 안에 서명해 주세요</span><button type="button" id="btnClearSig">다시 쓰기</button></div>
+      </div>
+      <div class="warn" id="signErr" hidden></div>
+      <div class="actions" style="margin-top:16px">
+        <button type="button" class="btn" id="btnDone">서명 완료 · 문서 저장</button>
+        <button type="button" class="btn quiet" id="btnCancel">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="doneCard" hidden>
+    <div class="ok"><b>저장되었습니다</b><span id="doneName"></span></div>
+    <p class="note">파일이 이 기기의 다운로드 폴더에 저장되었습니다. 이 기기에는 기록이 남지 않으니, 치료실로 파일을 전달하세요.</p>
+    <div class="actions" style="margin-top:14px">
+      <button type="button" class="btn ghost" id="btnAgain">다시 내려받기</button>
+      <button type="button" class="btn" id="btnNext">다음 환자</button>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<script>
+"use strict";
+
+/* ---------- 비급여 항목 (원본 서식 기준) ---------- */
+var ITEMS = [
+ {g:"언어·인지·연하", n:"언어치료", d:"평가 1회 당", p:70000, f:"월", df:1},
+ {g:"언어·인지·연하", n:"언어치료", d:"치료 1회 당", p:50000, f:"주", df:3},
+ {g:"언어·인지·연하", n:"전산화인지재활치료 (주의기억)", d:"치료 1회 당", p:60000, f:"주", df:3},
+ {g:"언어·인지·연하", n:"전산화인지재활치료 (상지로봇포함)", d:"치료 1회 당", p:70000, f:"주", df:3},
+ {g:"언어·인지·연하", n:"섭식 장애 평가", d:"평가 1회 당", p:15000, f:"-", df:0},
+ {g:"언어·인지·연하", n:"순차적 4채널을 이용한 연하장애 삼킴 기능 전기자극치료", d:"치료 1회 당", p:55000, f:"주", df:3},
+
+ {g:"검사·분석", n:"근감소증 체성분 분석", d:"평가 1회 당", p:50000, f:"-", df:0},
+ {g:"검사·분석", n:"(단순) 동적 족저압 측정 / 동적 체평형 검사 · 동작분석 역동적 근전도 / 동작분석(생역학검사) · 자율신경계이상검사", d:"평가 1회 당", p:100000, f:"주", df:1},
+ {g:"검사·분석", n:"(복잡) 동적 족저압측정 / 동적체평형검사 · 동작분석 역동적 근전도 / 동작분석(생역학검사) · 자율신경계이상검사", d:"평가 1회 당", p:400000, f:"주", df:1},
+
+ {g:"뇌자극", n:"뇌 자기공명영상을 활용한 인공지능기반 맞춤형 경두개직류자극술", d:"치료 1회 당", p:70000, f:"주", df:3},
+
+ {g:"통증·도수", n:"비침습적 무통증 치료요법(복잡)", d:"치료 1회 당", p:40000, f:"주", df:3},
+ {g:"통증·도수", n:"비침습적 무통증 치료요법(복잡-기타)", d:"치료 1회 당", p:60000, f:"주", df:3},
+ {g:"통증·도수", n:"비침습적 무통증 치료요법(복잡-2부위이상)", d:"치료 1회 당", p:70000, f:"주", df:3},
+ {g:"통증·도수", n:"비침습적무통증신호요법[10.0][special]", d:"치료 1회 당", p:100000, f:"주", df:3},
+ {g:"통증·도수", n:"신장분사치료(단순)", d:"치료 1회 당", p:60000, f:"주", df:3},
+ {g:"통증·도수", n:"신장분사치료(special)", d:"치료 1회 당", p:80000, f:"주", df:3},
+
+ {g:"체외충격파", n:"체외충격파 치료 ESWT3 / 2000타", sub:"ESWT3 / 2000타", d:"치료 1회당", p:30000, f:"주", df:1},
+ {g:"체외충격파", n:"체외충격파 치료 ESWT6 / 3000타", sub:"ESWT6 / 3000타", d:"치료 1회당", p:60000, f:"주", df:1},
+ {g:"체외충격파", n:"체외충격파 치료 ESWT9 / 4500타", sub:"ESWT9 / 4500타", d:"치료 1회당", p:90000, f:"주", df:1},
+ {g:"체외충격파", n:"체외충격파 치료 ESWT15 / 7500타", sub:"ESWT15 / 7500타", d:"치료 1회당", p:150000, f:"주", df:1},
+
+ {g:"재료", n:"메카노테이프", d:"1개 당", p:15000, f:"개", df:1}
+];
+
+/* ---------- 출력 서식 배치 (원본 동의서와 동일한 표 구조) ---------- */
+var FORM = [
+ {label:"언어치료", rows:[0,1]},
+ {label:"전산화인지재활치료 (주의기억)", rows:[2]},
+ {label:"전산화인지재활치료 (상지로봇포함)", rows:[3]},
+ {label:"섭식 장애 평가", rows:[4]},
+ {label:"순차적 4채널을 이용한\n연하장애 삼킴 기능 전기자극치료", rows:[5]},
+ {label:"근감소증 체성분 분석", rows:[6]},
+ {labels:["(단순) 동적 족저압 측정 / 동적 체평형 검사",
+          "동작분석 역동적 근전도 / 동작분석(생역학검사)",
+          "자율신경계이상검사"], merge:7},
+ {labels:["(복잡) 동적 족저압측정 / 동적체평형검사",
+          "동작분석 역동적 근전도 / 동작분석(생역학검사)",
+          "자율신경계이상검사"], merge:8},
+ {label:"뇌 자기공명영상을 활용한\n인공지능기반 맞춤형 경두개직류자극술", rows:[9]},
+ {label:"비침습적 무통증 치료요법(복잡)", rows:[10]},
+ {label:"비침습적 무통증 치료요법(복잡-기타)", rows:[11]},
+ {label:"비침습적 무통증 치료요법(복잡-2부위이상)", rows:[12]},
+ {label:"비침습적무통증신호요법[10.0][special]", rows:[13]},
+ {label:"체외충격파 치료", split:[16,17,18,19], cont:"치료 1회당", freq:"주 1회"},
+ {label:"신장분사치료(단순)", rows:[14]},
+ {label:"신장분사치료(special)", rows:[15]},
+ {label:"메카노테이프", rows:[20]}
+];
+
+var $ = function(id){ return document.getElementById(id); };
+var won = function(n){ return n.toLocaleString("ko-KR") + "원"; };
+var pad = function(n){ return n < 10 ? "0" + n : "" + n; };
+
+/* ---------- 모드 전환 ---------- */
+var MODES = [["mWrite","viewWrite"],["mSign","viewSign"]];
+function setMode(id){
+  MODES.forEach(function(m){
+    var on = m[0] === id;
+    $(m[0]).setAttribute("aria-pressed", on ? "true" : "false");
+    $(m[1]).hidden = !on;
+  });
+  if(id === "mSign") fitSig();
+  window.scrollTo(0,0);
+}
+MODES.forEach(function(m){ $(m[0]).addEventListener("click", function(){ setMode(m[0]); }); });
+
+/* ---------- 작성 화면 ---------- */
+var ORDER = [];
+FORM.forEach(function(b){
+  if(b.rows) b.rows.forEach(function(i){ ORDER.push(i); });
+  else if(b.split) b.split.forEach(function(i){ ORDER.push(i); });
+  else ORDER.push(b.merge);
+});
+
+(function buildList(){
+  var host = $("itemList");
+  ORDER.forEach(function(i){
+    var it = ITEMS[i];
+    var row = document.createElement("div");
+    row.className = "item";
+
+    var cb = document.createElement("input");
+    cb.type = "checkbox"; cb.className = "pick"; cb.dataset.idx = i;
+    cb.id = "it" + i;
+
+    var body = document.createElement("div");
+    body.className = "body";
+
+    var nm = document.createElement("label");
+    nm.className = "nm"; nm.htmlFor = "it" + i; nm.textContent = it.n;
+
+    var meta = document.createElement("div");
+    meta.className = "meta"; meta.textContent = it.d + " " + won(it.p);
+
+    var fr = null;
+    if(it.f !== "-"){
+      fr = document.createElement("div");
+      fr.className = "freq"; fr.hidden = true;
+      var fnum = document.createElement("input");
+      fnum.type = "text"; fnum.inputMode = "numeric"; fnum.value = it.df; fnum.dataset.fq = i;
+      if(it.f === "개"){
+        fr.appendChild(document.createTextNode("총"));
+        fr.appendChild(fnum);
+        fr.appendChild(document.createTextNode("개"));
+      } else {
+        fr.appendChild(document.createTextNode(it.f));
+        fr.appendChild(fnum);
+        fr.appendChild(document.createTextNode("회"));
+      }
+      var hint = document.createElement("span");
+      hint.className = "fhint"; hint.textContent = "비워두면 빈칸으로 인쇄됩니다";
+      fr.appendChild(hint);
+    }
+
+    body.appendChild(nm); body.appendChild(meta);
+    if(fr) body.appendChild(fr);
+    row.appendChild(cb); row.appendChild(body);
+    host.appendChild(row);
+
+    cb.addEventListener("change", function(){ if(fr) fr.hidden = !cb.checked; });
+  });
+})();
+
+function collect(){
+  var picks = [];
+  document.querySelectorAll("input.pick:checked").forEach(function(cb){
+    var i = +cb.dataset.idx;
+    var el = document.querySelector('[data-fq="' + i + '"]');
+    var v = el ? parseInt(el.value, 10) : 0;
+    if(!(v > 0)) v = 0;
+    picks.push([i, v]);
+  });
+  return picks;
+}
+
+function encode(o){
+  return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/=+$/,"");
+}
+function decode(s){
+  s = s.trim().replace(/\s+/g,"");
+  while(s.length % 4) s += "=";
+  return JSON.parse(decodeURIComponent(escape(atob(s))));
+}
+
+$("btnMake").addEventListener("click", function(){
+  var no = $("pno").value.trim(), nm = $("pname").value.trim();
+  if(!no || !nm){ alert("등록번호와 환자 성명을 입력하세요."); return; }
+  var picks = collect();
+  if(!picks.length){ alert("적용 항목을 하나 이상 선택하세요."); return; }
+  var payload = {
+    t: document.querySelector('input[name=ptype]:checked').value,
+    no: no, nm: nm, rm: $("proom").value.trim(),
+    d: $("pdate").value,
+    i: picks
+  };
+  $("codeText").value = encode(payload);
+  $("codeOut").hidden = false;
+  $("codeOut").scrollIntoView({behavior:"smooth", block:"nearest"});
+});
+
+function copyText(t, okMsg){
+  var ta = document.createElement("textarea");
+  ta.value = t;
+  ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.focus(); ta.select(); ta.setSelectionRange(0, 99999);
+  var ok = false;
+  try { ok = document.execCommand("copy"); } catch(e){}
+  document.body.removeChild(ta);
+  if(ok){ alert(okMsg); return; }
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(t).then(function(){ alert(okMsg); },
+      function(){ alert("자동 복사가 안 됩니다. 아래 칸의 내용을 길게 눌러 직접 복사하세요."); });
+    return;
+  }
+  alert("자동 복사가 안 됩니다. 아래 칸의 내용을 길게 눌러 직접 복사하세요.");
+}
+
+function signLink(code){
+  var u = location.href.split("#")[0].split("?")[0];
+  if(location.protocol === "file:") return null;
+  return u + "#s=" + code;
+}
+
+$("btnLink").addEventListener("click", function(){
+  var L = signLink($("codeText").value);
+  if(!L){
+    alert("링크는 웹 주소로 열었을 때만 만들 수 있습니다.\n지금은 파일을 직접 연 상태라 코드만 복사해 주세요.");
+    return;
+  }
+  $("codeText").value = L;
+  copyText(L, "서명 링크를 복사했습니다.\n사내 메신저로 병동에 보내세요.");
+});
+
+$("btnCopy").addEventListener("click", function(){
+  var ta = $("codeText");
+  ta.focus(); ta.select(); ta.setSelectionRange(0, 99999);
+  var ok = false;
+  try { ok = document.execCommand("copy"); } catch(e){}
+  if(!ok && navigator.clipboard){
+    navigator.clipboard.writeText(ta.value).then(function(){ alert("코드를 복사했습니다."); });
+    return;
+  }
+  alert(ok ? "코드를 복사했습니다." : "복사가 안 되면 코드를 길게 눌러 직접 복사하세요.");
+});
+
+$("btnReset").addEventListener("click", function(){
+  if(!confirm("입력한 내용을 모두 지울까요?")) return;
+  $("pno").value = ""; $("pname").value = ""; $("proom").value = "";
+  var t0 = new Date();
+  $("pdate").value = t0.getFullYear() + "-" + pad(t0.getMonth()+1) + "-" + pad(t0.getDate());
+  document.querySelectorAll("input.pick").forEach(function(cb){
+    cb.checked = false;
+    var f0 = cb.closest(".item").querySelector(".freq");
+    if(f0) f0.hidden = true;
+  });
+  $("codeOut").hidden = true;
+});
+
+/* ---------- 서명 화면 ---------- */
+var current = null, lastBlob = null, lastFile = "";
+
+$("btnLoad").addEventListener("click", function(){
+  var raw = $("codeIn").value;
+  $("codeErr").hidden = true;
+  if(!raw.trim()){ showErr("codeErr","코드를 붙여넣어 주세요."); return; }
+  var o;
+  try { o = decode(raw); } catch(e){ showErr("codeErr","코드를 읽을 수 없습니다. 전체가 복사되었는지 확인해 주세요."); return; }
+  if(!o || !o.nm || !o.i || !o.i.length){ showErr("codeErr","코드 내용이 올바르지 않습니다. 치료실에 다시 요청하세요."); return; }
+  current = o;
+  renderRecap(o);
+  $("pasteCard").hidden = true;
+  $("signCard").hidden = false;
+  $("doneCard").hidden = true;
+  fitSig();
+  window.scrollTo(0,0);
+});
+
+function showErr(id, msg){ var e = $(id); e.textContent = msg; e.hidden = false; }
+
+function renderRecap(o){
+  var pl = $("recapPatient");
+  pl.innerHTML = "";
+  var bits = [["구분", o.t], ["등록번호", o.no], ["성명", o.nm]];
+  if(o.rm) bits.push(["병실", o.rm + " 호"]);
+  bits.forEach(function(b){
+    var d = document.createElement("div");
+    var s = document.createElement("span"); s.textContent = b[0] + " ";
+    var v = document.createElement("b"); v.textContent = b[1];
+    d.appendChild(s); d.appendChild(v); pl.appendChild(d);
+  });
+
+  var t = $("recapTable");
+  t.innerHTML = "<tr><th>비급여 항목</th><th>내용</th><th style='text-align:right'>금액</th><th style='text-align:right'>빈도</th></tr>";
+  o.i.forEach(function(p){
+    var it = ITEMS[p[0]];
+    var tr = document.createElement("tr");
+    tr.innerHTML = "<td>" + esc(it.n) + "</td><td>" + esc(it.d) + "</td>" +
+      "<td class='num'>" + won(it.p) + "</td><td class='num'>" + freqText(it, p[1]) + "</td>";
+    t.appendChild(tr);
+  });
+}
+function esc(s){ return String(s).replace(/[&<>]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; }); }
+function freqText(it, v){
+  if(it.f === "-") return "해당 없음";
+  if(it.f === "개") return v ? ("총 " + v + "개") : "총 (  )개";
+  return v ? (it.f + " " + v + "회") : (it.f + " (  )회");
+}
+
+document.querySelectorAll('input[name=signer]').forEach(function(r){
+  r.addEventListener("change", function(){
+    $("relWrap").hidden = document.querySelector('input[name=signer]:checked').value !== "보호자";
+  });
+});
+
+/* ---------- 서명 캔버스 ---------- */
+var sc = $("sig"), sx = sc.getContext("2d"), drawing = false, hasInk = false, dpr = 1;
+function fitSig(){
+  if($("viewSign").hidden || $("signCard").hidden) return;
+  dpr = window.devicePixelRatio || 1;
+  var r = sc.getBoundingClientRect();
+  if(!r.width) return;
+  var data = hasInk ? sc.toDataURL() : null;
+  sc.width = Math.round(r.width * dpr);
+  sc.height = Math.round(r.height * dpr);
+  sx.setTransform(dpr,0,0,dpr,0,0);
+  sx.lineWidth = 2.4; sx.lineCap = "round"; sx.lineJoin = "round"; sx.strokeStyle = "#101820";
+  if(data){ var im = new Image(); im.onload = function(){ sx.drawImage(im,0,0,r.width,r.height); }; im.src = data; }
+}
+window.addEventListener("resize", fitSig);
+
+function pt(e){ var r = sc.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+sc.addEventListener("pointerdown", function(e){
+  e.preventDefault(); sc.setPointerCapture(e.pointerId);
+  drawing = true; hasInk = true;
+  var p = pt(e); sx.beginPath(); sx.moveTo(p[0], p[1]); sx.lineTo(p[0] + .1, p[1]); sx.stroke();
+});
+sc.addEventListener("pointermove", function(e){
+  if(!drawing) return; e.preventDefault();
+  var p = pt(e); sx.lineTo(p[0], p[1]); sx.stroke();
+});
+["pointerup","pointercancel","pointerleave"].forEach(function(ev){
+  sc.addEventListener(ev, function(){ drawing = false; });
+});
+$("btnClearSig").addEventListener("click", function(){
+  sx.clearRect(0,0,sc.width,sc.height); hasInk = false;
+});
+
+$("btnCancel").addEventListener("click", function(){ resetSign(); });
+function resetSign(){
+  current = null; hasInk = false;
+  sx.clearRect(0,0,sc.width,sc.height);
+  $("sname").value = ""; $("srel").value = ""; $("codeIn").value = "";
+  document.querySelector('input[name=signer][value="본인"]').checked = true;
+  $("relWrap").hidden = true;
+  $("signErr").hidden = true; $("codeErr").hidden = true;
+  $("signCard").hidden = true; $("doneCard").hidden = true; $("pasteCard").hidden = false;
+  try { history.replaceState(null, "", location.href.split("#")[0]); } catch(e){}
+  window.scrollTo(0,0);
+}
+
+/* ---------- 완료 → 문서 생성 ---------- */
+$("btnDone").addEventListener("click", function(){
+  $("signErr").hidden = true;
+  var who = document.querySelector('input[name=signer]:checked').value;
+  var sn = $("sname").value.trim();
+  var rel = $("srel").value.trim();
+  if(!sn){ showErr("signErr","서명자 성명을 입력하세요."); return; }
+  if(who === "보호자" && !rel){ showErr("signErr","환자와의 관계를 입력하세요."); return; }
+  if(!hasInk){ showErr("signErr","서명란에 서명해 주세요."); return; }
+
+  var now = new Date();
+  var rec = { o: current, who: who, sn: sn, rel: rel, at: now };
+  var cv = renderDoc(rec);
+  var jpeg = cv.toDataURL("image/jpeg", 0.92).split(",")[1];
+  lastBlob = buildPDF(atob(jpeg), cv.width, cv.height);
+  var fd = current.d ? current.d.replace(/-/g, "")
+         : (now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()));
+  lastFile = current.no + "_" + current.nm + "_" + fd + "_비급여동의서.pdf";
+
+  saveBlob(lastBlob, lastFile);
+
+  $("doneName").textContent = lastFile;
+  $("signCard").hidden = true;
+  $("doneCard").hidden = false;
+  window.scrollTo(0,0);
+});
+$("btnAgain").addEventListener("click", function(){ if(lastBlob) saveBlob(lastBlob, lastFile); });
+$("btnNext").addEventListener("click", function(){ resetSign(); });
+
+function saveBlob(b, name){
+  var u = URL.createObjectURL(b);
+  var a = document.createElement("a");
+  a.href = u; a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(u); }, 1500);
+}
+
+/* ---------- 서명 획 영역만 잘라내기 ---------- */
+function sigBounds(){
+  var w = sc.width, h = sc.height;
+  var d = sc.getContext("2d").getImageData(0, 0, w, h).data;
+  var x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for(var yy = 0; yy < h; yy++){
+    for(var xx = 0; xx < w; xx++){
+      if(d[(yy * w + xx) * 4 + 3] > 20){
+        if(xx < x0) x0 = xx; if(xx > x1) x1 = xx;
+        if(yy < y0) y0 = yy; if(yy > y1) y1 = yy;
+      }
+    }
+  }
+  if(x1 < 0) return {x:0, y:0, w:w, h:h};
+  var pd = Math.round(6 * (window.devicePixelRatio || 1));
+  x0 = Math.max(0, x0 - pd); y0 = Math.max(0, y0 - pd);
+  x1 = Math.min(w, x1 + pd); y1 = Math.min(h, y1 + pd);
+  return {x:x0, y:y0, w:x1 - x0, h:y1 - y0};
+}
+
+/* ---------- 문서를 캔버스로 그리기 (원본 동의서 서식) ---------- */
+var CLR = {
+  line:"#4472c4", lineIn:"#8faadc", head:"#dbe5f1",
+  red:"#c00000", ink:"#000000", soft:"#555555"
+};
+
+function renderDoc(rec){
+  var S = 2, W = 1000, M = 40, TW = 920;
+  var CW = [400,130,130,110,150];
+  var CX = [], acc = M;
+  for(var i = 0; i < 5; i++){ CX.push(acc); acc += CW[i]; }
+  var o = rec.o, app = {};
+  o.i.forEach(function(p){ app[p[0]] = p[1]; });
+
+  function F(sz, b){ return (b ? "bold " : "") + sz + 'px "Apple SD Gothic Neo","Malgun Gothic","\ub9d1\uc740 \uace0\ub515",sans-serif'; }
+  var mm = document.createElement("canvas").getContext("2d");
+  function wrap(ctx, text, max){
+    var out = [];
+    String(text).split("\n").forEach(function(seg){
+      var line = "";
+      for(var i = 0; i < seg.length; i++){
+        var t = line + seg[i];
+        if(ctx.measureText(t).width > max && line){ out.push(line); line = seg[i]; }
+        else line = t;
+      }
+      out.push(line);
+    });
+    return out;
+  }
+
+  /* --- 1차: 행 높이 계산 --- */
+  var LH = 17, MINR = 30;
+  mm.font = F(13);
+  var plan = [], tableH = 0;
+  FORM.forEach(function(b){
+    var e = {b:b, hs:[], h:0};
+    if(b.labels){
+      e.kind = "merge";
+      e.ls = b.labels.map(function(L){ return wrap(mm, L, CW[0] - 16); });
+      e.ls.forEach(function(ls){
+        var h = Math.max(MINR, ls.length * LH + 13);
+        e.hs.push(h); e.h += h;
+      });
+    } else if(b.split){
+      e.kind = "split";
+      e.ls = wrap(mm, b.label, CW[0]/2 - 16);
+      b.split.forEach(function(){ e.hs.push(MINR); e.h += MINR; });
+    } else {
+      e.kind = "rows";
+      e.ls = wrap(mm, b.label, CW[0] - 16);
+      var need = Math.max(MINR, e.ls.length * LH + 13);
+      var per = Math.max(MINR, Math.ceil(need / b.rows.length));
+      b.rows.forEach(function(){ e.hs.push(per); e.h += per; });
+    }
+    plan.push(e); tableH += e.h;
+  });
+
+  var headH = 34;
+  var H = 54 + 34 + 30 + headH + tableH + 30 + 52 + 40 + 34 + 30 + 190 + 26 + 40;
+  var A4 = W * 1.4142;
+  if(H < A4) H = A4;
+
+  var cv = document.createElement("canvas");
+  cv.width = W * S; cv.height = Math.round(H) * S;
+  var x = cv.getContext("2d");
+  x.setTransform(S,0,0,S,0,0);
+  x.fillStyle = "#fff"; x.fillRect(0,0,W,H);
+  x.textBaseline = "middle"; x.lineWidth = 1;
+
+  function box(bx, by, bw, bh, col){
+    x.strokeStyle = col || CLR.line;
+    x.strokeRect(bx + .5, by + .5, bw - 1, bh - 1);
+  }
+  function ctr(t, cx, cy, font, col){
+    x.font = font; x.fillStyle = col; x.textAlign = "center";
+    x.fillText(t, cx, cy);
+  }
+  function check(cx, cy){
+    x.strokeStyle = CLR.red; x.lineWidth = 2.6; x.lineCap = "round"; x.lineJoin = "round";
+    x.beginPath();
+    x.moveTo(cx - 7, cy); x.lineTo(cx - 2, cy + 6); x.lineTo(cx + 8, cy - 7);
+    x.stroke(); x.lineWidth = 1;
+  }
+  function tick(bx, by, on){
+    x.strokeStyle = "#333"; x.strokeRect(bx + .5, by + .5, 12, 12);
+    if(on){
+      x.strokeStyle = CLR.red; x.lineWidth = 2.2; x.lineCap = "round";
+      x.beginPath(); x.moveTo(bx + 2, by + 6); x.lineTo(bx + 5, by + 10); x.lineTo(bx + 11, by + 2);
+      x.stroke(); x.lineWidth = 1;
+    }
+  }
+  function ul(bx, by, bw){
+    x.strokeStyle = "#333";
+    x.beginPath(); x.moveTo(bx, by + .5); x.lineTo(bx + bw, by + .5); x.stroke();
+  }
+  function freqCell(it, v){
+    if(it.f === "-") return "-";
+    if(it.f === "개") return v ? (v + " 개") : "-";
+    return it.f + "(  " + (v ? v : "\u3000") + "  )회";
+  }
+
+  /* --- 제목 --- */
+  var y = 54;
+  ctr("재활센터 비급여 치료 동의서", W/2, y, F(25, true), "#000");
+  y += 34;
+
+  /* --- 입원/외래 · 호실 · 성명 --- */
+  x.textAlign = "left"; x.font = F(14); x.fillStyle = "#000";
+  var hx = M + 150, hy = y;
+  x.fillText("(", hx, hy); hx += 10;
+  tick(hx, hy - 6, o.t === "입원"); hx += 18;
+  x.fillText("입원  /", hx, hy); hx += 52;
+  tick(hx, hy - 6, o.t === "외래"); hx += 18;
+  x.fillText("외래", hx, hy); hx += 38;
+  ul(hx, hy + 9, 70);
+  ctr(o.rm || "", hx + 35, hy, F(14), "#000");
+  hx += 74; x.textAlign = "left"; x.font = F(14); x.fillStyle = "#000";
+  x.fillText("호", hx, hy); hx += 22;
+  ul(hx, hy + 9, 150);
+  ctr(o.nm, hx + 75, hy, F(14, true), "#000");
+  hx += 154; x.textAlign = "left"; x.font = F(14); x.fillStyle = "#000";
+  x.fillText(")", hx, hy);
+  y += 30;
+
+  /* --- 표 머리 --- */
+  x.fillStyle = CLR.head; x.fillRect(M, y, TW, headH);
+  box(M, y, TW, headH);
+  var htxt = ["비급여 항목","내용","금액(원)","신청","빈도"];
+  for(var c = 0; c < 5; c++){
+    if(c) { x.strokeStyle = CLR.line; x.beginPath(); x.moveTo(CX[c] + .5, y); x.lineTo(CX[c] + .5, y + headH); x.stroke(); }
+    ctr(htxt[c], CX[c] + CW[c]/2, y + headH/2, F(14, true), CLR.ink);
+  }
+  y += headH;
+
+  /* --- 표 본문 --- */
+  plan.forEach(function(e){
+    var b = e.b, top = y, ry = y;
+
+    box(M, top, TW, e.h);
+    for(var c = 1; c < 5; c++){
+      x.strokeStyle = CLR.line;
+      x.beginPath(); x.moveTo(CX[c] + .5, top); x.lineTo(CX[c] + .5, top + e.h); x.stroke();
+    }
+
+    if(e.kind === "rows"){
+      var lyc = top + e.h/2 - (e.ls.length - 1) * LH/2;
+      x.textAlign = "left"; x.font = F(13); x.fillStyle = CLR.ink;
+      e.ls.forEach(function(L){ x.fillText(L, CX[0] + 12, lyc); lyc += LH; });
+      b.rows.forEach(function(idx, k){
+        var it = ITEMS[idx], h = e.hs[k];
+        if(k){
+          x.strokeStyle = CLR.lineIn;
+          x.beginPath(); x.moveTo(CX[1], ry + .5); x.lineTo(M + TW, ry + .5); x.stroke();
+        }
+        ctr(it.d, CX[1] + CW[1]/2, ry + h/2, F(12), CLR.ink);
+        ctr(it.p.toLocaleString("ko-KR"), CX[2] + CW[2]/2, ry + h/2, F(12, true), CLR.ink);
+        if(idx in app) check(CX[3] + CW[3]/2, ry + h/2);
+        ctr(freqCell(it, app[idx]), CX[4] + CW[4]/2, ry + h/2, F(12), CLR.ink);
+        ry += h;
+      });
+    }
+
+    if(e.kind === "merge"){
+      var it2 = ITEMS[b.merge];
+      e.ls.forEach(function(ls, k){
+        var h = e.hs[k];
+        if(k){
+          x.strokeStyle = CLR.lineIn;
+          x.beginPath(); x.moveTo(M, ry + .5); x.lineTo(CX[1], ry + .5); x.stroke();
+        }
+        var ly = ry + h/2 - (ls.length - 1) * LH/2;
+        x.textAlign = "left"; x.font = F(13); x.fillStyle = CLR.ink;
+        ls.forEach(function(L){ x.fillText(L, CX[0] + 12, ly); ly += LH; });
+        ry += h;
+      });
+      var mid = top + e.h/2;
+      ctr(it2.d, CX[1] + CW[1]/2, mid, F(12), CLR.ink);
+      ctr(it2.p.toLocaleString("ko-KR"), CX[2] + CW[2]/2, mid, F(12, true), CLR.ink);
+      if(b.merge in app) check(CX[3] + CW[3]/2, mid);
+      ctr(freqCell(it2, app[b.merge]), CX[4] + CW[4]/2, mid, F(12), CLR.ink);
+    }
+
+    if(e.kind === "split"){
+      var half = CX[0] + CW[0]/2;
+      x.strokeStyle = CLR.line;
+      x.beginPath(); x.moveTo(half + .5, top); x.lineTo(half + .5, top + e.h); x.stroke();
+      var ly2 = top + e.h/2 - (e.ls.length - 1) * LH/2;
+      x.textAlign = "left"; x.font = F(13); x.fillStyle = CLR.ink;
+      e.ls.forEach(function(L){ x.fillText(L, CX[0] + 12, ly2); ly2 += LH; });
+      b.split.forEach(function(idx, k){
+        var it3 = ITEMS[idx], h = e.hs[k];
+        if(k){
+          x.strokeStyle = CLR.lineIn;
+          x.beginPath(); x.moveTo(half, ry + .5); x.lineTo(CX[1], ry + .5); x.stroke();
+          x.beginPath(); x.moveTo(CX[2], ry + .5); x.lineTo(CX[4], ry + .5); x.stroke();
+        }
+        ctr(it3.sub, half + CW[0]/4, ry + h/2, F(12), CLR.ink);
+        ctr(it3.p.toLocaleString("ko-KR"), CX[2] + CW[2]/2, ry + h/2, F(12, true), CLR.ink);
+        if(idx in app) check(CX[3] + CW[3]/2, ry + h/2);
+        ry += h;
+      });
+      ctr(b.cont, CX[1] + CW[1]/2, top + e.h/2, F(12), CLR.ink);
+      ctr(b.freq, CX[4] + CW[4]/2, top + e.h/2, F(12), CLR.ink);
+    }
+
+    y += e.h;
+  });
+
+  /* --- 동의 문구 --- */
+  y += 30;
+  x.font = F(14, true); x.fillStyle = "#000"; x.textAlign = "center";
+  x.fillText("상기 치료 내용은 의료보험 적용 예외 항목으로 전액 비급여임을 확인하며", W/2, y); y += 24;
+  x.fillText("치료 신청으로 발생하는 비급여 치료비 전액을 본인 또는 보호자가 수납할 것을 동의합니다.", W/2, y);
+  y += 46;
+
+  /* --- 날짜: 문서상 날짜는 작성일(치료 시작일) --- */
+  var d = rec.at, wd = d;
+  if(o.d){
+    var dp = o.d.split("-");
+    if(dp.length === 3) wd = new Date(+dp[0], +dp[1] - 1, +dp[2]);
+  }
+  var sameDay = wd.getFullYear() === d.getFullYear() &&
+                wd.getMonth() === d.getMonth() && wd.getDate() === d.getDate();
+  var dx = W/2 - 150;
+  x.font = F(15); x.fillStyle = "#000"; x.textAlign = "left";
+  ul(dx, y + 10, 60); ctr(String(wd.getFullYear()), dx + 30, y, F(15), "#000");
+  x.textAlign = "left"; x.font = F(15); x.fillStyle = "#000"; x.fillText("년", dx + 66, y);
+  ul(dx + 96, y + 10, 40); ctr(String(wd.getMonth() + 1), dx + 116, y, F(15), "#000");
+  x.textAlign = "left"; x.font = F(15); x.fillStyle = "#000"; x.fillText("월", dx + 142, y);
+  ul(dx + 172, y + 10, 40); ctr(String(wd.getDate()), dx + 192, y, F(15), "#000");
+  x.textAlign = "left"; x.font = F(15); x.fillStyle = "#000"; x.fillText("일", dx + 218, y);
+  y += sameDay ? 44 : 26;
+  if(!sameDay){
+    ctr("(서명일  " + d.getFullYear() + "년 " + (d.getMonth()+1) + "월 " + d.getDate() + "일)",
+        W/2, y, F(12), CLR.soft);
+    y += 34;
+  }
+
+  /* --- 서명: 성명은 줄 위에, 서명은 (서명) 자리에 --- */
+  var lx = M + 180, vx = lx + 150, sigX = vx + 340;
+  var rows = [
+    {t:"환      자:",     v:rec.who === "본인"   ? rec.sn  : "", sig:rec.who === "본인"},
+    {t:"보호자/대리인:", v:rec.who === "보호자" ? rec.sn  : "", sig:rec.who === "보호자"},
+    {t:"환자와의 관계:", v:rec.who === "보호자" ? rec.rel : "", sig:false}
+  ];
+  var sb = sigBounds();
+  rows.forEach(function(r){
+    x.textAlign = "left"; x.font = F(15, true); x.fillStyle = "#000";
+    x.fillText(r.t, lx, y);
+    ul(vx, y + 20, 300);
+    if(r.v) ctr(r.v, vx + 150, y, F(15), "#000");
+    ctr("(서명)", sigX, y + 2, F(13), CLR.soft);
+    if(r.sig){
+      var k = Math.min(200 / sb.w, 56 / sb.h);
+      var dw = sb.w * k, dh = sb.h * k;
+      x.drawImage(sc, sb.x, sb.y, sb.w, sb.h, sigX - dw/2, y - dh/2, dw, dh);
+    }
+    y += 58;
+  });
+
+  return cv;
+}
+
+/* ---------- 라이브러리 없이 PDF 만들기 (JPEG 1장 삽입) ---------- */
+function buildPDF(jpegBin, iw, ih){
+  var pw = 595.28, ph = 841.89, pad = 20;
+  var s = Math.min((pw - pad*2)/iw, (ph - pad*2)/ih);
+  var dw = iw*s, dh = ih*s, ox = (pw-dw)/2, oy = (ph-dh)/2;
+  var content = "q " + dw.toFixed(2) + " 0 0 " + dh.toFixed(2) + " " + ox.toFixed(2) + " " + oy.toFixed(2) + " cm /I0 Do Q";
+  var out = "%PDF-1.4\n", off = [];
+  function add(num, dict, stream){
+    off[num] = out.length;
+    out += num + " 0 obj\n" + dict + "\n";
+    if(stream !== undefined) out += "stream\n" + stream + "\nendstream\n";
+    out += "endobj\n";
+  }
+  add(1, "<</Type/Catalog/Pages 2 0 R>>");
+  add(2, "<</Type/Pages/Kids[3 0 R]/Count 1>>");
+  add(3, "<</Type/Page/Parent 2 0 R/MediaBox[0 0 " + pw.toFixed(2) + " " + ph.toFixed(2) +
+         "]/Resources<</XObject<</I0 4 0 R>>>>/Contents 5 0 R>>");
+  add(4, "<</Type/XObject/Subtype/Image/Width " + iw + "/Height " + ih +
+         "/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length " + jpegBin.length + ">>", jpegBin);
+  add(5, "<</Length " + content.length + ">>", content);
+  var xref = out.length;
+  out += "xref\n0 6\n0000000000 65535 f \n";
+  for(var i = 1; i <= 5; i++){
+    var s2 = "0000000000" + off[i];
+    out += s2.slice(-10) + " 00000 n \n";
+  }
+  out += "trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n" + xref + "\n%%EOF";
+  var arr = new Uint8Array(out.length);
+  for(var j = 0; j < out.length; j++) arr[j] = out.charCodeAt(j) & 0xff;
+  return new Blob([arr], {type:"application/pdf"});
+}
+
+(function(){
+  var t = new Date();
+  $("pdate").value = t.getFullYear() + "-" + pad(t.getMonth()+1) + "-" + pad(t.getDate());
+})();
+
+(function openFromLink(){
+  var h = location.hash || "";
+  var m = h.match(/^#s=(.+)$/);
+  if(!m) return;
+  $("codeIn").value = decodeURIComponent(m[1]);
+  setMode("mSign");
+  $("btnLoad").click();
+  try { history.replaceState(null, "", location.href.split("#")[0]); } catch(e){}
+})();
+
+setMode("mWrite");
+</script>
+</body>
+</html>

@@ -658,7 +658,7 @@ function findRobotName(cellCompact, targetName){
 
     const name = compact(match[1]);
 
-    if(name.includes(targetName) || targetName.includes(name)){
+    if(isSameName(name, targetName)){
 
       return robotCodes[match[2].toUpperCase()] || "";
     }
@@ -676,12 +676,147 @@ function stripRobotSegments(cellCompact, targetName){
       const compactName = compact(name);
 
       const isTarget =
-        compactName.includes(targetName) ||
-        targetName.includes(compactName);
+        isSameName(compactName, targetName);
 
       return isTarget ? "" : whole;
     }
   );
+}
+
+/* ===== 동명이인·비슷한 이름 구분 (이동반 시간표와 같은 규칙) =====
+   ① 이름은 한글 덩어리 단위로 읽고, 입력한 이름과 '정확히' 같을 때만 인정
+      → "정순"을 찾을 때 정순태·김정순은 제외
+   ② 이름 뒤 숫자 = 동명이인 번호  예) 이다혜 / 이다혜2
+      · '1'은 번호 없음과 같은 사람 (김옥자1 = 김옥자)
+      · 숫자 뒤에 : 분 층 호 가 오면 번호가 아님 (정순2층 → 정순)
+      · 번호까지 입력해야 그 사람만 뽑힘 (정순2 입력 → 정순2만)
+   ③ 이름 앞 한글 코드(도수), 이름 뒤 치료·기구 설명(견인·평가·슬라 등)은
+      떼고 비교  예) 도수정순 → 정순 / 정순견인 → 정순 */
+const hangulCodeKeys =
+  specialCodeKeys.filter(key => /^[가-힣]+$/.test(key));
+
+const NAME_TAIL_WORDS = new Set([
+  '음악치료실','음악치료','인지치료','언어치료','연하치료','호흡치료','호흡훈련',
+  '도수중재','열전기치료','전기자극','상지운동','하지운동','안면운동',
+  '상지압박','하지압박','상지','체외','견인','평가',
+  '슬라','런닝','코로','워킹','아크','경사','바로','동적','기립','체어','리포머','캐딜락',
+  '전기','안면전기','전기펜','전기장갑','전동상지','어댑핏','클라','오토','패시브','스마트',
+  '하네스','엔젤','엑소','엘봇','알봇','로봇','필라테스','진동기','등속성','저속','한발로',
+  '크라이오','스트레칭','도수','물리','작업','식이치료','재활'
+]);
+
+/* 띄어쓰기를 "/"로 바꿔 이름 경계를 남긴 칸 텍스트 */
+function nameKey(value){
+  return normalize(value).replace(/\s+/g,"/");
+}
+
+/* 입력한 환자명 → {base, num}   "정순2" → 정순/2, "정순1" → 정순/없음 */
+function parseTargetName(value){
+  const t = compact(value);
+  const m = t.match(/^([가-힣]+)(\d)?$/);
+  if(!m) return { base:t, num:null };
+  return { base:m[1], num:(m[2] && m[2] !== "1") ? m[2] : null };
+}
+
+/* 칸 텍스트 안의 이름 토큰들 [{base, num, start}]
+   base를 정할 때 코드·치료설명을 떼는 기준은 찾는 이름(wantBase) */
+function nameTokens(text, wantBase){
+
+  const out = [];
+  const re = /([가-힣]{2,})(\d)?/g;
+  let m;
+
+  while((m = re.exec(text)) !== null){
+
+    let token = m[1];
+    let start = m.index;
+
+    const stripTail = t => {
+      if(wantBase && t !== wantBase && t.startsWith(wantBase) &&
+         NAME_TAIL_WORDS.has(t.slice(wantBase.length)))
+        return { t:wantBase, tail:true };
+      return { t, tail:false };
+    };
+
+    let res = stripTail(token);
+
+    if(res.t !== wantBase){
+      const code = hangulCodeKeys.find(key =>
+        token.startsWith(key) && token.length - key.length >= 2);
+      if(code){
+        const res2 = stripTail(token.slice(code.length));
+        if(res2.t === wantBase || !wantBase){
+          res = res2;
+          start += code.length;
+        }
+      }
+    }
+
+    let num = null;
+
+    if(!res.tail && m[2]){
+      const after = text[m.index + m[0].length] || "";
+      if(!/[:분층호]/.test(after) && m[2] !== "1")
+        num = m[2];
+    }
+
+    out.push({ base:res.t, num, start });
+  }
+
+  return out;
+}
+
+function findNameIndex(text, targetName){
+
+  const tg = parseTargetName(targetName);
+  if(tg.base.length < 2) return -1;
+
+  const hit = nameTokens(text, tg.base)
+    .find(tk => tk.base === tg.base && tk.num === tg.num);
+
+  return hit ? hit.start : -1;
+}
+
+function hasName(value, targetName){
+  return findNameIndex(nameKey(value), targetName) !== -1;
+}
+
+/* 로봇 칸(GR이름코드)의 이름이 찾는 환자인지 */
+function isSameName(name, targetName){
+  const a = parseTargetName(name);
+  const b = parseTargetName(targetName);
+  return a.base === b.base && a.num === b.num;
+}
+
+/* 입력한 이름과 헷갈릴 수 있는 이름들
+   homonyms : 같은 이름, 다른 번호 (정순 ↔ 정순2)
+   similar  : 입력 이름을 포함하는 다른 이름 (정순태, 김정순) */
+function findRelatedNames(targetName){
+
+  const tg = parseTargetName(targetName);
+  const homonyms = new Set();
+  const similar = new Set();
+
+  if(tg.base.length < 2) return { homonyms:[], similar:[] };
+
+  pastedSheets.forEach(sheet=>{
+    sheet.rows.forEach(row=>{
+      row.forEach(cell=>{
+        const text = nameKey(cell);
+        if(!text.includes(tg.base)) return;
+        nameTokens(text, tg.base).forEach(tk=>{
+          const label = tk.base + (tk.num || "");
+          if(tk.base === tg.base){
+            if(tk.num !== tg.num) homonyms.add(label);
+          }else if(tk.base.includes(tg.base)){
+            similar.add(label);
+          }
+        });
+      });
+    });
+  });
+
+  return { homonyms:Array.from(homonyms), similar:Array.from(similar) };
 }
 
 /* ===== 시간표 구조 자동 인식 =====
@@ -2078,7 +2213,7 @@ function findPatientPositions(){
 
       row.forEach((cell,c)=>{
 
-        if(compact(cell).includes(targetName)){
+        if(hasName(cell, targetName)){
 
           found.push({
             sheet: sheetIndex + 1,
@@ -2093,8 +2228,14 @@ function findPatientPositions(){
 
   if(found.length === 0){
 
+    const related = findRelatedNames(targetName);
+    const others = related.homonyms.concat(related.similar);
+
     alert(
-      "붙여넣은 표 안에서 환자명을 찾지 못했습니다."
+      "붙여넣은 표 안에서 환자명을 찾지 못했습니다." +
+      (others.length
+        ? "\n비슷한 이름: " + others.join(", ")
+        : "")
     );
 
     return;
@@ -2264,9 +2405,9 @@ function parseWithLayout(
         if(!cellText) return;
 
         const cellCompact =
-          compact(cellText);
+          nameKey(cellText);
 
-        if(!cellCompact.includes(targetName))
+        if(findNameIndex(cellCompact, targetName) === -1)
           return;
 
         let treatment;
@@ -2343,9 +2484,9 @@ function parseMainTherapies(
         if(!cellText) continue;
 
         const cellCompact =
-          compact(cellText);
+          nameKey(cellText);
 
-        if(!cellCompact.includes(targetName))
+        if(findNameIndex(cellCompact, targetName) === -1)
           continue;
 
         const therapist =
@@ -2399,7 +2540,7 @@ function parseFirstFloorPT(
 
       if(!cellText) continue;
 
-      if(!compact(cellText).includes(targetName))
+      if(!hasName(cellText, targetName))
         continue;
 
       results.push({
@@ -2445,7 +2586,7 @@ function parseFirstFloorMachines(
 
       if(!cellText) continue;
 
-      if(!compact(cellText).includes(targetName))
+      if(!hasName(cellText, targetName))
         continue;
 
       const machineName =
@@ -2494,7 +2635,7 @@ function parseMachines(
 
       if(!cellText) continue;
 
-      if(!compact(cellText).includes(targetName))
+      if(!hasName(cellText, targetName))
         continue;
 
       const machineName =
@@ -2538,7 +2679,7 @@ function parseElectric(
 
       if(!cellText) continue;
 
-      if(!compact(cellText).includes(targetName))
+      if(!hasName(cellText, targetName))
         continue;
 
       results.push({
@@ -2668,13 +2809,13 @@ function getCodeBeforeName(
 ){
 
   const index =
-    cellCompact.indexOf(targetName);
+    findNameIndex(cellCompact, targetName);
 
   if(index <= 0)
     return "";
 
   const before =
-    cellCompact.slice(0,index);
+    cellCompact.slice(0,index).replace(/\/+$/,"");
 
   const matched =
     specialCodeKeys.find(key => before.endsWith(key));
@@ -2727,11 +2868,34 @@ function renderSchedule(patientName, items){
 
   if(items.length === 0){
 
+    const related =
+      findRelatedNames(patientName);
+    const others =
+      related.homonyms.concat(related.similar);
+
     result.innerHTML +=
-      "<p>검색 결과가 없습니다.</p>";
+      "<p>검색 결과가 없습니다.</p>" +
+      (others.length
+        ? "<p>비슷한 이름: " +
+          others.map(escapeHtml).join(", ") + "</p>"
+        : "");
 
     return;
   }
+
+  const homonymNote =
+    findRelatedNames(patientName).homonyms;
+
+  if(homonymNote.length){
+
+    const p = document.createElement("p");
+    p.style.color = "#c53a3a";
+    p.textContent =
+      "⚠️ 동명이인 있음: " + homonymNote.join(", ") +
+      " — 번호까지 입력하면 그 환자만 따로 뽑힙니다.";
+    result.appendChild(p);
+  }
+
 
   const grouped = {};
 

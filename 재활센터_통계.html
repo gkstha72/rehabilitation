@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b64</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b66</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -4190,12 +4190,17 @@ function dischargeWantOrder(sc, lblCodes) {
     if (lb === "CR6(F),CR7(F)") return fmt("(Free)특수작업치료", "MM113A");
     // 회복기 일반(H) — 어느 치료실 시간표인지로 처방을 좁힌다
     var isHoe = /^H/i.test(tok) || lb === "H" || lb === "H3" || lb === "H2";
-    var pre = isHoe ? "[회Ⅲ]" : "";
+    // 등급은 표기가 있으면 그대로, 없으면 한 칸에 몇 명이 있는지로 가른다.
+    //   한 칸에 H 표기가 둘 이상 = 그룹 = 회Ⅱ, 하나 = 1:1 = 회Ⅲ
+    var isH2 = (lb === "H2") || /^H2/i.test(tok) ||
+               (lb !== "H3" && !/^H3/i.test(tok) && (sc.hCount||0) >= 2);
+    var pre  = isHoe ? (isH2 ? "[회Ⅱ]" : "[회Ⅲ]") : "";
+    function hCode(c3, c2, nonHoe) { return isHoe ? (isH2 ? c2 : c3) : nonHoe; }
     // COMPLEX 처럼 치료실마다 뜻이 다른 라벨은 치료실 규칙을 먼저 본다
     if (g === "작업") {
-        if (lb === "ADL")        return fmt(pre + "일상생활동작훈련치료", isHoe ? "IM114001~016" : "MM114");
+        if (lb === "ADL")        return fmt(pre + "일상생활동작훈련치료", hCode("IM114001~016","IM11401~416","MM114"));
         if (lb === "COMPLEX")    return "";   // 복합작업치료는 따로 넘기지 않는다
-        if (lb === "SPECIAL")    return fmt(pre + "특수작업치료",         isHoe ? "IM113001~016" : "MM113 · MM1131");
+        if (lb === "SPECIAL")    return fmt(pre + "특수작업치료",         hCode("IM113001~016","IM11301~316","MM113 · MM1131"));
         if (lb === "DYSPHAGIA")  return fmt("연하장애재활치료",           "MX141 · MX142");
         if (lb === "VITAL STIM") return fmt("VitalStim",                  "MZ0081 · MZ0082");
     }
@@ -4206,11 +4211,11 @@ function dischargeWantOrder(sc, lblCodes) {
         return fmt(ORDER_NAMES[lb] || lb, compactCodeList(lblCodes[lb]));
     if (g === "물리") {
         if (/보행|워킹|런닝|클라|엑소|엔젤|모닝/.test(tok))
-            return fmt(pre + "보행치료", isHoe ? "IM302001~016" : "MM3022");
-        return fmt(pre + "매트및이동치료", isHoe ? "IM301001~016" : "MM3012");
+            return fmt(pre + "보행치료", hCode("IM302001~016","IM30201~216","MM3022"));
+        return fmt(pre + "매트및이동치료", hCode("IM301001~016","IM30101~116","MM3012"));
     }
-    if (g === "작업") return fmt(pre + "특수작업치료", isHoe ? "IM113001~016" : "MM113");
-    if (g === "언어") return fmt(pre + "언어치료", isHoe ? "IM006001~016" : "MM006");
+    if (g === "작업") return fmt(pre + "특수작업치료", hCode("IM113001~016","IM11301~316","MM113"));
+    if (g === "언어") return fmt(pre + "언어치료", hCode("IM006001~016","IM00601~616","MM006"));
     if (g === "전기" && (lb === "FES" || !lblCodes[lb]))
         return fmt("기능적전기자극치료", "MM1511 · MM1512");
     if (g === "통증" || g === "전기" || g === "메디페인")
@@ -4252,7 +4257,11 @@ function analyzeDischargeLogic() {
                         var who1 = dischargeWhoOf(g[0], r, c, cols);
                         var tm1  = slot[r] || "-";
                         function put(lb) {
-                            sched.push({ grid: g[1], time: tm1, token: t, who: who1, label: lb || "" });
+                            // 한 칸에 H 표기가 둘 이상이면 회Ⅱ(그룹), 하나면 회Ⅲ(1:1)
+                            var hCnt = (v.replace(/\r?\n|\r/g," ").split(/[\s,]+/)
+                                         .filter(function(x){ return /^H[가-힣]/.test(x) || /^H\d?[가-힣]/.test(x); })).length;
+                            sched.push({ grid: g[1], time: tm1, token: t, who: who1, label: lb || "",
+                                         hCount: hCnt, cell: v });
                         }
                         if (g[0] === "mtGridTable") { put(classifyMedipainCell(t)); return; }
 
@@ -5209,6 +5218,10 @@ function buildRowSlotMap(gridId) {
 function isEvalMemoCell(text) {
     var t = String(text||"");
     var body = t.replace(/\([^)]*\)/g, "").trim();
+    // "나재홍S 14:05->13:30" 처럼 시간 변경 메모가 붙으면 등급 표기가 끝자리를 잃는다.
+    // 시간 표기는 떼고 본다.
+    body = body.replace(/\d{1,2}\s*:\s*\d{2}(\s*[-–—>~→]+\s*\d{1,2}\s*:\s*\d{2})?/g, " ")
+               .replace(/[-–—>~→]+/g, " ").replace(/\s+/g, " ").trim();
     if (body === "") return true;                                  // "(성기용 기립성 혈압검사-단순)"
     if (/[+＋]/.test(body)) return false;                          // "H김태식+알봇"
     // F 는 전기 자리 표기다 (F윤샛별). 빠져 있으면 그 칸이 평가 메모로 잘못 분류된다.

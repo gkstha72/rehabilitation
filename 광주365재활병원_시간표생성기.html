@@ -936,9 +936,15 @@ function detectLayout(rows, colors){
 
   /* 치료사 이름을 못 찾아 통째로 빠진 표는 따로 기록해서 화면에 알립니다.
      예전에 여백 열 때문에 PT 표가 조용히 빠진 적이 있어 눈에 보이게 했습니다. */
+  /* 치료사 표(PT·작업치료)만 알립니다.
+     "기구" 같은 이름표는 오른쪽 요약 영역에도 또 있어서
+     그것까지 알리면 매번 헛경고가 뜹니다. */
   layout.skipped =
     anchors
-      .filter(a => a.cols.length === 0)
+      .filter(a =>
+        a.cols.length === 0 &&
+        a.kind === "therapist"
+      )
       .map(a => ({
         label:a.label,
         row:a.row,

@@ -1120,10 +1120,14 @@ function renderDayButtons(){
     const isActive = d.key === state.activeDay;
     const dnum = d.date ? Number(d.date.split('-')[2]) : null;
     const label = dnum ? `${d.key} ${dnum}일` : `${d.key}요일`;
-    return `<button class="day-btn${isActive?' active':''}" data-day="${d.key}" onclick="setActiveDay('${d.key}')" `+
-      `style="border:none;padding:6px 13px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;`+
-      `background:${isActive?'#181818':'#fff'};color:${isActive?'#fff':'var(--ink-soft)'};`+
-      `${i>0?'border-left:1px solid var(--line);':''}">${label}</button>`;
+    return `<span style="display:inline-flex;align-items:stretch;${i>0?'border-left:1px solid var(--line);':''}">`+
+      `<button class="day-btn${isActive?' active':''}" data-day="${d.key}" onclick="setActiveDay('${d.key}')" `+
+      `style="border:none;padding:6px 10px 6px 13px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;`+
+      `background:${isActive?'#181818':'#fff'};color:${isActive?'#fff':'var(--ink-soft)'};">${label}</button>`+
+      `<button onclick="removeDay('${d.key}')" title="이 날 빼기" `+
+      `style="border:none;padding:6px 8px 6px 2px;font-size:12px;cursor:pointer;`+
+      `background:${isActive?'#181818':'#fff'};color:${isActive?'#ffffff88':'#b9c4d1'};">✕</button>`+
+      `</span>`;
   }).join('');
 }
 
@@ -1743,9 +1747,10 @@ function updateDateDisplay(){
     `<span class="date-pick" title="시작일을 고르고 일수를 선택하세요">`+
       `<span class="dp-label${(list.length||state.date)?'':' empty'}">${label}</span>`+
       `<input type="date" id="date-picker" value="${start}" onchange="onWeekendStartPicked(this.value)" title="시작일">`+
-      `<select id="day-count" onchange="onDayCountPicked(this.value)" title="며칠짜리 주말인지 선택">`+
-        [2,3,4,5].map(n=>`<option value="${n}"${n===count?' selected':''}>${n}일</option>`).join('')+
+      `<select id="day-count" onchange="onDayCountPicked(this.value)" title="연속 며칠인지 (추석처럼 띄엄띄엄이면 옆 + 날짜추가 사용)">`+
+        [1,2,3,4,5].map(n=>`<option value="${n}"${n===count?' selected':''}>${n}일</option>`).join('')+
       `</select>`+
+      `<input type="date" id="day-add" onchange="addDayByDate(this.value)" title="필요한 날짜를 하나씩 추가 (추석 등 띄엄띄엄한 날)">`+
       ((list.length||state.date) ? `<button class="dp-clear" title="날짜 지우기" onclick="onWeekendStartPicked('')">✕</button>` : '')+
     `</span>`;
   const lbl = el.querySelector('.dp-label');
@@ -1779,6 +1784,33 @@ function onDayCountPicked(n){
   }
   applyDayList(buildDayList(start, count), '기간');
 }
+// 필요한 날짜를 하나씩 추가 — 추석처럼 날짜가 띄엄띄엄할 때 쓴다.
+//   예) 24일(목) · 26일(토) · 27일(일)
+const WD_KEYS = ['일','월','화','수','목','금','토'];
+function addDayByDate(v){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v||'')) return;
+  const [y,m,d] = v.split('-').map(Number);
+  const key = WD_KEYS[new Date(y, m-1, d).getDay()];
+  const list = (state.dayList || []).map(x=>({...x}));
+  if(list.some(x=>x.date === v)){ showStatus('이미 있는 날짜입니다'); return; }
+  if(list.some(x=>x.key === key)){
+    showStatus(`${key}요일이 이미 있습니다. 먼저 ✕로 빼고 추가해주세요.`);
+    return;
+  }
+  list.push({key, date:v});
+  list.sort((a,b)=> String(a.date||'').localeCompare(String(b.date||'')));
+  applyDayList(list, '날짜 추가');
+  const inp = document.getElementById('day-add');
+  if(inp) inp.value = '';
+}
+// 필요 없는 날 빼기 (그 날 시간표도 같이 사라짐)
+function removeDay(key){
+  const list = (state.dayList || []).filter(d=>d.key !== key);
+  if(!list.length){ showStatus('최소 하루는 남겨야 합니다'); return; }
+  if(state.activeDay === key) state.activeDay = list[0].key;
+  applyDayList(list, '날짜 제외');
+}
+
 // dayList 적용 (셀 데이터는 요일 키 기준으로 최대한 보존)
 function applyDayList(list, what){
   state.dayList = list;
@@ -2501,13 +2533,8 @@ function runVerification(){
       msg:'불러온 파일에서 요일 시트를 찾지 못했습니다. 주말 시간표 파일이 아닐 수 있습니다.',
       fix:'요일별 시트가 들어있는 주말 합산 시간표 파일을 불러주세요.'
     });
-  }else if(mappedDays.length === 1){
-    fileIssues.push({
-      kind:'종류',
-      msg:`요일 시트가 1개(${mappedDays[0]}요일)뿐입니다. 주말 시간표는 보통 2일 이상입니다.`,
-      fix:`토·일(공휴일이 있으면 그 날짜까지) 모든 요일 시트가 들어있는 파일인지 확인해주세요.`
-    });
   }else{
+    // 하루만 불러오는 건 정상 — 추석처럼 날짜별로 따로 붙여넣는 경우가 있다.
     fileChecks.push(`주말 파일 확인 — 요일 시트 ${mappedDays.length}개 (${mappedDays.join('·')}요일)`);
   }
 
@@ -3087,7 +3114,7 @@ function autoFillFromWorkbook(wb, ev){
       }
 
       // === 감지한 요일 구성을 프로그램에 반영 (2일이든 3일이든) ===
-      const newDayList = dayEntries.map(d=>({
+      let newDayList = dayEntries.map(d=>({
         key: d.key,
         date: d.iso || ''
       }));
@@ -3100,6 +3127,22 @@ function autoFillFromWorkbook(wb, ev){
           const dt = new Date(ay, am-1, ad + (i - anchorIdx));
           d.date = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
         });
+      }
+      // 한 번에 한 요일만 들어온 경우(붙여넣기 등)는 기존 요일에 덧붙인다.
+      //   추석처럼 목·토·일 3일치를 따로따로 붙여넣어도 쌓이도록.
+      //   이미 채워진 요일은 남기고, 빈 요일은 정리한다.
+      if(newDayList.length === 1 && state.dayList && state.dayList.length){
+        const hasCells = (key)=> ALL_ROOMS.some(r=>{
+          const c = state.rooms[r] && state.rooms[r].cellsByDay && state.rooms[r].cellsByDay[key];
+          return c && Object.keys(c).length > 0;
+        });
+        const nd = newDayList[0];
+        const kept = state.dayList.filter(d=> d.key === nd.key || hasCells(d.key)).map(d=>({...d}));
+        const hit = kept.find(d=>d.key === nd.key);
+        if(hit){ if(nd.date) hit.date = nd.date; }
+        else kept.push({...nd});
+        kept.sort((a,b)=> String(a.date||'').localeCompare(String(b.date||'')));
+        newDayList = kept;
       }
       state.dayList = newDayList;
       state.date = newDayList[0].date || state.date;

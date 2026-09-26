@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b68</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b69</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -5229,8 +5229,9 @@ function isEvalMemoCell(text) {
     if (body === "") return true;                                  // "(성기용 기립성 혈압검사-단순)"
     if (/[+＋]/.test(body)) return false;                          // "H김태식+알봇"
     // F 는 전기 자리 표기다 (F윤샛별). 빠져 있으면 그 칸이 평가 메모로 잘못 분류된다.
-    if (/^(GR|RS|[HGNMSADVF])[가-힣]/.test(body)) return false;      // "H최망월/" · "F윤샛별"
-    if (/[가-힣]\s*(GR|RS|[HGNMSADVF])\s*\/?\s*$/.test(body)) return false;  // "마정욱S /" · "차광철V"
+    // 등급 뒤에 숫자가 붙기도 한다 — "H2김대선" · "H3정판순"
+    if (/^(GR|RS|[HGNMSADVF])\d?[가-힣]/.test(body)) return false;   // "H최망월/" · "F윤샛별" · "H2김대선"
+    if (/[가-힣]\s*(GR|RS|[HGNMSADVF])\d?\s*\/?\s*$/.test(body)) return false;  // "마정욱S /" · "차광철V"
     // 치료 이름으로 시작하는 칸도 배정이다 — "메디6윤서원" · "페인10김난영"
     if (/^(메디페인|메디|페인|전기|도수|기구|로봇|보행|매트|신장|견인|온열|한냉|CR\d|FES|SSP|ICT|TENS)\s*\d*/i.test(body)) return false;
     return true;

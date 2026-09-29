@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b69</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b70</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -152,7 +152,10 @@ td.clickable:hover { opacity:0.75; }
     <input type="file" id="emrInput" accept=".xlsx, .xls" onclick="this.value='';" />
     <span id="emrStatus">엑셀 미등록</span>
     <button class="step-btn s12-reset" onclick="resetEmrFile()" title="EMR 초기화">초기화</button>
+    <button class="step-btn" onclick="showOutpatientList()" title="외래 환자 성함만 뽑기"
+            style="background:#2980b9;color:#fff;border-color:#2980b9;">&#128101; 외래 명단</button>
   </div>
+  <div id="outpatientArea" style="display:none;margin-top:7px;"></div>
   <div class="s12-head" style="margin-top:7px;">
     <span class="s12-title" style="color:#e67e22;">📋 STEP 2 · 시간표</span>
     <span class="s12-hint">시트 전체 복사 후 아래 칸에 Ctrl+V → 6개 자동 분리</span>
@@ -4471,6 +4474,45 @@ function renderDateBanner() {
 }
 
 // ── 단계별 초기화 ─────────────────────────────────────────────────────────
+// ── 외래 환자 명단 뽑기 ────────────────────────────────────────────────
+// 일일업무보고 환자현황 칸에 그대로 붙여넣을 수 있게 다섯 명씩 줄바꿈해서 보여 준다.
+var outpatientText = "";
+function showOutpatientList() {
+    var area = document.getElementById("outpatientArea");
+    if (!area) return;
+    if (!globalEmrRows || globalEmrRows.length === 0) return alert("EMR 엑셀 파일을 먼저 연동해 주세요.");
+    if (globalEmrVisitIdx === -1) return alert("슬립 리스트에서 '외래/입원' 열을 찾지 못했습니다.");
+
+    var seen = {}, names = [];
+    globalEmrRows.forEach(function(row) {
+        if (!row) return;
+        if (String(row[globalEmrVisitIdx]||"").trim() !== "외래") return;
+        var nm = String(row[globalEmrPatientIdx]||"").trim();
+        if (!nm || seen[nm]) return;
+        seen[nm] = true; names.push(nm);
+    });
+    names.sort(function(a,b){ return a.localeCompare(b, "ko"); });
+
+    var lines = [];
+    for (var i = 0; i < names.length; i += 5) lines.push(names.slice(i, i + 5).join(" "));
+    outpatientText = lines.join("\n");
+
+    area.style.display = "block";
+    area.innerHTML =
+        "<div style='border:1px solid #2980b9;border-radius:6px;padding:9px 11px;background:#eaf2f8;'>" +
+        "<div style='font-weight:700;color:#1f618d;margin-bottom:6px;'>외래 " + names.length + "명" +
+        " <button class='btn-copy' style='margin-left:8px;padding:3px 10px;font-size:12px;' " +
+        "onclick='copyOutpatientList()'>&#128203; 복사</button></div>" +
+        "<pre style='margin:0;font-family:\"Malgun Gothic\",sans-serif;font-size:13.5px;line-height:1.7;" +
+        "white-space:pre-wrap;color:#222;'>" + (outpatientText || "(없음)") + "</pre></div>";
+}
+function copyOutpatientList() {
+    if (!outpatientText) return alert("복사할 명단이 없습니다.");
+    navigator.clipboard.writeText(outpatientText)
+        .then(function(){ notify("외래 명단을 복사했습니다!"); })
+        .catch(function(){ alert("복사에 실패했습니다."); });
+}
+
 function resetEmrFile() {
     if (!confirm("EMR 엑셀 연동을 해제하시겠습니까?\n(시간표 입력 내용은 그대로 유지됩니다)")) return;
     var inp = document.getElementById("emrInput");

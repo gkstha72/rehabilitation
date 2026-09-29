@@ -1455,6 +1455,8 @@ function parseFormatB(rows, headerRowIdx, sheetName){
           fullName += extraTagsByCol[c].join('');
         }
         console.log(`[병실현황 import] ${room}호 p${pIdx}: 원본="${val.replace(/\n/g,'⏎')}" 아래태그=${JSON.stringify(extraTagsByCol[c]||[])} 저장="${fullName}"`);
+        // 자리 주인이 바뀌면 그 자리에 남아 있던 시간표 값은 이전 환자 것이므로 지운다
+        if(state.rooms[room].patients[pIdx].name !== fullName) clearSeatCells(room, pIdx);
         state.rooms[room].patients[pIdx].name = fullName;
         namesImported++;
         pIdx++;
@@ -1462,8 +1464,10 @@ function parseFormatB(rows, headerRowIdx, sheetName){
     }
 
     // 환자 수 부족하면 나머지 슬롯 비우기 (예: 408호는 3명)
+    //   이름만 지우면 이전 환자의 시간표 값이 이름 없는 줄에 남아 인쇄물에 찍힌다.
     for(let p = pIdx; p < PATIENTS_PER_ROOM; p++){
       state.rooms[room].patients[p].name = '';
+      clearSeatCells(room, p);
     }
 
     updatedRooms.add(room);
@@ -2238,6 +2242,24 @@ function logHomonymAssign(name, m_, targets){
   });
 }
 
+// 한 자리(호실·자리번호)의 시간표 값을 요일별로 통째로 지운다 — 환자가 바뀌거나 빠졌을 때.
+function clearSeatCells(room, p){
+  const R = state.rooms[room]; if(!R) return;
+  const pre = `${room}-${p}-`;
+  Object.keys(R.cellsByDay || {}).forEach(d=>{
+    const cells = R.cellsByDay[d] || {};
+    Object.keys(cells).forEach(k=>{ if(k.startsWith(pre)) delete cells[k]; });
+  });
+  Object.keys(state.cellSourceByDay || {}).forEach(d=>{
+    const src = state.cellSourceByDay[d] || {};
+    Object.keys(src).forEach(k=>{ if(k.startsWith(pre)) delete src[k]; });
+  });
+  Object.keys(state.cellConflictsByDay || {}).forEach(d=>{
+    const cf = state.cellConflictsByDay[d] || {};
+    Object.keys(cf).forEach(k=>{ if(k.startsWith(pre)) delete cf[k]; });
+  });
+}
+
 function buildNameMap(){
   const map = {};
   ALL_ROOMS.forEach(r=>{
@@ -2741,10 +2763,35 @@ function runVerification(){
   const _hm = Object.values(vHomonym);
   if(_hm.length) fileChecks.push(`동명이인 판정 ${_hm.length}건 확인 (번호 일치 ${_hm.filter(x=>x.kind==='exact').length} · 번호없는 분 ${_hm.filter(x=>x.kind==='plain').length} · 번호 불일치 ${_hm.filter(x=>x.kind==='numMismatch').length} · 제외 ${_hm.filter(x=>x.kind==='skip').length})`);
 
+  // ── 초기화 없이 이어서 작업한 흔적 ──────────────
+  //   이름 없는 자리에 값이 남아 있으면 이전 명단 기준 값이 그대로 있는 것이다.
+  const setupIssues = [];
+  const staleNoName = [];
+  ALL_ROOMS.forEach(r=>{
+    const room = state.rooms[r]; if(!room) return;
+    room.patients.forEach((pt, i)=>{
+      if((pt.name || '').trim()) return;
+      const pre = `${r}-${i}-`;
+      const hit = [];
+      Object.keys(room.cellsByDay || {}).forEach(d=>{
+        Object.keys(room.cellsByDay[d] || {}).forEach(k=>{ if(k.startsWith(pre)) hit.push(`${d} ${k.split('-')[2]}`); });
+      });
+      if(hit.length) staleNoName.push({room:r, seat:i+1, slots:hit});
+    });
+  });
+  if(staleNoName.length){
+    setupIssues.push({
+      kind:'초기화',
+      msg:`초기화 없이 이어서 작업한 흔적이 있습니다 (이름 없는 자리 ${staleNoName.length}곳에 값이 남아 있음)`,
+      fix:'모두 초기화 → 병실현황 → 시간표 붙여넣기 순서로 다시 해주세요. 이름과 값이 어긋난 채로 인쇄될 수 있습니다.',
+      detail: staleNoName.slice(0,8).map(x=>`${x.room}호 ${x.seat}번 자리(이름 없음) — ${x.slots.slice(0,6).join(', ')}`)
+    });
+  }
+
   showVerificationReport(problems, {
     checkedCells, checks: fileChecks, unmatchedCount: cleanUnmatched.length,
     similarPairs, ambiguous: Object.values(vAmbiguous),
-    homonym: Object.values(vHomonym)
+    homonym: Object.values(vHomonym), setupIssues
   });
 }
 
@@ -2771,11 +2818,22 @@ function showVerificationReport(problems, meta){
   if(!panel) return;
   const conflictProblems = (problems.conflict || []).length;
   const ambiguousProblems = (meta.ambiguous || []).length;
+  const setupIssues = meta.setupIssues || [];
+  let setupHtml = '';
+  if(setupIssues.length){
+    setupHtml += `<div class="vf-sec"><div class="vf-sec-title" style="color:#b3352c">🚫 먼저 확인해주세요 (${setupIssues.length})</div>`;
+    setupIssues.forEach(x=>{
+      setupHtml += `<div class="vf-row"><b>${x.msg}</b></div>`;
+      (x.detail || []).forEach(d=>{ setupHtml += `<div class="vf-row" style="color:#5b6b7f">· ${d}</div>`; });
+      setupHtml += `<div class="vf-row" style="color:#8a97ab;font-size:12px">→ ${x.fix}</div>`;
+    });
+    setupHtml += `</div>`;
+  }
   const hmList = meta.homonym || [];
   const hmCheck = hmList.filter(x=>x.kind==='numMismatch');
   const hmInfo  = hmList.filter(x=>x.kind==='exact' || x.kind==='plain' || x.kind==='skip');
   const total = problems.missing.length + problems.wrongFloor.length
-              + conflictProblems + ambiguousProblems + hmCheck.length;
+              + conflictProblems + ambiguousProblems + hmCheck.length + setupIssues.length;
   const pass = total === 0;
   let html = '';
   html += `<div class="vf-head ${pass?'ok':'bad'}">`;
@@ -2784,6 +2842,7 @@ function showVerificationReport(problems, meta){
     : `⚠️ 문제 ${total}건 발견 (${meta.checkedCells}칸 확인)`;
   html += `<button class="vf-close" onclick="document.getElementById('verify-panel').style.display='none'">✕</button></div>`;
 
+  html += setupHtml;
   if(problems.missing.length){
     html += `<div class="vf-sec"><div class="vf-sec-title">🔴 누락 — 원본엔 있는데 표에 안 채워진 칸 (${problems.missing.length})</div>`;
     problems.missing.slice(0,60).forEach(m=>{

@@ -1457,6 +1457,8 @@ function parseFormatB(rows, headerRowIdx, sheetName){
           fullName += extraTagsByCol[c].join('');
         }
         console.log(`[병실현황 import] ${room}호 p${pIdx}: 원본="${val.replace(/\n/g,'⏎')}" 아래태그=${JSON.stringify(extraTagsByCol[c]||[])} 저장="${fullName}"`);
+        // 자리 주인이 바뀌면 그 자리에 남아 있던 시간표 값은 이전 환자 것이므로 지운다
+        if(state.rooms[room].patients[pIdx].name !== fullName) clearSeatCells(room, pIdx);
         state.rooms[room].patients[pIdx].name = fullName;
         namesImported++;
         pIdx++;
@@ -1464,8 +1466,10 @@ function parseFormatB(rows, headerRowIdx, sheetName){
     }
 
     // 환자 수 부족하면 나머지 슬롯 비우기 (예: 408호는 3명)
+    //   이름만 지우면 이전 환자의 시간표 값이 이름 없는 줄에 남아 인쇄물에 찍힌다.
     for(let p = pIdx; p < PATIENTS_PER_ROOM; p++){
       state.rooms[room].patients[p].name = '';
+      clearSeatCells(room, p);
     }
 
     updatedRooms.add(room);
@@ -2137,6 +2141,15 @@ function renderHomonymSummary(){
   html += `<button class="homonym-apply" onclick="document.getElementById('homonym-panel').style.display='none'">확인</button>`;
   panel.innerHTML = html;
   panel.style.display = 'block';
+}
+
+// 한 자리(호실·자리번호)의 시간표 값을 통째로 지운다 — 환자가 바뀌거나 빠졌을 때.
+function clearSeatCells(room, p){
+  const R = state.rooms[room]; if(!R) return;
+  const pre = `${room}-${p}-`;
+  Object.keys(R.cells || {}).forEach(k=>{ if(k.startsWith(pre)) delete R.cells[k]; });
+  Object.keys(state.cellSource || {}).forEach(k=>{ if(k.startsWith(pre)) delete state.cellSource[k]; });
+  Object.keys(state.cellConflicts || {}).forEach(k=>{ if(k.startsWith(pre)) delete state.cellConflicts[k]; });
 }
 
 function buildNameMap(){
@@ -3305,6 +3318,39 @@ function runVerification(){
   if(_hm.length) fileChecks.push(`동명이인 판정 ${_hm.length}건 확인 (번호 일치 ${_hm.filter(x=>x.kind==='exact').length} · 번호없는 분 ${_hm.filter(x=>x.kind==='plain').length} · 번호 불일치 ${_hm.filter(x=>x.kind==='numMismatch').length} · 제외 ${_hm.filter(x=>x.kind==='skip').length})`);
 
   const setupIssues = [];   // (파일 누락·날짜 불일치는 파일 점검에서 이미 잡음)
+
+  // ── 초기화 없이 이어서 작업한 흔적 찾기 ──────────────
+  //   이전 날짜 값이 남은 채로 병실현황만 새로 불러오면 이름과 값이 어긋난다.
+  //   ① 이름 없는 자리에 값이 있음  ② 오늘 원본에 없는 환자에게 값이 있음
+  const staleNoName = [], staleNotToday = [];
+  ALL_ROOMS.forEach(r=>{
+    const room = state.rooms[r]; if(!room) return;
+    room.patients.forEach((pt, i)=>{
+      const pre = `${r}-${i}-`;
+      const keys = Object.keys(room.cells || {}).filter(k=>k.startsWith(pre));
+      if(!keys.length) return;
+      const nm = (pt.name || '').trim();
+      if(!nm){
+        staleNoName.push({room:r, seat:i+1, slots:keys.map(k=>k.split('-')[2])});
+      }else{
+        const base = nameTagInfo(nm).display.replace(/\s*\([^)]+\)/g,'').replace(/\d+$/,'').trim();
+        if(!expectedNames[base] && !expectedNames[nm]){
+          staleNotToday.push({room:r, name:nm, slots:keys.map(k=>k.split('-')[2])});
+        }
+      }
+    });
+  });
+  if(staleNoName.length || staleNotToday.length){
+    setupIssues.push({
+      kind:'초기화',
+      msg:`초기화 없이 이어서 작업한 흔적이 있습니다 (이름 없는 자리 ${staleNoName.length}곳 · 오늘 원본에 없는 환자 ${staleNotToday.length}명)`,
+      fix:'모두 초기화 → 병실현황 → 신경계·근골 순서로 다시 불러오세요. 이름과 값이 어긋난 채로 인쇄될 수 있습니다.',
+      detail:[
+        ...staleNoName.slice(0,8).map(x=>`${x.room}호 ${x.seat}번 자리(이름 없음) — ${x.slots.slice(0,6).join(', ')}`),
+        ...staleNotToday.slice(0,8).map(x=>`${x.room}호 ${x.name} — 오늘 원본에 없음 (${x.slots.slice(0,6).join(', ')})`)
+      ]
+    });
+  }
   // 구분별 칸 수 — 통증 0처럼 눈에 띄는 이상을 바로 보이게 (표에 실제로 찍힌 값 기준)
   const tableCount = {};
   ALL_ROOMS.forEach(r=>{
@@ -3362,6 +3408,9 @@ function showVerificationReport(problems, meta){
     setupHtml += `<div class="vf-sec"><div class="vf-sec-title" style="color:#b3352c">🚫 먼저 확인해주세요 (${setupIssues.length})</div>`;
     setupIssues.forEach(x=>{
       setupHtml += `<div class="vf-row"><b>${x.msg}</b></div>`;
+      (x.detail || []).forEach(dline=>{
+        setupHtml += `<div class="vf-row" style="color:#5b6b7f">· ${dline}</div>`;
+      });
       setupHtml += `<div class="vf-row" style="color:#8a97ab;font-size:12px">→ ${x.fix}</div>`;
     });
     setupHtml += `</div>`;

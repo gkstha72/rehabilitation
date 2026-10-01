@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b72</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b73</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -1703,6 +1703,8 @@ function calculateEmrStatsLogic(members, orderList, codeMap) {
 }
 
 function analyzePtEtMtCombinedMasterLogic() {
+    // 개인 시간표 ↔ 전기 시간표 중복 제거용
+    var personalSeenDup = {}, ptRowSlotForDup = buildRowSlotMap("ptGridTable");
     resetEmrTherapistAlias();   // 치료사 이름 변환표를 최신 EMR 기준으로 다시 만든다
     debugLogs.pt = {}; debugLog = debugLogs.pt; // 통합 집계 시 물리 로그 초기화
     var res = extractMembers("ptGridTable");
@@ -1770,6 +1772,18 @@ function analyzePtEtMtCombinedMasterLogic() {
                 if (hasMGF || unmatchedHCount > 1) { hAsH2 = unmatchedHCount; }
                 else { hAsH3 = 1; }
             }
+            // 개인 시간표에 적힌 (치료사 · 환자 · 시간) 을 기록해 둔다.
+            // 같은 건이 전기 시간표에도 있으면 두 번 세지 않기 위함이다.
+            var ptSlotNow = ptRowSlotForDup[r] || "";
+            if (ptSlotNow) {
+                tokens.forEach(function(tk) {
+                    var mm = String(tk).replace(/\([^)]*\)/g,"").match(/[가-힣]{2,4}\d?/);
+                    if (!mm) return;
+                    therapists.forEach(function(th0) {
+                        personalSeenDup[th0 + "|" + mm[0] + "|" + ptSlotNow] = true;
+                    });
+                });
+            }
             therapists.forEach(function(th) {
                 function logC(label, cell) { var k=th+"||"+label; if(!debugLog[k])debugLog[k]=[]; debugLog[k].push(cell); }
                 ptOrder.forEach(function(p){ if(directCounts[p]>0){ timeStats[th][p] += directCounts[p]; logC(p,cellText); } });
@@ -1782,6 +1796,7 @@ function analyzePtEtMtCombinedMasterLogic() {
             });
         });
     }
+    var etRowSlotForDup = buildRowSlotMap("etGridTable");
     var etStartCol = etTherapistCol() + 1;   // 담당 열 다음 칸부터가 치료 자리다
     for (var r = 1; r < ROW_COUNT; r++) {
         var etTherapist = etRowTherapistMap[r] || ""; if (!etTherapist) continue;
@@ -1790,6 +1805,10 @@ function analyzePtEtMtCombinedMasterLogic() {
                     document.getElementById("etGridTable-cell-"+r+"-"+c).value.trim());
             if (!ct || cellValIsBlankOrInvalid(ct)) continue;
             if (masterTherapists.includes(ct)) continue;
+            // 같은 치료사·환자·시간이 개인 시간표에 이미 있으면 개인 쪽을 쓴다
+            var etSlotNow = etRowSlotForDup[r] || "";
+            var etNm = String(ct).replace(/\([^)]*\)/g,"").match(/[가-힣]{2,4}\d?/);
+            if (etSlotNow && etNm && personalSeenDup[etTherapist + "|" + etNm[0] + "|" + etSlotNow]) continue;
             var cu = ct.toUpperCase();
             if (cu.includes("H2") || cu.startsWith("H")) {
                 timeStats[etTherapist]["H2"] += 1;

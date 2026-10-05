@@ -2745,11 +2745,21 @@ function computeDetailDiff(therapist, label, room) {
     // pt룸은 pt/et/mt 세 로그를 합산해서 조회
     var schedItems = [];
     if (room === "pt") {
+        // 같은 내용의 칸이 여러 시간에 있으면 모두 살려야 한다 (H손영희 09:35 · 17:00 등)
+        // 세 로그에 겹쳐 들어간 건만 한 번으로 친다 → 내용별 최대 횟수만큼 담는다
         var combinedKeys = ["pt","et","mt"];
+        var maxCnt = {}, order = [];
         combinedKeys.forEach(function(r) {
             var rLog = debugLogs[r] || {};
-            if (rLog[key]) rLog[key].forEach(function(item){ if(!schedItems.includes(item)) schedItems.push(item); });
+            if (!rLog[key]) return;
+            var cnt = {};
+            rLog[key].forEach(function(item){
+                cnt[item] = (cnt[item]||0) + 1;
+                if (!(item in maxCnt)) { maxCnt[item] = 0; order.push(item); }
+            });
+            Object.keys(cnt).forEach(function(it){ if (cnt[it] > maxCnt[it]) maxCnt[it] = cnt[it]; });
         });
+        order.forEach(function(it){ for (var i = 0; i < maxCnt[it]; i++) schedItems.push(it); });
     } else {
         var log = debugLogs[room] || {};
         schedItems = log[key] || [];
@@ -2952,15 +2962,47 @@ function computeDetailDiff(therapist, label, room) {
         var tokens = extractMatchingTokens(cellText, label);
         tokens.forEach(function(t) { filteredSched.push(t); });
     });
-    // 시간표 내역도 시간 순으로 정렬한다
+    // 시간표 내역 시간: 이 치료사 열에서 순서대로 찾아 붙인다 (같은 내용이 여러 시간에 있어도 각자 시간)
     resetSchedTimeIndex();
-    filteredSched.sort(function(a, b) {
-        var ta = toMinutes(schedTokenTime(a)), tb = toMinutes(schedTokenTime(b));
+    var thSlots = [];
+    ["ptGridTable","otGridTable","stGridTable"].forEach(function(gid) {
+        var rowSlot = buildRowSlotMap(gid);
+        var cols = extractMembers(gid).colMapping;
+        Object.keys(cols).forEach(function(c) {
+            for (var r = 1; r < ROW_COUNT; r++) {
+                if (!rowSlot[r]) continue;
+                var owners = ownersAt(gid, r, c, cols) || [];
+                if (owners.indexOf(therapist) === -1) continue;
+                var el = document.getElementById(gid+"-cell-"+r+"-"+c);
+                var raw = el ? el.value.trim() : "";
+                if (!raw) continue;
+                var txt = liveCellText(gid, r, c, raw);
+                if (!txt) continue;
+                var toks = txt.replace(/\r?\n|\r/g," ").split(/[\s,]+/).map(function(t){ return t.trim(); }).filter(Boolean);
+                thSlots.push({ slot: rowSlot[r], text: txt, toks: toks, used: {} });
+            }
+        });
+    });
+    thSlots.sort(function(a, b){ return toMinutes(a.slot) - toMinutes(b.slot); });
+    var schedTimes = filteredSched.map(function(tok) {
+        var t = String(tok||"").trim();
+        for (var i = 0; i < thSlots.length; i++) {
+            var s = thSlots[i];
+            if (s.used[t]) continue;
+            if (s.text === t || s.toks.indexOf(t) !== -1) { s.used[t] = true; return s.slot; }
+        }
+        return schedTokenTime(t);
+    });
+    var schedPairs = filteredSched.map(function(t, i){ return { text: t, time: schedTimes[i] }; });
+    schedPairs.sort(function(a, b) {
+        var ta = toMinutes(a.time), tb = toMinutes(b.time);
         if (ta === null && tb === null) return 0;
         if (ta === null) return 1;
         if (tb === null) return -1;
         return ta - tb;
     });
+    filteredSched = schedPairs.map(function(p){ return p.text; });
+    schedTimes   = schedPairs.map(function(p){ return p.time; });
     // EMR 내역도 시작시간 순으로 맞춰 나란히 보이게 한다
     emrItems.sort(function(a, b) {
         var ta = toMinutes(a.time), tb = toMinutes(b.time);
@@ -2975,22 +3017,29 @@ function computeDetailDiff(therapist, label, room) {
     var emrMatched = emrItems.map(function() { return false; });
     var schedMatched = filteredSched.map(function() { return false; });
 
-    // 시간표 순서대로 EMR과 1:1 매칭
-    filteredSched.forEach(function(schedToken, si) {
-        var schedName = extractPatientName(schedToken);
-        if (schedName.length < 1) return;
-        for (var ei = 0; ei < emrItems.length; ei++) {
-            if (emrMatched[ei]) continue; // 이미 매칭된 EMR 항목 건너뜀
-            var emrName = emrItems[ei].patient;
-            if (emrName.includes(schedName) || schedName.includes(emrName)) {
+    // 시간표 ↔ EMR 1:1 매칭 — 1차: 같은 환자 + 같은 시간, 2차: 같은 환자
+    [true, false].forEach(function(sameTime) {
+        filteredSched.forEach(function(schedToken, si) {
+            if (schedMatched[si]) return;
+            var schedName = extractPatientName(schedToken);
+            if (schedName.length < 1) return;
+            var sMin = toMinutes(schedTimes[si]);
+            for (var ei = 0; ei < emrItems.length; ei++) {
+                if (emrMatched[ei]) continue; // 이미 매칭된 EMR 항목 건너뜀
+                var emrName = emrItems[ei].patient;
+                if (!(emrName.includes(schedName) || schedName.includes(emrName))) continue;
+                if (sameTime) {
+                    var eMin = toMinutes(emrItems[ei].time);
+                    if (sMin === null || eMin === null || Math.abs(sMin - eMin) > 2) continue;
+                }
                 emrMatched[ei] = true;
                 schedMatched[si] = true;
-                break; // 1:1 매칭이므로 첫 번째 매칭 후 중단
+                break;
             }
-        }
+        });
     });
 
-    return { sched: filteredSched, emr: emrItems,
+    return { sched: filteredSched, emr: emrItems, times: schedTimes,
              schedMatched: schedMatched, emrMatched: emrMatched,
              nameOf: extractPatientName };
 }
@@ -3088,7 +3137,7 @@ function showDetail(therapist, label, count, room) {
                 // 노랑: 시간표에만 있음
                 div.style.cssText = "background:#fef9e7;border-left:4px solid #f39c12;padding:8px 12px;margin-bottom:6px;border-radius:4px;font-size:13px;";
             }
-            var stime = schedTokenTime(text);
+            var stime = (d.times && d.times[idx]) || schedTokenTime(text);
             div.innerText = (idx+1) + ". " + (stime ? stime + "  " : "") + text;
             schedCol.appendChild(div);
         });
@@ -4278,7 +4327,9 @@ function analyzeDischargeLogic() {
                     var el = document.getElementById(g[0]+"-cell-"+r+"-"+c);
                     var v = el ? el.value.trim() : "";
                     if (!v || !textHasPatient(v, nm)) continue;
-                    if (isEvalMemoCell(v)) continue;   // 평가 대상자 메모 칸은 치료 배정이 아니다
+                    // 평가 대상자 메모 칸은 치료 배정이 아니다.
+                    // 단, 전기 · 메디페인 · 통증 시간표는 접두 없이 성함만 적으므로(예: "천동우") 메모로 보지 않는다.
+                    if ((g[0] === "ptGridTable" || g[0] === "otGridTable" || g[0] === "stGridTable") && isEvalMemoCell(v)) continue;
                     // 시행선이 그어진 줄은 "시행만 하고 액팅은 안 넘김" 이라 오더 대상이 아니다.
                     // 한 칸에 여러 명이면 그 사람 줄에만 선이 그어졌는지 본다.
                     var lnsD = cellLines(g[0], r, c, v);

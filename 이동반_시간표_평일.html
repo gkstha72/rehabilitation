@@ -1938,9 +1938,18 @@ function resetNameSimilarNotes(){ nameSimilarNotes = { hits:{}, suspects:{} }; }
 //   예: "G방극열+패시브\nH정금복+슬라\n\nC조민경+리포머(외래)"
 //       → (외래) 태그는 조민경 줄에만 적용. 방극열·정금복은 영향 없음.
 //   단독 태그 줄(예: "(병동)"만 있는 줄)은 직전 이름 줄에 붙임.
+// 괄호 없이 적은 위치 표시를 괄호 태그로 바꿔준다.
+//   "H오은자 ⏎ 침상"  → "H오은자 ⏎ (침상)"
+//   "H오은자+침상"    → "H오은자(침상)"
+//   치료사가 괄호를 빼먹어도 침상·외래·병동은 이동반 대상에서 정확히 빠지도록.
+function normalizeBareTags(s){
+  return String(s)
+    .replace(/(^|\n)[ \t]*(침상|외래|병동)[ \t]*(?=\n|$)/g, '$1($2)')
+    .replace(/\+[ \t]*(침상|외래|병동)(?![가-힣])/g, '($1)');
+}
 function extractPatientNames(content, nameMap){
   if(!content) return [];
-  const text = String(content);
+  const text = normalizeBareTags(content);
   const results = [];
   const hasRoster = nameMap && Object.keys(nameMap).length > 0;
   const isRealName = (n) => hasRoster ? !!(nameMap[n] && nameMap[n].length > 0) : true;
@@ -2798,11 +2807,24 @@ const LIST_HEADER_RE = /(리스트|명단)\s*$/;
 // 섹션 머리행(치료사 이름 줄)에서 '실제 치료 열'만 뽑는다.
 //   시간표는 [치료사 열] × [치료시간 행]이 만나는 칸만 유효하다.
 //   머리행에 이름이 없는 열(오른쪽 외출·외진 명단, 메모 등)은 시간 행이어도 읽지 않는다.
+//   머리행 값이 환자 표기(H박명희·N김민남 같은 접두+이름)면 치료사 열이 아니다.
+//   오른쪽에 세로로 적어둔 가나다순 환자 명단이 머리행에 걸쳐 있을 때 걸러낸다.
+//   환자 표기는 정해진 접두(H·N·G·M·S·A·D·C·GR·RS)만 쓴다. 그 접두 바로 뒤에 한글 이름이 와야 환자로 본다.
+//   'NDT김수연' 'OT김수연' 'PT김수연'처럼 치료 구분이 앞에 붙은 치료사 이름은 환자로 보지 않는다.
+const PATIENT_LIKE_RE = /^(?:GR|RS|H|N|G|M|S|A|D|C)\d?[가-힣]{2,}/;
 function colsOfHeaderRow(ws, range, r){
   const set = new Set();
+  // 병실현황에 있는 환자 이름 — 머리행에 접두 없이 환자 이름만 있어도 명단 열로 본다
+  let roster = null;
+  try{ roster = (typeof buildNameMap === 'function') ? buildNameMap() : null; }catch(e){ roster = null; }
   for(let c = range.s.c; c <= range.e.c; c++){
     const cell = ws[XLSX.utils.encode_cell({r, c})];
-    if(cell && cell.v != null && String(cell.v).trim()) set.add(c);
+    if(!cell || cell.v == null) continue;
+    const v = String(cell.v).trim();
+    if(!v) continue;
+    if(PATIENT_LIKE_RE.test(v)) continue;   // 환자 이름이 머리행에 있음 → 명단 열
+    if(roster && roster[v] && roster[v].length) continue;   // 접두 없는 환자 이름(은종원 등) → 명단 열
+    set.add(c);
   }
   return set;
 }

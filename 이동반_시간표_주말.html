@@ -1907,11 +1907,24 @@ const SKIP_BLOCK_RE = /(방문|재택)/;
 const LIST_HEADER_RE = /(리스트|명단)\s*$/;
 // 섹션 머리행(치료사 이름 줄)에서 '실제 치료 열'만 뽑는다.
 //   시간표는 [치료사 열] × [치료시간 행]이 만나는 칸만 유효하다.
+//   머리행 값이 환자 표기(H박명희·N김민남 같은 접두+이름)면 치료사 열이 아니다.
+//   오른쪽에 세로로 적어둔 가나다순 환자 명단이 머리행에 걸쳐 있을 때 걸러낸다.
+//   환자 표기는 정해진 접두(H·N·G·M·S·A·D·C·GR·RS)만 쓴다. 그 접두 바로 뒤에 한글 이름이 와야 환자로 본다.
+//   'NDT김수연' 'OT김수연' 'PT김수연'처럼 치료 구분이 앞에 붙은 치료사 이름은 환자로 보지 않는다.
+const PATIENT_LIKE_RE = /^(?:GR|RS|H|N|G|M|S|A|D|C)\d?[가-힣]{2,}/;
 function colsOfHeaderRow(ws, range, r){
   const set = new Set();
+  // 병실현황에 있는 환자 이름 — 머리행에 접두 없이 환자 이름만 있어도 명단 열로 본다
+  let roster = null;
+  try{ roster = (typeof buildNameMap === 'function') ? buildNameMap() : null; }catch(e){ roster = null; }
   for(let c = range.s.c; c <= range.e.c; c++){
     const cell = ws[XLSX.utils.encode_cell({r, c})];
-    if(cell && cell.v != null && String(cell.v).trim()) set.add(c);
+    if(!cell || cell.v == null) continue;
+    const v = String(cell.v).trim();
+    if(!v) continue;
+    if(PATIENT_LIKE_RE.test(v)) continue;   // 환자 이름이 머리행에 있음 → 명단 열
+    if(roster && roster[v] && roster[v].length) continue;   // 접두 없는 환자 이름(은종원 등) → 명단 열
+    set.add(c);
   }
   return set;
 }
@@ -2044,9 +2057,18 @@ function resetNameSimilarNotes(){ nameSimilarNotes = { hits:{}, suspects:{} }; }
 //   주말 카테고리는 1층/3층/통증만 유효. (외래)·(병동)은 자동입력에서 제외
 //     - (외래): 사용자가 셀 클릭으로 직접 표시
 //     - (병동): 주말 카테고리가 아니므로 자동입력 대상 아님
+// 괄호 없이 적은 위치 표시를 괄호 태그로 바꿔준다.
+//   "H오은자 ⏎ 침상"  → "H오은자 ⏎ (침상)"
+//   "H오은자+침상"    → "H오은자(침상)"
+//   치료사가 괄호를 빼먹어도 침상·외래·병동은 이동반 대상에서 정확히 빠지도록.
+function normalizeBareTags(s){
+  return String(s)
+    .replace(/(^|\n)[ \t]*(침상|외래|병동)[ \t]*(?=\n|$)/g, '$1($2)')
+    .replace(/\+[ \t]*(침상|외래|병동)(?![가-힣])/g, '($1)');
+}
 function extractPatientNames(content, nameMap){
   if(!content) return [];
-  const text = String(content);
+  const text = normalizeBareTags(content);
   const results = [];
   const hasRoster = nameMap && Object.keys(nameMap).length > 0;
   const isRealName = (n) => hasRoster ? !!(nameMap[n] && nameMap[n].length > 0) : true;
@@ -3459,6 +3481,7 @@ function processSheetForDay(wb, sheetName, day, nameMap, opts){
   let currentCategory = '3층';
   let skipZone = false;      // 집계표 등 이동반과 무관한 구역
   let allowedCols = null;
+  let bannedCols = null;   // 머리행에 환자 이름이 있는 열 (세로 명단)
   const skippedZones = [];
   const sectionCounts = {};
 
@@ -3473,6 +3496,12 @@ function processSheetForDay(wb, sheetName, day, nameMap, opts){
       if(label){
         // === 합산 파일 핵심: (3층) / (1층) 섹션 헤더 자동 감지 ===
         // 예: '6월 14일 일요일 주말시간표 (3층)', '... (1층)'
+        // 섹션 머리행이면 그 행의 치료사 이름 열만 읽도록 목록 갱신 (어느 분기로 가든 먼저)
+        if(/^(통증|ST|언어|스피치|speech|NDT|PT|OT|MAT|GAIT|FES|매트|로봇|회복기|신경계|근골|기구|전기)/i.test(label)){
+          // 치료사 이름 줄 = 이 행. 여기 이름이 있는 열만 시간표로 읽는다.
+          //   (머리행에 환자 표기 H박명희 등이 걸친 명단 열은 colsOfHeaderRow가 제외)
+          allowedCols = colsOfHeaderRow(ws, range, r);
+        }
         if(/\(\s*3\s*층\s*\)/.test(label)){
           currentCategory = '3층';
           sectionCounts[label] = '3층';
@@ -3499,7 +3528,6 @@ function processSheetForDay(wb, sheetName, day, nameMap, opts){
           sectionCounts[label] = currentCategory;
           skipZone = false;
           continue;
-        }else if(/^(통증|ST|언어|스피치|speech|NDT|PT|OT|MAT|GAIT|매트|로봇|회복기|신경계|근골|기구|전기|\(?[13]층)/i.test(label) && (allowedCols = colsOfHeaderRow(ws, range, r)) && false){
         }else if(SKIP_SECTION.test(label)){
           skipZone = true;
           skippedZones.push(label);
@@ -3536,7 +3564,7 @@ function processSheetForDay(wb, sheetName, day, nameMap, opts){
       // 시간 셀은 건너뜀
       if(parseTimeValue(cell.v, cell.w)) continue;
       // 밑줄 친 셀(액팅 처리) → 제외
-      if(allowedCols && !allowedCols.has(c)) continue;   // 치료사 열이 아님
+      if(allowedCols && !allowedCols.has(c)) continue;   // 치료사 열이 아님 (시간 행 × 치료사 열만)
       if(listCols[c] !== undefined && r > listCols[c]) continue;
       if(isMemoCell(cell.v)) continue;   // 메모·참고 표기
       if(underlineSet.has(ref)) continue;

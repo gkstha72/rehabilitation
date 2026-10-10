@@ -138,7 +138,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-09-04 b73</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-10 b80</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -361,6 +361,22 @@ ICT(15) + MI(5) = <b>20분</b> · ICT(15) + HP(15) = <b>30분</b> · ICT(15) + B
 <span id="checkListStatus" style="font-size:13px;color:#7f8c8d;">파일 미등록</span>
 </div>
 <div id="checkListArea"></div>
+</div>
+
+<div class="container">
+<h2 class="result-header" style="border-color:#d35400;font-size:22px;">&#127942; [13] OT 인센티브 카운팅</h2>
+<p>시간표(작업치료)의 <b>평가 메모</b>와 <b>MBI_SCIM 시행확인방</b> 대화를 읽어 인센티브 시트에 붙일 <b>날짜 · 이름 · 평가 구분</b> 목록을 만듭니다.<br>
+모든 건은 <b>인센 날짜</b>로 들어갑니다 (챗에 적힌 평가 날짜는 쓰지 않음). 비워 두면 시간표 날짜로 채웁니다.<br>
+OT평가·신환평가 1점 · 월재평가 0.5점 · 교차확인 0.25점 · 치매척도/MMSE 제외 · <b>(신환)</b> 챗은 교차확인자만 · 감점은 직접 확인</p>
+<textarea id="otIncChat" placeholder="MBI_SCIM 시행확인방 대화를 복사해서 붙여넣기 (시간표 평가만 셀 때는 비워 두세요)"
+          style="width:100%;height:130px;box-sizing:border-box;padding:8px;font-size:12.5px;border:1px solid #e0b48a;border-radius:6px;"></textarea>
+<div class="action-area">
+<label style="font-size:14px;font-weight:700;color:#a04000;margin-right:8px;">인센 날짜
+  <input type="date" id="otIncDate" style="margin-left:4px;padding:5px 8px;font-size:14px;border:1px solid #e0b48a;border-radius:6px;" />
+</label>
+<button class="btn-calc" style="background:#d35400;border-color:#d35400;" onclick="analyzeOtIncentive()">&#127942; 인센 카운팅 실행</button>
+</div>
+<div id="otIncArea"></div>
 </div>
 <div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
   <div class="modal-box" id="detailModalBox">
@@ -1434,7 +1450,7 @@ function clearResultAreas() {
     ["ptTripleArea","otTripleArea","stTripleArea","painTripleArea","evalArea",
      "orderIssueArea","crPairArea","qtyCheckArea","robotGaitArea","overlapArea",
      "slipDetailArea","dosuConflictArea","painTimeArea","dupNameArea",
-     "dischargeArea","evalCheckArea","excludeResultArea"].forEach(function(id) {
+     "dischargeArea","evalCheckArea","otIncArea","excludeResultArea"].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.innerHTML = "";
     });
@@ -6487,6 +6503,273 @@ function emrOutpatientNames() {
     return set;
 }
 
+// ── [13] OT 인센티브 카운팅 ────────────────────────────────────────────
+//   OT평가 1 · 신환평가 1 · 월재평가 0.5 · 교차확인 0.25
+//   시간표(작업치료)의 평가 메모 → OT평가 · 신환평가
+//   MBI_SCIM 시행확인방 → 글쓴이 월재평가, "확인 - ○○○" 교차확인
+//   (신환) 챗은 평가자 점수를 시간표에서 이미 주므로 교차확인자만 센다.
+var OT_INC_PTS = { "OT평가":1, "신환평가":1, "월재평가":0.5, "교차확인":0.25 };
+// 치매척도 · MMSE 는 인센티브 제외. MBI/SCIM(일상생활동작검사)은 신환평가 · 월재평가로 따로 센다.
+var OT_INC_SKIP_RE = /간이정신|치매척도|MMSE|일상생활동작/;
+var otIncText = "";
+
+// 인센티브 시트 표기 — 시간표에 "김수진" 으로 적었는데 EMR 별칭으로 붙은 번호(김수진1)만 뗀다.
+// 챗에 직접 적힌 번호(김수현2)는 다른 사람이므로 그대로 둔다. 고정 별칭(김다은 → 김다은2)은 유지.
+function otIncName(n) {
+    n = String(n||"").trim();
+    var base = n.replace(/\d+$/, "");
+    if (base !== n && !THERAPIST_FIXED_ALIAS[base] &&
+        emrTherapistAlias && emrTherapistAlias[base] === n) n = base;
+    return THERAPIST_FIXED_ALIAS[n] || n;
+}
+function otIncDate(o) { return o ? (o.mo + "/" + o.d) : ""; }
+
+// 대화 붙여넣기 → [{ date, writer, patient, isNew, discharge, checkers[] }]
+//   재활센터 김선중 작업치료사
+//   08:30
+//   10/6 이상열 mbi(5병동) / 확인 - 윤희지
+function parseMbiChat(text) {
+    var lines = nfc(String(text||"")).split(/\r?\n/).map(function(x){ return x.replace(/\u00a0/g, " ").trim(); });
+    var TIME_ONLY = /^(오전|오후)?\s*\d{1,2}\s*:\s*\d{2}(\s*[AP]M)?$/i;
+    var TIME_TAIL = /^(.*?[가-힣)\]])\s*(오전|오후)?\s*\d{1,2}\s*:\s*\d{2}(\s*[AP]M)?$/i;
+    var TITLE_RE  = /작업치료사|물리치료사|언어재활사|치료사|계장|과장|팀장|실장|주임|선생님/;
+    var MSG_RE    = /^(\d{1,2})\s*\/\s*(\d{1,2})\s+(.*?)\s*(mbi|scim)(?![a-z])/i;
+    function nextLine(i) {
+        for (var j = i + 1; j < lines.length; j++) if (lines[j]) return lines[j];
+        return "";
+    }
+    function nameOf(h) {
+        var w = h.replace(/재활센터/g, " ").replace(new RegExp(TITLE_RE.source, "g"), " ");
+        var wm = w.match(/[가-힣]{2,4}\d?/);
+        return wm ? wm[0] : "";
+    }
+    var out = [], unread = [], writer = "";
+    for (var i = 0; i < lines.length; i++) {
+        var ln = lines[i];
+        if (!ln || TIME_ONLY.test(ln)) continue;
+        if (/^\(?편집됨\)?$/.test(ln)) continue;
+        var m = ln.match(MSG_RE);
+        if (!m) {
+            // 글쓴이 줄 — 다음 줄이 시각이거나, 시각이 같은 줄 끝에 붙었거나, 직함이 붙은 줄
+            var tm = ln.match(TIME_TAIL);
+            var head = "";
+            if (TIME_ONLY.test(nextLine(i))) head = ln;
+            else if (tm && !/mbi|scim/i.test(ln)) head = tm[1];
+            else if (/재활센터/.test(ln) || new RegExp("(" + TITLE_RE.source + ")\\s*$").test(ln)) head = ln;
+            if (head) { var nm = nameOf(head); if (nm) writer = nm; continue; }
+            if (/mbi|scim/i.test(ln)) unread.push(ln);
+            continue;
+        }
+        var pm = stripHonorifics(m[3]).trim().match(/([가-힣]{2,4}\d?)\s*$/);
+        var rest = ln.slice(m[0].length).replace(/\(?편집됨\)?/g, "");
+        var cm = rest.match(/확인\s*[-–—:：]?\s*(.+)$/);
+        var checkers = [];
+        if (cm) {
+            (cm[1].match(/[가-힣]{2,4}\d?/g) || []).forEach(function(n) {
+                if (!/선생님|확인/.test(n) && checkers.indexOf(n) === -1) checkers.push(n);
+            });
+        }
+        out.push({ date: (+m[1]) + "/" + (+m[2]), writer: writer, patient: pm ? pm[1] : "",
+                   isNew: /신[환황]/.test(rest), discharge: /퇴원/.test(rest),
+                   checkers: checkers, raw: ln });
+    }
+    return { items: out, unread: unread };
+}
+
+function analyzeOtIncentive() {
+    var area = document.getElementById("otIncArea");
+    if (!area) return;
+    var rows = [], warns = [], seen = {};
+    // sub — OT평가는 검사 종류(수지 · 후글 …)마다 따로 센다
+    function add(date, name, kind, patient, note, warn, sub) {
+        date = incDate;
+        name = otIncName(name);
+        if (!name) return;
+        var k = date + "|" + name + "|" + kind + "|" + patient + "|" + (sub || "");
+        if (seen[k]) return;          // 같은 평가가 두 칸에 적히거나 대화를 겹쳐 붙인 경우
+        seen[k] = true;
+        rows.push({ date:date, name:name, kind:kind, patient:patient, note:note||"", warn:!!warn });
+    }
+
+    // ① 시간표 — OT평가 · 신환평가
+    var dObj = parseAnyDate(schedDateText) || parseAnyDate(emrDateText);
+    var tDate = otIncDate(dObj);            // 시간표 날짜 — 신환 챗 대조용
+    // 인센 날짜 — 목록의 날짜는 모두 이 날짜로 쓴다
+    var dIn = document.getElementById("otIncDate");
+    if (dIn && !dIn.value) {
+        var base = dObj ? new Date(dObj.y, dObj.mo - 1, dObj.d) : new Date();
+        dIn.value = base.getFullYear() + "-" + ("0" + (base.getMonth()+1)).slice(-2) + "-" + ("0" + base.getDate()).slice(-2);
+    }
+    var incDate = "";
+    if (dIn && dIn.value) { var dp = dIn.value.split("-"); incDate = (+dp[1]) + "/" + (+dp[2]); }
+    var schedNewPts = {};   // 신환 챗 대조용 — 시간표에 신환평가가 적힌 환자
+    var ev = analyzeEvalCheck(true);
+    var schedNote = "";
+    if (!ev) {
+        schedNote = "EMR 파일이 없어 시간표 평가(OT평가 · 신환평가)는 세지 않았습니다.";
+    } else {
+        function whoOne(who, raw) {
+            var ws = String(who||"").split("·").filter(Boolean);
+            if (ws.length > 1) warns.push({ who: ws.join("·"), text: "담당이 둘로 읽힘 — 앞사람으로 셈 〈" + raw + "〉" });
+            return ws[0] || "";
+        }
+        ev.sched.forEach(function(sc) {
+            if (sc.gid !== "otGridTable") return;
+            if (!sc.any && sc.labels.every(function(lb){ return OT_INC_SKIP_RE.test(lb); })) return;
+            var who = whoOne(sc.who, sc.raw);
+            if (!who) { warns.push({ who:"-", text:"담당을 못 읽어 뺐습니다 〈" + sc.raw + "〉" }); return; }
+            var lb = sc.slip ? sc.slip.label : (sc.any ? "평가(검사명 미기재)" : sc.labels[0]);
+            if (sc.slip && OT_INC_SKIP_RE.test(lb)) return;   // "평가" 로만 적었는데 치매척도였던 경우
+            add(tDate, who, "OT평가", sc.patient, sc.slip ? lb : lb + " — EMR 슬립 없음", !sc.slip, lb);
+        });
+        ev.newPt.forEach(function(n) {
+            schedNewPts[n.patient] = true;
+            var who = whoOne(n.who, n.raw);
+            if (!who) { warns.push({ who:"-", text:"담당을 못 읽어 뺐습니다 〈" + n.raw + "〉" }); return; }
+            add(tDate, who, "신환평가", n.patient, "MBI/SCIM");
+        });
+        // 외래 — 신환평가는 그대로, 검사는 EMR 오더가 있는 것만 센다
+        ev.outEval.forEach(function(o) {
+            if (o.gid !== "otGridTable") return;
+            var who = whoOne(o.who, o.raw);
+            if (!who) return;
+            if (o.kind === "new") {
+                schedNewPts[o.patient] = true;
+                add(tDate, who, "신환평가", o.patient, "외래 · MBI/SCIM");
+                return;
+            }
+            if (!o.any && o.labels.every(function(lb){ return OT_INC_SKIP_RE.test(lb); })) return;
+            if (o.newMark && o.labels.some(function(lb){ return /일상생활동작/.test(lb); })) {
+                schedNewPts[o.patient] = true;
+                add(tDate, who, "신환평가", o.patient, "외래 · MBI/SCIM");
+                return;
+            }
+            var hit = null;
+            globalEmrRows.forEach(function(row) {
+                if (hit || !row) return;
+                if (String(row[globalEmrPatientIdx]||"").trim() !== o.patient) return;
+                var code = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
+                var lab = evalCodeMap[code];
+                if (!lab || OT_INC_SKIP_RE.test(lab)) return;
+                if (o.any || o.labels.indexOf(lab) !== -1) hit = lab;
+            });
+            if (hit) add(tDate, who, "OT평가", o.patient, "외래 · " + hit, false, hit);
+            else warns.push({ who: otIncName(who), text: o.patient + " (외래) — EMR 평가 오더 없음, 세지 않음 〈" + o.raw + "〉" });
+        });
+    }
+
+    // ② MBI_SCIM 시행확인방
+    var chat = parseMbiChat((document.getElementById("otIncChat")||{}).value || "");
+    chat.items.forEach(function(c) {
+        var pt = c.patient || "?";
+        if (!c.writer) warns.push({ who:"-", text:"글쓴이를 못 읽음 〈" + c.raw + "〉" });
+        if (c.isNew) {
+            // 신환 평가자 점수는 시간표에서 준다 — 시간표에 신환평가가 없으면 점수 없음
+            if (ev && c.date === tDate && !schedNewPts[pt]) {
+                warns.push({ who: otIncName(c.writer), text: c.date + " " + pt + " (신환) — 시간표에 신환평가 기입 없음, 평가자 점수 없음" });
+            }
+        } else if (c.writer) {
+            add(c.date, c.writer, "월재평가", pt, "챗 " + c.date + (c.discharge ? " · 퇴원" : ""));
+        }
+        if (!c.checkers.length) {
+            warns.push({ who: otIncName(c.writer), text: c.date + " " + pt + " — 교차확인자 없음" });
+        }
+        c.checkers.forEach(function(ck) {
+            add(c.date, ck, "교차확인", pt, "챗 " + c.date + (c.isNew ? " · 신환" : ""));
+        });
+    });
+    chat.unread.forEach(function(u) { warns.push({ who:"-", text:"날짜를 못 읽은 줄 〈" + u + "〉" }); });
+
+    if (!rows.length && !warns.length) {
+        area.innerHTML = "<div class='section-box'><p>" + (schedNote || "셀 건이 없습니다.") + "</p></div>";
+        return;
+    }
+
+    // MBI/SCIM 은 같은 치료사 · 같은 환자에 한 번만 — 신환평가 · 월재평가 · 교차확인 중 점수가 큰 것 하나만 남긴다.
+    //   (예: 신환평가 1점을 받았는데 같은 환자 MBI 챗이 (신환) 없이 올라와 월재평가가 또 붙는 경우)
+    //   OT평가(수지 · 후글 …)는 MBI 와 별개라 함께 센다.
+    (function() {
+        var MBI_KIND = { "신환평가":1, "월재평가":1, "교차확인":1 };
+        var best = {};
+        rows.forEach(function(r, i) {
+            if (!MBI_KIND[r.kind]) return;
+            var k = r.name + "|" + r.patient;
+            if (!(k in best) || OT_INC_PTS[r.kind] > OT_INC_PTS[rows[best[k]].kind]) best[k] = i;
+        });
+        var drop = {};
+        rows.forEach(function(r, i) {
+            if (!MBI_KIND[r.kind]) return;
+            var keep = best[r.name + "|" + r.patient];
+            if (keep === i) return;
+            drop[i] = true;
+            var kr = rows[keep];
+            kr.note = (kr.note ? kr.note + " · " : "") + "중복 제외: " + r.kind;
+        });
+        rows = rows.filter(function(r, i){ return !drop[i]; });
+    })();
+
+    // ③ 표 — 날짜 · 시간표 → 대화 순서 그대로
+    function dKey(d) { var p = String(d).split("/"); return p.length === 2 ? (+p[0])*100 + (+p[1]) : 0; }
+    var KO = { "OT평가":1, "신환평가":2, "월재평가":3, "교차확인":3 };
+    var ordered = rows.map(function(r, i){ r.i = i; return r; }).sort(function(a, b) {
+        return (dKey(a.date) - dKey(b.date)) || (KO[a.kind] - KO[b.kind]) || (a.i - b.i);
+    });
+    otIncText = ordered.map(function(r){ return [r.date, r.name, r.kind].join("\t"); }).join("\n");
+
+    var sum = {}, order = [];
+    ordered.forEach(function(r) {
+        if (!(r.name in sum)) { sum[r.name] = 0; order.push(r.name); }
+        sum[r.name] += OT_INC_PTS[r.kind] || 0;
+    });
+    order.sort(function(a, b){ return sum[b] - sum[a] || (a < b ? -1 : 1); });
+
+    var html = "<div class='section-box'><h3 style='border-left-color:#d35400;'>OT 인센티브 " + ordered.length + "건</h3>";
+    if (schedNote) html += "<p style='font-size:12.5px;color:#a04000;margin-bottom:6px;'>" + schedNote + "</p>";
+    html += "<p style='font-size:12.5px;color:#555;margin-bottom:8px;'>복사하면 <b>날짜 · 이름 · 평가 구분</b> 세 칸만 들어갑니다 — 시트 A열에 그대로 붙여넣으세요.</p>";
+    html += "<div style='display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;'>";
+    html += "<div style='flex:2 1 420px;min-width:0;'>";
+    html += "<button class='btn-copy' onclick='copyOtIncentive()'>&#128203; 시트용 목록 복사</button>";
+    html += "<div style='max-height:460px;overflow:auto;border:1px solid #ccc;border-radius:6px;'>";
+    html += "<table class='result-table' style='table-layout:auto;margin-bottom:0;'><thead><tr>";
+    ["날짜","이름","평가 구분","점수","환자","비고"].forEach(function(x){ html += "<th class='th-sub-label'>" + x + "</th>"; });
+    html += "</tr></thead><tbody>";
+    ordered.forEach(function(r) {
+        var st = r.warn ? " style='background:#fffbe6;'" : "";
+        html += "<tr" + st + "><td>" + r.date + "</td><td style='font-weight:700;'>" + r.name +
+                "</td><td>" + r.kind + "</td><td>" + OT_INC_PTS[r.kind] +
+                "</td><td>" + r.patient + "</td><td style='text-align:left;color:#555;'>" +
+                (r.warn ? "❔ " : "") + r.note + "</td></tr>";
+    });
+    html += "</tbody></table></div></div>";
+
+    html += "<div style='flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:14px;'>";
+    html += "<div><h3 style='border-left-color:#d35400;margin-top:0;'>사람별 합계</h3>";
+    html += "<div style='max-height:260px;overflow:auto;border:1px solid #ccc;border-radius:6px;'>";
+    html += "<table class='result-table' style='table-layout:auto;margin-bottom:0;'><thead><tr><th class='th-sub-label'>이름</th><th class='th-sub-label'>점수</th></tr></thead><tbody>";
+    order.forEach(function(n) {
+        html += "<tr><td style='font-weight:700;'>" + n + "</td><td>" + (Math.round(sum[n]*100)/100) + "</td></tr>";
+    });
+    html += "</tbody></table></div></div>";
+    if (warns.length) {
+        html += "<div><h3 style='border-left-color:#c0392b;margin-top:0;'>확인 필요 " + warns.length + "건</h3>";
+        html += "<div style='max-height:260px;overflow:auto;border:1px solid #ccc;border-radius:6px;'>";
+        html += "<table class='result-table' style='table-layout:auto;margin-bottom:0;'><tbody>";
+        warns.forEach(function(w) {
+            html += "<tr class='error-cell'><td style='white-space:nowrap;'>" + w.who +
+                    "</td><td style='text-align:left;'>⚠️ " + w.text + "</td></tr>";
+        });
+        html += "</tbody></table></div></div>";
+    }
+    html += "</div></div></div>";
+    area.innerHTML = html;
+}
+function copyOtIncentive() {
+    if (!otIncText) return alert("복사할 목록이 없습니다.");
+    navigator.clipboard.writeText(otIncText)
+        .then(function(){ notify("인센티브 목록을 복사했습니다!"); })
+        .catch(function(){ alert("복사에 실패했습니다."); });
+}
+
 var evalNoSlipText = "";
 function copyEvalNoSlip() {
     if (!evalNoSlipText) return alert("복사할 명단이 없습니다.");
@@ -6495,10 +6778,12 @@ function copyEvalNoSlip() {
         .catch(function(){ alert("복사에 실패했습니다."); });
 }
 
-function analyzeEvalCheck() {
+// silent 이면 표를 그리지 않고 수집한 목록만 돌려준다 (OT 인센티브 카운팅에서 씀)
+function analyzeEvalCheck(silent) {
     var area = document.getElementById("evalCheckArea");
-    if (!area) return;
+    if (!area && !silent) return;
     if (!globalEmrRows || globalEmrRows.length === 0 || globalEmrCodeIdx === -1) {
+        if (silent) return null;
         return alert("EMR 엑셀 파일을 먼저 연동해 주세요.");
     }
     _evalNameIndex = null; _evalPatNames = null;
@@ -6507,6 +6792,7 @@ function analyzeEvalCheck() {
     // ① EMR 평가 슬립 수집
     var outPat = emrOutpatientNames();
     var outSkipped = 0;
+    var outEval = [];   // 외래 환자 평가 메모 — 점검에서는 빼지만 인센티브 카운팅은 오더를 확인해 센다
     var emrList = [], emrSeen = {};
     globalEmrRows.forEach(function(row) {
         if (!row) return;
@@ -6545,7 +6831,9 @@ function analyzeEvalCheck() {
                 // "신향순 평가" 처럼 검사명 없이 적는 칸이 있다.
                 // 어떤 검사인지 시간표만으로는 알 수 없으므로,
                 // EMR 에서 그 환자의 평가 슬립을 찾아 맞추는 것으로 둔다.
-                if (!groups.length && /평가|검사/.test(vv)) {
+                // "신환평가" 의 "평가" 글자는 여기 해당하지 않는다 — 신환평가는 아래에서 따로 모은다.
+                //   (이걸 "검사명 없는 평가" 로 보면 같은 환자의 다른 검사 슬립을 모두 가져가 버린다)
+                if (!groups.length && /평가|검사/.test(vv.replace(/신[환황]\s*평가/g, " "))) {
                     groups = [{ labels: [], any: true, idx: vv.search(/평가|검사/) }];
                 }
                 var isNew  = NEWPT_RE.test(vv);
@@ -6615,7 +6903,11 @@ function analyzeEvalCheck() {
                 }
                 var newMark = NEWMARK_RE.test(vv);
                 function addNewPt(pp) {
-                    if (outPat[pp.name]) { outSkipped++; return; }
+                    if (outPat[pp.name]) {
+                        outSkipped++;
+                        outEval.push({ kind:"new", patient:pp.name, who:who, slot:slot, raw:v, gid:gid });
+                        return;
+                    }
                     var k = pp.name + "|" + v;
                     if (newPtSeen[k]) return;
                     newPtSeen[k] = true;
@@ -6623,7 +6915,12 @@ function analyzeEvalCheck() {
                 }
                 groups.forEach(function(g) {
                     var pp = ownerOf(g.idx);
-                    if (outPat[pp.name]) { outSkipped++; return; }   // 외래 환자 제외
+                    if (outPat[pp.name]) {                           // 외래 환자 제외
+                        outSkipped++;
+                        outEval.push({ kind:"eval", patient:pp.name, labels:g.labels, any:!!g.any,
+                                       newMark:newMark, who:who, slot:slot, raw:v, gid:gid });
+                        return;
+                    }
                     // 신환평가(MBI · SCIM)는 오더를 넘기지 않으므로 대조하지 않는다
                     if (newMark && g.labels.some(function(lb){ return NEWPT_NO_ORDER.indexOf(lb) !== -1; })) {
                         addNewPt(pp);
@@ -6640,7 +6937,9 @@ function analyzeEvalCheck() {
 
     // ③ 대조
     var rows = [];
-    schedList.forEach(function(sc) {
+    // 검사명이 적힌 메모를 먼저 맞추고, "평가" 라고만 적힌 메모는 남은 슬립으로 맞춘다.
+    //   (먼저 돌면 다른 치료사의 젭슨 · 후글 슬립까지 가져가 버린다)
+    schedList.slice().sort(function(a, b){ return (a.any ? 1 : 0) - (b.any ? 1 : 0); }).forEach(function(sc) {
         // 검사명 없이 "평가" 라고만 적힌 칸 — 그 환자의 평가 슬립이면 무엇이든 짝으로 본다.
         // 한 번의 "평가" 표기에 검사가 여러 개 딸리기도 하므로 그 환자 것을 모두 가져간다.
         if (sc.any) {
@@ -6653,6 +6952,7 @@ function analyzeEvalCheck() {
             }
             if (mine.length) {
                 mine.forEach(function(e){ e.used = true; });
+                sc.slip = mine[0];
                 if (sc.typo) {
                     rows.push({ kind:"typo", level:"warn", patient:sc.patient, label:mine[0].label,
                                 schedWho:sc.who, emrWho:mine[0].who, slot:sc.slot, code:mine[0].code,
@@ -6670,7 +6970,7 @@ function analyzeEvalCheck() {
             var e = emrList[i];
             if (e.used || e.patient !== sc.patient) continue;
             if (sc.labels.indexOf(e.label) === -1) continue;
-            hit = e; e.used = true; break;
+            hit = e; e.used = true; sc.slip = e; break;
         }
         if (!hit) {
             rows.push({ kind:"noSlip", level:"bad", patient:sc.patient, label:sc.labels.join(" 또는 "),
@@ -6723,6 +7023,8 @@ function analyzeEvalCheck() {
                     schedWho:"-", emrWho:e.who, slot:e.time, code:e.code,
                     note:"시간표에 평가 표기 없음", raw:"-" });
     });
+
+    if (silent) return { sched: schedList, newPt: newPtList, outEval: outEval };
 
     // ④ 표 그리기 — 환자 · 담당 · 오류 이유 세 칸만
     function whoOf(r) {

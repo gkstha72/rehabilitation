@@ -97,6 +97,17 @@ td.clickable:hover { opacity:0.75; }
 .s12-reset{margin-left:auto;padding:2px 9px;font-size:12px;border-color:#c0392b;color:#c0392b;white-space:nowrap;}
 #bulkPasteArea{min-height:50px;height:50px;margin-top:7px;padding:7px 9px;font-size:12.5px;
                background:#fffdf3;border:2px dashed #f0c987;}
+.ward-split{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:7px;}
+.ward-box{border:1px solid #e3d3b0;border-radius:7px;padding:6px 8px;background:#fffdf6;min-width:0;}
+.ward-box.done{border-color:#7dc99a;background:#f3fbf6;}
+.ward-head{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;}
+.ward-head .ward-clear{margin-left:auto;padding:1px 8px;font-size:11.5px;border:1px solid #c0392b;color:#c0392b;background:#fff;border-radius:5px;cursor:pointer;}
+.ward-paste{width:100%;box-sizing:border-box;height:44px;min-height:44px;margin-top:5px;padding:6px 8px;font-size:12.5px;
+            font-family:"Malgun Gothic",sans-serif;background:#fffdf3;border:2px dashed #f0c987;border-radius:6px;color:#555;resize:vertical;}
+.ward-box.done .ward-paste{border-color:#a9dcbc;background:#fff;}
+.ward-paste:focus{outline:2px solid #e67e22;background:#fff;}
+.ward-status{margin-top:4px;font-size:12px;font-weight:700;color:#999;line-height:1.5;}
+.ward-box.done .ward-status{color:#1e8449;}
 .top-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start;margin:12px 0 10px;clear:both;}
 @media (max-width:1100px){ .top-split{grid-template-columns:1fr;} }
 .top-split > div{box-sizing:border-box;min-width:0;margin:0;}
@@ -138,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-10 b80</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-11 b84</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -158,21 +169,23 @@ td.clickable:hover { opacity:0.75; }
   <div id="outpatientArea" style="display:none;margin-top:7px;"></div>
   <div class="s12-head" style="margin-top:7px;">
     <span class="s12-title" style="color:#e67e22;">📋 STEP 2 · 시간표</span>
-    <span class="s12-hint">시트 전체 복사 후 아래 칸에 Ctrl+V → 6개 자동 분리</span>
-    <span id="wardToggle" style="display:inline-flex;margin-left:8px;border:1px solid #b9c6d4;
-          border-radius:6px;overflow:hidden;font-size:12px;font-weight:800;cursor:pointer;">
-      <span id="wardNeuro" onclick="setWardMode('neuro')" style="padding:3px 9px;">🧠 신경계</span>
-      <span id="wardMsk"   onclick="setWardMode('msk')"   style="padding:3px 9px;">🦴 근골</span>
-    </span>
-    <label class="s12-hint" style="display:inline-flex;align-items:center;gap:4px;margin-left:8px;
-           padding:2px 7px;border:1px solid #f0c98a;border-radius:5px;background:#fffaf0;cursor:pointer;"
-           title="켜두면 이미 붙여넣은 시간표 오른쪽에 이어서 채웁니다 (신경계 → 근골 추가)">
-      <input type="checkbox" id="bulkAppend" style="margin:0;" />
-      <b style="color:#c87f0a;">이어붙이기</b>
-    </label>
-    <button class="step-btn s12-reset" onclick="resetBulkPaste()" title="시간표 초기화">초기화</button>
+    <span class="s12-hint">신경계 · 근골 시트를 각 칸에 Ctrl+V (순서 상관없음)</span>
+    <button class="step-btn s12-reset" onclick="resetBulkPaste()" title="신경계 · 근골 시간표 모두 초기화">전체 초기화</button>
   </div>
-  <textarea id="bulkPasteArea" placeholder="여기를 클릭하고 Ctrl+V"></textarea>
+  <div class="ward-split">
+    <div class="ward-box" id="wardBoxNeuro">
+      <div class="ward-head"><span style="color:#2c3e50;">🧠 신경계</span>
+        <button class="ward-clear" onclick="clearWard('neuro')" title="신경계 시간표만 지우기">비우기</button></div>
+      <textarea class="ward-paste" id="bulkPasteNeuro" placeholder="신경계 시간표 — 클릭 후 Ctrl+V"></textarea>
+      <div class="ward-status" id="bulkStatusNeuro">비어 있음</div>
+    </div>
+    <div class="ward-box" id="wardBoxMsk">
+      <div class="ward-head"><span style="color:#2c3e50;">🦴 근골</span>
+        <button class="ward-clear" onclick="clearWard('msk')" title="근골 시간표만 지우기">비우기</button></div>
+      <textarea class="ward-paste" id="bulkPasteMsk" placeholder="근골 시간표 — 클릭 후 Ctrl+V"></textarea>
+      <div class="ward-status" id="bulkStatusMsk">비어 있음</div>
+    </div>
+  </div>
   <div id="bulkPasteStatus"></div>
 </div>
 
@@ -1218,11 +1231,97 @@ else { initOnLoad(); }
         return null;
     }
 
-    window.addEventListener("DOMContentLoaded", function() {
-        var area = document.getElementById("bulkPasteArea");
-        if (!area) return;
+    // 신경계 · 근골 시간표를 따로 보관해 두고, 붙일 때마다 그리드를 새로 채운다.
+    //   신경계가 항상 왼쪽(0열부터), 근골이 그 오른쪽 — 붙여넣는 순서와 상관없다.
+    var wardBuffers = { neuro: null, msk: null };
+    var wardDates   = { neuro: "", msk: "" };
+    var WARD_NAME   = { neuro: "신경계", msk: "근골" };
+    var ALL_GRIDS   = ["ptGridTable","otGridTable","stGridTable","etGridTable","mtGridTable","painGridTable"];
 
-        area.addEventListener("paste", function(e) {
+    function wardStatusEl(ward) { return document.getElementById(ward === "msk" ? "bulkStatusMsk" : "bulkStatusNeuro"); }
+    function wardBoxEl(ward)    { return document.getElementById(ward === "msk" ? "wardBoxMsk" : "wardBoxNeuro"); }
+
+    function redistributeWards() {
+        // 그리드를 비운다 (서식 포함)
+        ALL_GRIDS.forEach(function(g) {
+            clearGridFmt(g);
+            for (var r = 0; r < ROW_COUNT; r++) {
+                for (var c = 0; c < COL_COUNT; c++) {
+                    var el = document.getElementById(g+"-cell-"+r+"-"+c);
+                    if (el) { el.value = ""; el.style.textDecoration = ""; el.title = ""; }
+                }
+            }
+        });
+        resetEmrTherapistAlias();
+        if (typeof resetHeaderRowCache === "function") resetHeaderRowCache();
+        var report = { neuro: [], msk: [] };
+        ["neuro","msk"].forEach(function(ward) {
+            var gb = wardBuffers[ward];
+            if (!gb) return;
+            Object.keys(gb).forEach(function(gid) {
+                var buf = gb[gid];
+                var colOffset = nextFreeCol(gid), start = colOffset;
+                buf.cols.forEach(function(subRows, bi) {
+                    if (!subRows.length) return;
+                    var fakeTarget = (function(off) {
+                        return { getAttribute: function(attr) { return attr === "data-row" ? 0 : off; } };
+                    })(colOffset);
+                    distributeMatrix(subRows, gid, fakeTarget, (buf.fmts || [])[bi] || null);
+                    colOffset += (subRows[0]||[]).length;
+                });
+                var over = colOffset > COL_COUNT;
+                report[ward].push(buf.name + "(×" + buf.cols.length + ")" + (over ? " ⚠️칸 부족" : ""));
+            });
+        });
+        // 제외해 둔 칸은 같은 자리에 그대로 있으면 다시 적용한다
+        if (excludeUndo.length) {
+            var keep = [];
+            excludeUndo.forEach(function(x) {
+                var el = document.getElementById(x.grid+"-cell-"+x.row+"-"+x.col);
+                if (!el || el.value !== x.before) return;
+                el.value = (x.row === 0 || x.removed === x.before) ? "" : removeNameFromCell(x.before, x.keyword);
+                keep.push(x);
+            });
+            excludeUndo = keep;
+            renderExcludedList();
+        }
+        // 날짜 — 신경계 우선
+        schedDateText = wardDates.neuro || wardDates.msk || "";
+        renderDateBanner();
+        // 언어 · 전기 · 메디페인 칸은 신경계가 있을 때만 보인다
+        setWardMode(wardBuffers.neuro || !wardBuffers.msk ? "neuro" : "msk");
+        // 저장 확인 — 칸마다 따로
+        ["neuro","msk"].forEach(function(ward) {
+            var st = wardStatusEl(ward), box = wardBoxEl(ward);
+            var ok = !!wardBuffers[ward];
+            if (box) box.classList.toggle("done", ok);
+            if (st) st.innerText = ok ? "✅ 저장됨 · " + (report[ward].join(" · ") || "인식된 치료실 없음")
+                                      : "비어 있음";
+        });
+    }
+    window.clearWard = function(ward) {
+        if (!wardBuffers[ward]) return;
+        if (!confirm(WARD_NAME[ward] + " 시간표만 지우시겠습니까?")) return;
+        wardBuffers[ward] = null; wardDates[ward] = "";
+        redistributeWards();
+    };
+    window.resetWardBuffers = function() {
+        wardBuffers = { neuro: null, msk: null };
+        wardDates   = { neuro: "", msk: "" };
+        ["neuro","msk"].forEach(function(ward) {
+            var st = wardStatusEl(ward), box = wardBoxEl(ward);
+            if (box) box.classList.remove("done");
+            if (st) st.innerText = "비어 있음";
+        });
+    };
+
+    window.addEventListener("DOMContentLoaded", function() {
+        [["bulkPasteNeuro","neuro"], ["bulkPasteMsk","msk"]].forEach(function(pair) {
+            var el = document.getElementById(pair[0]);
+            if (el) el.addEventListener("paste", function(e){ onWardPaste(e, el, pair[1]); });
+        });
+
+        function onWardPaste(e, area, ward) {
             e.preventDefault();
             var cbB = e.clipboardData || window.clipboardData;
             var raw = cbB.getData("Text");
@@ -1265,12 +1364,11 @@ else { initOnLoad(); }
             if (!matrix || matrix.length === 0) { setStatus("⚠️ 붙여넣기 데이터가 없습니다.", "#e74c3c"); return; }
 
             // 시간표 상단(첫 몇 줄)에서 날짜 인식
-            schedDateText = "";
+            var wardDate = "";
             for (var di = 0; di < Math.min(matrix.length, 6); di++) {
                 var dline = (matrix[di]||[]).join(" ");
-                if (parseAnyDate(dline)) { schedDateText = dline; break; }
+                if (parseAnyDate(dline)) { wardDate = dline; break; }
             }
-            renderDateBanner();
 
             var totalCols = 0;
             matrix.forEach(function(row){ if ((row||[]).length > totalCols) totalCols = row.length; });
@@ -1364,36 +1462,31 @@ else { initOnLoad(); }
                 gridBuffers[MEDIPAIN_GRID].fmts.push(mpFmt);
             }
 
-            // ④ 각 그리드에 배분
-            resetEmrTherapistAlias();
-            var resultMsgs = [];
-            var apEl = document.getElementById("bulkAppend");
-            var appendMode = !!(apEl && apEl.checked);
-            Object.keys(gridBuffers).forEach(function(gid) {
-                var buf = gridBuffers[gid];
-                var colOffset = appendMode ? nextFreeCol(gid) : 0;
-                buf.cols.forEach(function(subRows, bi) {
-                    if (!subRows.length) return;
-                    var fakeTarget = (function(off) {
-                        return { getAttribute: function(attr) { return attr === "data-row" ? 0 : off; } };
-                    })(colOffset);
-                    distributeMatrix(subRows, gid, fakeTarget, (buf.fmts || [])[bi] || null);
-                    colOffset += (subRows[0]||[]).length;
-                });
-                resultMsgs.push(buf.name + "(×" + buf.cols.length + ") ✓");
-            });
-
-            var statusMsg = resultMsgs.length > 0
-                ? (appendMode ? "✅ 이어붙임: " : "✅ 분리 완료: ") + resultMsgs.join(" | ")
-                : "";
-            setStatus(statusMsg || "처리 완료", resultMsgs.length > 0 ? "#27ae60" : "#e74c3c");
+            // ④ 이 칸(신경계/근골)의 시간표로 보관하고 그리드를 다시 채운다
+            if (Object.keys(gridBuffers).length === 0) {
+                setStatus("⚠️ 치료실을 하나도 인식하지 못했습니다." +
+                          (unmatchedTitles.length ? " (" + unmatchedTitles.join(", ") + ")" : ""), "#e74c3c");
+                area.value = ""; return;
+            }
+            wardBuffers[ward] = gridBuffers;
+            wardDates[ward] = wardDate;
+            redistributeWards();
             area.value = "";
-        });
+            var other = ward === "neuro" ? "msk" : "neuro";
+            var msg = "";
+            if (wardDates.neuro && wardDates.msk) {
+                var a = parseAnyDate(wardDates.neuro), b = parseAnyDate(wardDates.msk);
+                if (a && b && !sameDate(a, b)) msg = "⚠️ 신경계 " + fmtDate(a) + " / 근골 " + fmtDate(b) + " — 날짜가 다릅니다";
+            }
+            setStatus(msg, "#c0392b");
+            return;
 
-        function setStatus(msg, color) {
-            var el = document.getElementById("bulkPasteStatus");
-            if (el) { el.innerText = msg; el.style.color = color || "#333"; }
+            function setStatus(msg, color) {
+                var el = document.getElementById("bulkPasteStatus");
+                if (el) { el.innerText = msg; el.style.color = color || "#333"; }
+            }
         }
+
     });
 })();
 // ─────────────────────────────────────────────────────────────────────────
@@ -4773,33 +4866,16 @@ function setWardMode(mode) {
         var el = document.getElementById(id);
         if (el) el.style.display = (WARD_HIDE[wardMode].indexOf(id) !== -1) ? "none" : "";
     });
-    var on = { background:"#2c3e50", color:"#fff" }, off = { background:"#f4f7fa", color:"#5d6d7e" };
-    var n = document.getElementById("wardNeuro"), m = document.getElementById("wardMsk");
-    if (n && m) {
-        var a = (wardMode === "neuro") ? on : off, b = (wardMode === "neuro") ? off : on;
-        n.style.background = a.background; n.style.color = a.color;
-        m.style.background = b.background; m.style.color = b.color;
-    }
-    // 근골로 넘어가면 신경계 시간표를 덮어쓰지 않도록 이어붙이기를 자동으로 켠다
-    var ap = document.getElementById("bulkAppend");
-    if (ap) ap.checked = (wardMode === "msk");
-    var st = document.getElementById("bulkPasteStatus");
-    if (st) {
-        st.innerText = (wardMode === "msk")
-            ? "🦴 근골 모드 — 물리 · 작업 · 통증만 사용합니다. 붙여넣으면 신경계 오른쪽에 이어집니다."
-            : "🧠 신경계 모드";
-        st.style.color = "#5d6d7e";
-    }
 }
 
 function resetBulkPaste() {
     if (!confirm("붙여넣은 시간표를 모두 지우시겠습니까?\n(EMR 엑셀 연동은 그대로 유지됩니다)")) return;
-    var ta = document.getElementById("bulkPasteArea");
-    if (ta) ta.value = "";
+    ["bulkPasteNeuro","bulkPasteMsk"].forEach(function(id){ var ta = document.getElementById(id); if (ta) ta.value = ""; });
     var st = document.getElementById("bulkPasteStatus");
     if (st) st.innerHTML = "";
+    if (typeof resetWardBuffers === "function") resetWardBuffers();
+    ["ptGridTable","otGridTable","stGridTable","etGridTable","mtGridTable","painGridTable"].forEach(clearGridFmt);
     schedDateText = ""; renderDateBanner();
-    var ap = document.getElementById("bulkAppend"); if (ap) ap.checked = false;
     excludeHits = []; excludeUndo = [];
     var ea = document.getElementById("excludeResultArea"); if (ea) ea.innerHTML = "";
     renderExcludedList();
@@ -4829,19 +4905,21 @@ function analyzeOrderCheckAll() {
     resetEmrTherapistAlias();
     // 한 항목에서 오류가 나도 나머지 점검과 요약·복사 버튼이 멈추지 않도록 각각 감싼다
     var steps = [
-        ["① tDCS·CR",        analyzeCrPairLogic],
-        ["② 수량·액팅 시간", analyzeQtyCheckLogic],
-        ["④ 보행로봇",       analyzeRobotGaitLogic],
-        ["⑤ 겹침",           analyzeOverlapLogic],
-        ["⑥ 담당 불일치",    analyzeSlipDetailLogic],
-        ["⑦ 도수 충돌",      analyzeDosuConflictLogic],
-        ["⑧ 통증 시간",      analyzePainTimeLogic],
-        ["⑨ 동명이인",       analyzeDupNameLogic]
+        ["① tDCS·CR",        analyzeCrPairLogic,       "crPairArea"],
+        ["② 수량·액팅 시간", analyzeQtyCheckLogic,     "qtyCheckArea"],
+        ["④ 보행로봇",       analyzeRobotGaitLogic,    "robotGaitArea"],
+        ["⑤ 겹침",           analyzeOverlapLogic,      "overlapArea"],
+        ["⑥ 담당 불일치",    analyzeSlipDetailLogic,   "slipDetailArea"],
+        ["⑦ 도수 충돌",      analyzeDosuConflictLogic, "dosuConflictArea"],
+        ["⑧ 통증 시간",      analyzePainTimeLogic,     "painTimeArea"],
+        ["⑨ 동명이인",       analyzeDupNameLogic,      "dupNameArea"]
     ];
     var failed = [];
     steps.forEach(function(st) {
+        var before = orderIssues.length;
         try { st[1](); }
-        catch (err) { failed.push(st[0]); console.error(st[0] + " 점검 오류:", err); }
+        catch (err) { failed.push(st[0]); console.error(st[0] + " 점검 오류:", err); return; }
+        trimOrderArea(st[2], orderIssues.length > before);
     });
     renderOrderIssues();   // 결과 영역 맨 위에 요약 표시
     if (failed.length) {
@@ -4850,6 +4928,38 @@ function analyzeOrderCheckAll() {
             "<div style='margin:10px 0;padding:10px 13px;border:1px solid #f5c26b;border-radius:8px;" +
             "background:#fff8e8;color:#8a6d3b;font-weight:700;'>⚠️ " + failed.join(" · ") +
             " 점검에서 오류가 나 결과가 빠졌습니다. 나머지 결과는 정상입니다.</div>");
+    }
+}
+
+// 오더 점검 결과는 틀린 것만 보여 준다.
+//   · 틀린 건이 없는 항목은 통째로 숨긴다 ("먼저 EMR 연동" 같은 안내는 남긴다)
+//   · 틀린 건이 있는 항목도 "— 0건" 소제목과 정상 줄은 지운다
+function trimOrderArea(id, hasIssue) {
+    var area = document.getElementById(id);
+    if (!area) return;
+    var hasErrRow = !!area.querySelector(".error-cell");
+    if (!hasIssue && !hasErrRow) {
+        if (/먼저 EMR|찾지 못했습니다/.test(area.textContent)) return;
+        area.innerHTML = "";
+        return;
+    }
+    // "— 0건" 소제목과 그 아래 내용 (다음 소제목 전까지) 삭제
+    Array.prototype.slice.call(area.querySelectorAll("h3, h4")).forEach(function(h) {
+        var t = h.textContent;
+        var zero = /—\s*0건/.test(t) || /중\s*0건\s*불일치/.test(t);
+        if (!zero) return;
+        var n = h.nextElementSibling;
+        while (n && !/^H[34]$/.test(n.tagName)) { var nx = n.nextElementSibling; n.parentNode.removeChild(n); n = nx; }
+        h.parentNode.removeChild(h);
+    });
+    // 정상/오류가 섞인 표 — 정상 줄은 지운다 (tDCS·CR · 15분 · 보행로봇)
+    if (["crPairArea","qtyCheckArea","robotGaitArea"].indexOf(id) !== -1) {
+        Array.prototype.slice.call(area.querySelectorAll("table")).forEach(function(tb) {
+            if (!tb.querySelector("tbody tr.error-cell")) return;
+            Array.prototype.slice.call(tb.querySelectorAll("tbody tr")).forEach(function(tr) {
+                if (!tr.classList.contains("error-cell")) tr.parentNode.removeChild(tr);
+            });
+        });
     }
 }
 
@@ -6245,7 +6355,8 @@ function resetAllGrids() {
     if (!confirm("모든 시간표 그리드를 지우겠습니까?")) return;
     var grids = ["ptGridTable","otGridTable","stGridTable","etGridTable","mtGridTable","painGridTable"];
     var handlers = [handlePtPaste, handleOtPaste, handleStPaste, handleEtPaste, handleMtPaste, handlePainPaste];
-    grids.forEach(function(id, i){ initGrid(id, handlers[i]); });
+    grids.forEach(function(id, i){ initGrid(id, handlers[i]); clearGridFmt(id); });
+    if (typeof resetWardBuffers === "function") resetWardBuffers();
     // 결과 및 stats 초기화
     ["ptTripleArea","otTripleArea","stTripleArea","painTripleArea","evalArea"].forEach(function(id){
         var el = document.getElementById(id); if(el) el.innerHTML="";
@@ -6366,14 +6477,16 @@ function stripHonorifics(text) {
 function findEvalTokens(text) {
     var t = stripHonorifics(text);
     var out = [], seen = {};
+    // 한 칸에 여러 환자가 같은 검사를 받기도 한다 — "김형중 후글마이어 / 임벨라 수지젭슨,후글마이어"
+    //   그래서 같은 검사명도 나올 때마다 모두 찾는다. (같은 환자 중복은 쓰는 쪽에서 거른다)
     EVAL_TOKENS.forEach(function(tk) {
-        var m = t.match(tk.re);
-        if (!m || seen[tk.label]) return;
-        seen[tk.label] = true;
-        var idx = t.search(tk.re);
-        out.push({ label: tk.label, hit: m[0], idx: idx });
-        // 먹힌 글자는 자리를 유지한 채 비운다 (위치가 밀리면 안 된다)
-        t = t.slice(0, idx) + new Array(m[0].length + 1).join(" ") + t.slice(idx + m[0].length);
+        var m;
+        while ((m = t.match(tk.re)) && m[0].length) {
+            var idx = t.search(tk.re);
+            out.push({ label: tk.label, hit: m[0], idx: idx });
+            // 먹힌 글자는 자리를 유지한 채 비운다 (위치가 밀리면 안 된다)
+            t = t.slice(0, idx) + new Array(m[0].length + 1).join(" ") + t.slice(idx + m[0].length);
+        }
     });
     return out;
 }
@@ -6576,6 +6689,25 @@ function parseMbiChat(text) {
     return { items: out, unread: unread };
 }
 
+// 그 치료사가 그 환자에게 넘긴 EMR 평가 오더 — 인센 대상 검사명 목록과, 제외 검사(MBI · 치매척도)만 있었는지
+//   다른 치료사(물리치료 MMT · 버그 등)의 오더는 세지 않는다.
+function otIncEmrOrders(patient, who) {
+    var me = otIncName(cleanTherapistName(who) || who);
+    var labels = [], skipOnly = false;
+    (globalEmrRows || []).forEach(function(row) {
+        if (!row) return;
+        if (String(row[globalEmrPatientIdx]||"").trim() !== patient) return;
+        var code = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
+        var lab = evalCodeMap[code];
+        if (!lab) return;
+        var wh = String(row[globalEmrNameIdx]||"").trim();
+        if (wh && otIncName(wh) !== me) return;
+        if (OT_INC_SKIP_RE.test(lab)) { skipOnly = true; return; }
+        if (labels.indexOf(lab) === -1) labels.push(lab);
+    });
+    return { labels: labels, skipOnly: skipOnly && !labels.length };
+}
+
 function analyzeOtIncentive() {
     var area = document.getElementById("otIncArea");
     if (!area) return;
@@ -6618,8 +6750,19 @@ function analyzeOtIncentive() {
             if (!sc.any && sc.labels.every(function(lb){ return OT_INC_SKIP_RE.test(lb); })) return;
             var who = whoOne(sc.who, sc.raw);
             if (!who) { warns.push({ who:"-", text:"담당을 못 읽어 뺐습니다 〈" + sc.raw + "〉" }); return; }
-            var lb = sc.slip ? sc.slip.label : (sc.any ? "평가(검사명 미기재)" : sc.labels[0]);
-            if (sc.slip && OT_INC_SKIP_RE.test(lb)) return;   // "평가" 로만 적었는데 치매척도였던 경우
+            // "○○○ 평가" 처럼 검사명 없이 적은 칸 — 그 치료사가 넘긴 평가 오더로 센다
+            if (sc.any) {
+                var ord = otIncEmrOrders(sc.patient, who);
+                if (ord.skipOnly) return;                     // MBI · 치매척도만 넘김 — MBI 는 챗에서 셈
+                if (!ord.labels.length) {
+                    add(tDate, who, "OT평가", sc.patient, "평가(검사명 미기재) — EMR 슬립 없음", true, "평가");
+                    return;
+                }
+                ord.labels.forEach(function(l){ add(tDate, who, "OT평가", sc.patient, l, false, l); });
+                return;
+            }
+            var lb = sc.slip ? sc.slip.label : sc.labels[0];
+            if (sc.slip && OT_INC_SKIP_RE.test(lb)) return;
             add(tDate, who, "OT평가", sc.patient, sc.slip ? lb : lb + " — EMR 슬립 없음", !sc.slip, lb);
         });
         ev.newPt.forEach(function(n) {
@@ -6644,17 +6787,14 @@ function analyzeOtIncentive() {
                 add(tDate, who, "신환평가", o.patient, "외래 · MBI/SCIM");
                 return;
             }
-            var hit = null;
-            globalEmrRows.forEach(function(row) {
-                if (hit || !row) return;
-                if (String(row[globalEmrPatientIdx]||"").trim() !== o.patient) return;
-                var code = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
-                var lab = evalCodeMap[code];
-                if (!lab || OT_INC_SKIP_RE.test(lab)) return;
-                if (o.any || o.labels.indexOf(lab) !== -1) hit = lab;
-            });
-            if (hit) add(tDate, who, "OT평가", o.patient, "외래 · " + hit, false, hit);
-            else warns.push({ who: otIncName(who), text: o.patient + " (외래) — EMR 평가 오더 없음, 세지 않음 〈" + o.raw + "〉" });
+            // 외래는 그 치료사가 넘긴 오더가 있는 검사만 센다
+            var ord = otIncEmrOrders(o.patient, who);
+            var hits = o.any ? ord.labels : ord.labels.filter(function(l){ return o.labels.indexOf(l) !== -1; });
+            if (hits.length) {
+                hits.forEach(function(l){ add(tDate, who, "OT평가", o.patient, "외래 · " + l, false, l); });
+            } else if (!ord.skipOnly) {
+                warns.push({ who: otIncName(who), text: o.patient + " (외래) — EMR 평가 오더 없음, 세지 않음 〈" + o.raw + "〉" });
+            }
         });
     }
 
@@ -6913,8 +7053,12 @@ function analyzeEvalCheck(silent) {
                     newPtSeen[k] = true;
                     newPtList.push({ patient:pp.name, who:who, slot:slot, raw:v, typo:pp.typo });
                 }
+                var cellSeen = {};   // 같은 칸 · 같은 환자 · 같은 검사는 한 번만
                 groups.forEach(function(g) {
                     var pp = ownerOf(g.idx);
+                    var ck = pp.name + "|" + g.labels.join(",");
+                    if (cellSeen[ck]) return;
+                    cellSeen[ck] = true;
                     if (outPat[pp.name]) {                           // 외래 환자 제외
                         outSkipped++;
                         outEval.push({ kind:"eval", patient:pp.name, labels:g.labels, any:!!g.any,

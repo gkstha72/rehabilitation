@@ -1,0 +1,2175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="noindex, nofollow">
+<title>주말 시간표 사전 검증</title>
+
+<style>
+:root{
+  --paper:#f1f2ef;
+  --card:#ffffff;
+  --ink:#17211d;
+  --muted:#6d7671;
+  --line:#e3e6e2;
+  --accent:#16584a;
+  --accent-soft:#e8f0ed;
+  --warn:#a8701a;
+  --warn-soft:#fdf3e2;
+  --bad:#b0352b;
+  --bad-soft:#fbeceb;
+  --good:#2d7a4f;
+  --good-soft:#e6f3eb;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","맑은 고딕","Noto Sans KR",sans-serif;
+  --mono:"Consolas","D2Coding","Menlo","Courier New",monospace;
+
+  /* 치료 종류별 색 */
+  --k-one:#16584a;
+  --k-robot:#6a4fb3;
+  --k-machine:#2f6fb0;
+  --k-electric:#c4861b;
+  --k-mg:#2a8a8a;
+  --k-special:#8a8f8c;
+  --k-doshu:#b5487a;
+}
+
+*{box-sizing:border-box;}
+
+body{
+  font-family:var(--sans);
+  font-size:14px;
+  line-height:1.6;
+  color:var(--ink);
+  background:var(--paper);
+  margin:0;
+  padding:28px 24px 60px;
+  -webkit-font-smoothing:antialiased;
+}
+
+main,.masthead{max-width:1240px;margin:0 auto;}
+.masthead{margin-bottom:22px;}
+
+.eyebrow{margin:0;font-size:11px;letter-spacing:.18em;color:var(--muted);}
+h1{margin:4px 0 0;font-size:23px;font-weight:700;letter-spacing:-.02em;}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:20px;
+  margin-bottom:16px;
+}
+
+.card-title{
+  display:flex;align-items:center;gap:10px;
+  margin:0 0 14px;font-size:15px;font-weight:700;
+}
+
+.card-title .num{
+  width:22px;height:22px;border-radius:50%;
+  background:var(--accent);color:#fff;
+  font-family:var(--mono);font-size:12px;line-height:22px;text-align:center;
+  flex:none;
+}
+
+.hint{margin:0 0 12px;font-size:13px;color:var(--muted);}
+.hint kbd{
+  font-family:var(--mono);font-size:11.5px;background:#fff;
+  border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;color:var(--ink);
+}
+
+/* 붙여넣기 칸 */
+.paste-zone{
+  border:2px dashed #c9d3ce;
+  border-radius:12px;
+  background:#fafbfa;
+  min-height:110px;
+  display:flex;align-items:center;justify-content:center;
+  text-align:center;
+  color:var(--muted);
+  font-size:14px;
+  cursor:text;
+  outline:none;
+  padding:16px;
+  transition:border-color .12s ease, background .12s ease;
+}
+.paste-zone:focus{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);}
+.paste-zone.loaded{border-style:solid;border-color:var(--accent);background:var(--accent-soft);color:var(--accent);min-height:72px;}
+
+.status{margin:12px 0 0;font-size:13px;}
+.status.error{color:var(--bad);}
+
+details.layout{margin-top:8px;font-size:12.5px;}
+details.layout summary{cursor:pointer;color:var(--muted);}
+details.layout table{border-collapse:collapse;margin-top:6px;}
+details.layout td{padding:2px 14px 2px 0;}
+details.layout td:last-child{font-family:var(--mono);color:var(--muted);}
+
+/* 설정 */
+.setting-grid{display:grid;grid-template-columns:150px 1fr;gap:12px 16px;align-items:start;}
+.setting-grid > .label{font-size:13px;font-weight:600;padding-top:5px;}
+.setting-grid > .label small{display:block;font-weight:400;color:var(--muted);font-size:11.5px;}
+.group-head{
+  grid-column:1 / -1;
+  margin-top:8px;padding-top:12px;border-top:1px solid var(--line);
+  font-size:13px;font-weight:700;color:var(--accent);
+}
+
+.row-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;}
+.field{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
+.field > span.name{font-size:13px;min-width:40px;}
+
+.chip{position:relative;display:inline-block;}
+.chip input{position:absolute;opacity:0;pointer-events:none;}
+.chip span{
+  display:inline-block;min-width:34px;padding:4px 10px;
+  border:1px solid var(--line);border-radius:999px;background:#fff;
+  font-size:13px;text-align:center;cursor:pointer;user-select:none;
+  transition:background .12s ease,border-color .12s ease,color .12s ease;
+}
+.chip input:checked + span{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+.chip input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px;}
+
+.check{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;}
+.check input{accent-color:var(--accent);width:15px;height:15px;margin:0;}
+
+.dist{font-size:11.5px;color:var(--muted);margin-left:4px;}
+.dist b{color:var(--ink);font-weight:600;}
+
+select{
+  font-family:inherit;font-size:13px;color:var(--ink);
+  padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;
+}
+
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;align-items:center;}
+.actions .spacer{flex:1;}
+
+button{
+  font-family:inherit;font-size:13px;color:var(--ink);
+  padding:8px 13px;border:1px solid var(--line);border-radius:9px;background:#fff;cursor:pointer;
+  transition:background .12s ease,border-color .12s ease;
+}
+button:hover{background:#f6f7f5;border-color:#cfd5d0;}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;padding:9px 20px;}
+button.primary:hover{background:#124a3e;border-color:#124a3e;}
+button:disabled{opacity:.45;cursor:not-allowed;}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+
+/* 결과 */
+#result{max-width:1240px;margin:0 auto;}
+
+.day-head{display:flex;align-items:baseline;gap:12px;margin:30px 0 12px;}
+.day-head h2{margin:0;font-size:20px;letter-spacing:-.01em;}
+.day-head span{font-size:13px;color:var(--muted);}
+
+.floor-panel{margin-bottom:22px;}
+.floor-head{display:flex;align-items:baseline;gap:10px;margin:14px 0 10px;padding-left:10px;border-left:4px solid var(--accent);}
+.floor-head h3{margin:0;font-size:16px;}
+.floor-head span{font-size:13px;color:var(--muted);}
+
+.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px;}
+.tile{
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:12px 14px;cursor:pointer;text-align:left;
+}
+.tile .t-name{font-size:12.5px;color:var(--muted);}
+.tile .t-num{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.3;}
+.tile.bad{border-color:#e6c0bc;background:var(--bad-soft);}
+.tile.bad .t-num{color:var(--bad);}
+.tile.good .t-num{color:var(--good);}
+.tile.off{opacity:.5;cursor:default;}
+.tile .t-ok{font-size:12px;color:var(--good);}
+
+details.issue{
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  margin-bottom:10px;overflow:hidden;
+}
+details.issue > summary{
+  cursor:pointer;padding:11px 16px;font-weight:600;font-size:14px;
+  display:flex;align-items:center;gap:8px;list-style:none;
+}
+details.issue > summary::-webkit-details-marker{display:none;}
+details.issue > summary::before{content:"▸";color:var(--muted);font-size:11px;}
+details.issue[open] > summary::before{content:"▾";}
+details.issue > summary .count{
+  font-size:12px;font-weight:600;color:#fff;background:var(--bad);
+  border-radius:999px;padding:0 8px;line-height:19px;
+}
+details.issue > summary .count.zero{background:var(--good);}
+details.issue .issue-body{padding:0 16px 14px;overflow-x:auto;}
+details.issue .note{font-size:12.5px;color:var(--muted);margin:0 0 8px;}
+
+table.list{width:100%;border-collapse:collapse;font-size:13px;}
+table.list th{
+  text-align:left;font-size:11.5px;color:var(--muted);font-weight:600;
+  padding:6px 10px;border-bottom:1px solid var(--line);background:#f8f9f7;white-space:nowrap;
+}
+table.list td{padding:7px 10px;border-bottom:1px solid #f0f2ef;vertical-align:top;}
+table.list tr:last-child td{border-bottom:none;}
+.ref{
+  font-family:var(--mono);font-size:11.5px;color:var(--accent);
+  background:var(--accent-soft);border-radius:4px;padding:0 5px;margin-right:4px;white-space:nowrap;
+}
+.raw{font-family:var(--mono);font-size:11.5px;color:var(--muted);}
+.tag{
+  display:inline-block;font-size:11px;border-radius:4px;padding:0 6px;line-height:18px;
+  background:#eef0ed;color:var(--muted);white-space:nowrap;
+}
+.tag.rec{background:var(--accent-soft);color:var(--accent);}
+.tag.non{background:#e4f2f2;color:var(--k-mg);}
+.tag.ff{background:#e2eefb;color:#2f6fb0;}
+.nm{white-space:nowrap;font-weight:600;}
+.memo{margin-left:5px;font-size:10.5px;font-weight:600;color:var(--warn);background:var(--warn-soft);border-radius:4px;padding:0 4px;cursor:help;}
+.time{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;}
+
+/* 환자별 시간표 */
+.board-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:0 16px 10px;}
+.board-tools input[type=search]{
+  font-family:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;width:180px;
+}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;color:var(--muted);margin-left:auto;}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:-1px;}
+
+table.board{border-collapse:separate;border-spacing:0;font-size:12.5px;min-width:100%;}
+table.board th{
+  font-size:11px;color:var(--muted);font-weight:600;padding:6px 6px;
+  border-bottom:1px solid var(--line);background:#f8f9f7;white-space:nowrap;
+  position:sticky;top:0;z-index:1;
+}
+table.board td{padding:4px 6px;border-bottom:1px solid #f0f2ef;white-space:nowrap;text-align:center;}
+table.board td.name{text-align:left;font-weight:600;}
+table.board td.num{font-variant-numeric:tabular-nums;color:var(--muted);}
+table.board td.num.hit{color:var(--ink);font-weight:600;}
+table.board td.lunch,table.board th.lunch{width:6px;padding:0;background:#f1f2ef;border-bottom-color:#f1f2ef;}
+table.board td.state{text-align:left;font-size:12px;}
+table.board td.state .bad{color:var(--bad);}
+table.board td.state .ok{color:var(--good);}
+table.board tr.has-issue td.name{color:var(--bad);}
+.board-wrap{overflow:auto;max-height:620px;border-top:1px solid var(--line);}
+
+.slot{
+  display:inline-block;min-width:26px;height:22px;line-height:22px;padding:0 3px;
+  border-radius:5px;font-size:11px;font-weight:600;color:#fff;
+}
+.slot.empty{background:transparent;}
+.slot.gap{background:repeating-linear-gradient(45deg,#f6d6d2,#f6d6d2 3px,#fff 3px,#fff 6px);border:1px solid #e6b3ad;}
+.slot.conflict{box-shadow:0 0 0 2px var(--bad);}
+.k-one{background:var(--k-one);}
+.k-robot{background:var(--k-robot);}
+.k-machine{background:var(--k-machine);}
+.k-electric{background:var(--k-electric);}
+.k-mg{background:var(--k-mg);}
+.k-special,.k-vital{background:var(--k-special);}
+.k-doshu{background:var(--k-doshu);}
+
+.empty-msg{padding:6px 0;color:var(--good);font-size:13px;}
+
+@media (max-width:1000px){
+  .tiles{grid-template-columns:repeat(3,minmax(0,1fr));}
+}
+
+@media (max-width:760px){
+  body{padding:20px 14px 48px;}
+  .card{padding:15px;}
+  .setting-grid{grid-template-columns:1fr;gap:6px;}
+  .setting-grid > .label{padding-top:8px;}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+
+@media print{
+  body{background:#fff;padding:0;}
+  .card{display:none;}
+  details.issue{break-inside:avoid;}
+  .board-wrap{max-height:none;overflow:visible;}
+}
+</style>
+</head>
+
+<body>
+
+<header class="masthead">
+  <p class="eyebrow">광주365재활병원 재활치료실</p>
+  <h1>주말 · 공휴일 시간표 사전 검증</h1>
+</header>
+
+<main>
+
+<section class="card">
+  <h2 class="card-title"><span class="num">1</span>시간표 붙여넣기</h2>
+  <p class="hint">
+    시놀로지에서 <b>주말시간표</b>(첫 번째 시트)를 열고 <kbd>Ctrl</kbd>+<kbd>A</kbd> <kbd>Ctrl</kbd>+<kbd>C</kbd> →
+    아래 칸을 클릭하고 <kbd>Ctrl</kbd>+<kbd>V</kbd>.
+    토·일로 나눈 시트를 하나씩 붙여넣어도 됩니다.
+  </p>
+  <div id="pasteZone" class="paste-zone" contenteditable="true" tabindex="0" spellcheck="false">
+    여기를 클릭하고 Ctrl+V
+  </div>
+  <p id="pasteStatus" class="status"></p>
+  <div id="layoutBox"></div>
+</section>
+
+<section class="card">
+  <h2 class="card-title"><span class="num">2</span>검증 기준 고르기</h2>
+
+  <div class="setting-grid">
+
+    <div class="label">검증할 요일</div>
+    <div class="row-line" id="dayChoices"><span class="hint" style="margin:0">시트를 붙여넣으면 요일이 나타납니다.</span></div>
+
+    <div class="label">검증할 층</div>
+    <div class="row-line" id="floorChoices"></div>
+
+    <div class="label">검증 항목</div>
+    <div class="row-line">
+      <label class="check"><input type="checkbox" data-check="overlap">환자 시간 중복</label>
+      <label class="check"><input type="checkbox" data-check="columnDup">한 치료사 칸에 같은 환자 2번 이상</label>
+      <label class="check"><input type="checkbox" data-check="continuity">치료 연속성(빈 시간)</label>
+      <label class="check"><input type="checkbox" data-check="routine">루틴 개수</label>
+      <label class="check"><input type="checkbox" data-check="notes">특이사항 (기구X · 전기X 등)</label>
+    </div>
+
+    <div class="group-head">3층 회복기 환자 (H 코드)</div>
+
+    <div class="label">1:1<small>회복기재활치료</small></div>
+    <div class="field" data-chips="rec.one" data-range="1-5" data-dist="rec.one"></div>
+
+    <div class="label">기구</div>
+    <div class="field" data-chips="rec.machine" data-range="0-4" data-dist="rec.machine"></div>
+
+    <div class="label">전기</div>
+    <div class="field" data-chips="rec.electric" data-range="0-3" data-dist="rec.electric"></div>
+
+    <div class="label">로봇 환자<small>GR 표기</small></div>
+    <div class="row-line">
+      <label class="check"><input type="radio" name="robotMode" value="one">로봇 = 1:1로 계산</label>
+      <label class="check"><input type="radio" name="robotMode" value="machine">로봇 = 기구로 계산</label>
+    </div>
+
+    <div class="group-head">1층(근골) 회복기 환자</div>
+
+    <div class="label">1:1</div>
+    <div class="field" data-chips="rec1.one" data-range="1-5" data-dist="rec1.one"></div>
+
+    <div class="label">기구</div>
+    <div class="field" data-chips="rec1.machine" data-range="0-4" data-dist="rec1.machine"></div>
+
+    <div class="group-head">비회복기 환자 (M · G 코드)</div>
+
+    <div class="label">M · G</div>
+    <div class="field" data-chips="non.mg" data-range="0-4" data-dist="non.mg"></div>
+
+    <div class="label">전기</div>
+    <div class="field" data-chips="non.electric" data-range="0-3" data-dist="non.electric"></div>
+
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="runButton" disabled>검증하기</button>
+    <button id="resetButton" type="button">기준 처음으로</button>
+    <span class="spacer"></span>
+    <button id="printButton" type="button" disabled>결과 인쇄</button>
+  </div>
+</section>
+
+<div id="result"></div>
+
+</main>
+
+<script>
+/*CORE-START*/
+/* ================================================================
+   1. 공통 도구
+   ================================================================ */
+
+function normalize(value){
+  if(value === undefined || value === null) return "";
+  return String(value).replace(/\s+/g," ").trim();
+}
+
+function compact(value){
+  return normalize(value).replace(/\s+/g,"");
+}
+
+function columnName(index){
+  let name = "";
+  let n = index + 1;
+  while(n > 0){
+    const rem = (n - 1) % 26;
+    name = String.fromCharCode(65 + rem) + name;
+    n = Math.floor((n - 1) / 26);
+  }
+  return name;
+}
+
+function cellRef(r, c){
+  return columnName(c) + (r + 1);
+}
+
+function isTimeText(value){
+  return /^\d{1,2}\s*[:시]\s*\d{2}/.test(normalize(value));
+}
+
+/* 1:30 처럼 적힌 오후 시간은 13:30 으로 봅니다. */
+function timeOrder(timeText){
+  const match = normalize(timeText).match(/(\d{1,2})\s*[:시]\s*(\d{2})?/);
+  if(!match) return 9999;
+  let hour = parseInt(match[1],10);
+  const minute = parseInt(match[2] || "0",10);
+  if(hour >= 1 && hour <= 5) hour += 12;
+  return hour * 60 + minute;
+}
+
+function minutesText(min){
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0");
+}
+
+const LUNCH = 12 * 60 + 30;
+
+/* ================================================================
+   2. 표 구조 인식 (시간표 생성기와 같은 방식)
+   ================================================================ */
+
+const anchorTypes = [
+  { kind:"therapist", label:"PT",   test:t => /^PT(\(|$)/.test(t) },
+  { kind:"therapist", label:"OT",   test:t => /^OT(\(|$)/.test(t) },
+  { kind:"machine",   label:"기구", test:t => t === "기구" },
+  { kind:"machine",   label:"CPM",  fixedName:"CPM", test:t => t === "CPM" },
+  { kind:"electric",  label:"전기", test:t => /^전기(\(|$)/.test(t) },
+  { kind:"electric",  label:"통증", test:t => t === "통증" }
+];
+
+function toRgb(color){
+  const text = String(color).trim().toLowerCase();
+  const hex = text.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/);
+  if(hex){
+    let v = hex[1];
+    if(v.length === 3) v = v[0]+v[0]+v[1]+v[1]+v[2]+v[2];
+    return [parseInt(v.slice(0,2),16), parseInt(v.slice(2,4),16), parseInt(v.slice(4,6),16)];
+  }
+  const rgb = text.match(/rgba?\(([^)]+)\)/);
+  if(rgb){
+    const p = rgb[1].split(",").map(v => parseFloat(v));
+    if(p.length >= 3) return [p[0],p[1],p[2]];
+  }
+  return null;
+}
+
+/* 근골(1층) 치료사 이름칸 색 */
+const firstFloorColors = ["#cce6ff"];
+
+function isFirstFloorColor(color){
+  const rgb = toRgb(color);
+  if(!rgb) return false;
+  return firstFloorColors.some(target=>{
+    const want = toRgb(target);
+    return want &&
+      Math.abs(rgb[0]-want[0]) <= 8 &&
+      Math.abs(rgb[1]-want[1]) <= 8 &&
+      Math.abs(rgb[2]-want[2]) <= 8;
+  });
+}
+
+function splitFloorPrefix(text){
+  const match = text.match(/^(근골|(\d)층)/);
+  if(!match) return { floor:"", rest:text };
+  return { floor: match[2] ? match[2] + "층" : "1층", rest: text.slice(match[0].length) };
+}
+
+function hasTimeBelow(rows, r, c){
+  for(let rr = r + 1; rr <= r + 3; rr++){
+    const row = rows[rr];
+    if(row && isTimeText(row[c])) return true;
+  }
+  return false;
+}
+
+function findRowTime(row, fromCol){
+  for(let c = fromCol - 1; c >= 0 && c >= fromCol - 20; c--){
+    if(isTimeText(row[c])) return normalize(row[c]);
+  }
+  return "";
+}
+
+function dayOfHeader(text){
+  const m = compact(text).match(/\(([월화수목금토일])\)/);
+  return m ? m[1] : "";
+}
+
+function detectLayout(rows, colors){
+
+  const anchors = [];
+
+  for(let r = 0; r < rows.length; r++){
+    const row = rows[r] || [];
+    for(let c = 0; c < row.length; c++){
+      const text = compact(row[c]);
+      if(!text) continue;
+      const parsed = splitFloorPrefix(text);
+      const type = anchorTypes.find(item => item.test(parsed.rest));
+      if(!type) continue;
+      if(!hasTimeBelow(rows, r, c)) continue;
+      anchors.push({
+        row:r, col:c,
+        kind:type.kind, label:type.label,
+        fixedName:type.fixedName || "",
+        prefixFloor:parsed.floor,
+        day: type.kind === "therapist" ? dayOfHeader(text) : ""
+      });
+    }
+  }
+
+  if(anchors.length === 0) return [];
+
+  const anchorKeys = new Set(anchors.map(a => a.row + "," + a.col));
+  const floors = detectFloors(rows);
+  const colorGrid = colors || [];
+
+  anchors.forEach(anchor=>{
+    anchor.endRow = findBlockEndRow(rows, anchors, anchor);
+    anchor.cols = collectBlockCols(rows, anchor, anchorKeys);
+    if(anchor.kind === "therapist"){
+      anchor.cols.forEach(col=>{
+        col.color = (colorGrid[anchor.row] || [])[col.col] || "";
+        if(isFirstFloorColor(col.color)) col.floor = "1층";
+      });
+    }
+  });
+
+  /* PT(금) / PT(토) / PT(일) 처럼 머리글이 위아래로 쌓여 있으면
+     맨 아래 머리글 하나의 표로 묶고, 요일마다 치료사 이름을 따로 기억합니다. */
+  anchors.forEach(anchor=>{
+    anchor.dayHeaders = [];
+    if(anchor.kind === "therapist" && anchor.day){
+      anchor.dayHeaders.push({ day:anchor.day, row:anchor.row });
+    }
+  });
+
+  const stacked = new Set();
+
+  anchors
+    .filter(a => a.kind === "therapist")
+    .sort((a,b) => b.row - a.row)
+    .forEach(anchor=>{
+      if(stacked.has(anchor)) return;
+      let top = anchor;
+      while(true){
+        const above = anchors
+          .filter(o =>
+            o !== top &&
+            o.kind === "therapist" &&
+            o.label === anchor.label &&
+            o.col === top.col &&
+            o.row < top.row &&
+            top.row - o.row <= 3 &&
+            o.endRow <= o.row
+          )
+          .sort((a,b) => b.row - a.row)[0];
+        if(!above) break;
+        stacked.add(above);
+        if(above.day) anchor.dayHeaders.unshift({ day:above.day, row:above.row });
+        top = above;
+      }
+    });
+
+  const blocks = anchors.filter(a => !stacked.has(a) && a.cols.length > 0 && a.endRow > a.row);
+
+  blocks.forEach(anchor=>{
+    const colored = anchor.cols.filter(col => col.floor === "1층").length;
+    if(colored > 0 && colored === anchor.cols.length){
+      anchor.floor = "1층";
+      anchor.floorKnown = true;
+      return;
+    }
+    const resolved = resolveFloor(rows, anchors, anchor, floors);
+    anchor.floor = resolved.floor;
+    anchor.floorKnown = resolved.known;
+  });
+
+  /* 요일별 치료사 이름 */
+  blocks.forEach(block=>{
+    block.namesByDay = {};
+    block.dayHeaders.forEach(h=>{
+      const header = rows[h.row] || [];
+      const names = {};
+      block.cols.forEach(col=>{
+        names[col.col] = block.fixedName || normalize(header[col.col]) || col.name;
+      });
+      block.namesByDay[h.day] = names;
+    });
+  });
+
+  return blocks;
+}
+
+function findBlockEndRow(rows, anchors, anchor){
+  const nextSameCol = anchors
+    .filter(o => o.col === anchor.col && o.row > anchor.row)
+    .map(o => o.row)
+    .sort((a,b) => a - b)[0];
+  const limit = (nextSameCol === undefined ? rows.length : nextSameCol) - 1;
+  let lastTimeRow = anchor.row;
+  let gap = 0;
+  for(let r = anchor.row + 1; r <= limit; r++){
+    const row = rows[r] || [];
+    if(isTimeText(row[anchor.col])){
+      lastTimeRow = r;
+      gap = 0;
+    }else{
+      gap++;
+      if(gap > 6) break;
+    }
+  }
+  return lastTimeRow;
+}
+
+const firstFloorHeaders = /^(리포머|캐포머|케포머|슬라이드|오토사이클)(\(\d+\))?$/;
+
+function floorFromMachines(rows, anchors, anchor){
+  if(anchor.kind === "machine"){
+    if(anchor.prefixFloor) return anchor.prefixFloor;
+    if(anchor.fixedName === "CPM") return "1층";
+    const header = rows[anchor.row] || [];
+    let count = 0;
+    anchor.cols.forEach(col=>{
+      if(firstFloorHeaders.test(compact(header[col.col]))) count++;
+    });
+    return count >= 2 ? "1층" : "";
+  }
+  const rightMachine = anchors
+    .filter(o => o.row === anchor.row && o.kind === "machine" && o.col > anchor.col && o.cols.length > 0)
+    .sort((a,b) => a.col - b.col)[0];
+  return rightMachine ? floorFromMachines(rows, anchors, rightMachine) : "";
+}
+
+function floorFromLeft(anchors, anchor){
+  const left = anchors
+    .filter(o => o.row === anchor.row && o.col < anchor.col && o.cols.length > 0)
+    .sort((a,b) => b.col - a.col);
+  for(const o of left){
+    if(o.prefixFloor) return o.prefixFloor;
+    if(o.kind === "therapist") return "";
+  }
+  return "";
+}
+
+function resolveFloor(rows, anchors, anchor, floors){
+  const floor = [
+    anchor.prefixFloor,
+    floorFromMachines(rows, anchors, anchor),
+    floorFromLeft(anchors, anchor),
+    floorOfRow(floors, anchor.row)
+  ].find(v => v);
+  return floor ? { floor, known:true } : { floor:"3층", known:false };
+}
+
+function detectFloors(rows){
+  const found = [];
+  rows.forEach((row, r)=>{
+    (row || []).forEach(value=>{
+      const text = normalize(value);
+      if(!text.includes("시간표")) return;
+      const m = text.match(/\((\d)층\)/);
+      if(m) found.push({ row:r, floor:m[1] + "층" });
+    });
+  });
+  return found;
+}
+
+function floorOfRow(floors, r){
+  let floor = "";
+  floors.forEach(item => { if(item.row <= r) floor = item.floor; });
+  return floor;
+}
+
+function collectBlockCols(rows, anchor, anchorKeys){
+  const header = rows[anchor.row] || [];
+  const cols = [];
+
+  if(anchor.kind === "electric"){
+    let start = -1;
+    for(let c = anchor.col + 1; c <= anchor.col + 4 && c < header.length; c++){
+      if(/^\d+$/.test(compact(header[c]))){ start = c; break; }
+    }
+    if(start < 0) return [];
+    for(let c = start; c < header.length; c++){
+      const h = compact(header[c]);
+      if(!/^\d+$/.test(h) && !/^EST$/i.test(h)) break;
+      cols.push({ col:c, name:/^EST$/i.test(h) ? "EST" : anchor.label + h });
+    }
+    return cols;
+  }
+
+  const MAX_BLANK_RUN = 3;
+  let blankRun = 0;
+
+  for(let c = anchor.col + 1; c < header.length; c++){
+    if(anchorKeys.has(anchor.row + "," + c)) break;
+    const name = normalize(header[c]);
+    if(!name){
+      blankRun++;
+      if(blankRun >= MAX_BLANK_RUN) break;
+      cols.push({ col:c, name:anchor.fixedName || "(이름 없음)", blankHeader:true });
+      continue;
+    }
+    blankRun = 0;
+    cols.push({ col:c, name: anchor.fixedName ? anchor.fixedName + "-" + name : name });
+  }
+
+  while(cols.length > 0 && cols[cols.length - 1].blankHeader) cols.pop();
+
+  return cols;
+}
+
+/* ================================================================
+   3. 칸 내용 읽기 — 환자 한 명 한 명으로 나누기
+   ================================================================ */
+
+/* 치료사 칸에 "+장비"로 적힌 기구 */
+const inlineMachineWords = {
+  "경사":"경사","슬라":"슬라이드","슬라이드":"슬라이드","워킹":"워킹","런닝":"런닝","러닝":"런닝",
+  "기립":"기립","코끼리":"코끼리","스마트":"스마트","코로":"코로","바로":"바로","동적":"동적",
+  "어댑핏":"어댑핏","전상":"전동상지","전동상지":"전동상지","에르":"등속성에르고미터",
+  "아크":"아크트레이너","클라":"클라이밋","진동":"진동기","리포머":"리포머","캐포머":"캐포머",
+  "체어":"체어","체":"체어","리":"리포머","오토":"오토사이클","오토사이클":"오토사이클","CPM":"CPM"
+};
+
+const robotCodes = { "RBOT":"알봇", "MW":"모닝워크", "AR":"엔젤렉스" };
+
+/* 코드 → 이름 */
+const specialNames = {
+  "N":"중추운동", "S":"특수작업", "A":"일상생활", "D":"연하치료", "X":"X"
+};
+
+const DAY_CHARS = "월화수목금토일";
+
+/* 칸 하나를 사람 단위로 자릅니다.
+   예) "G부지호(토) H임훈성(일)" → ["G부지호(토)", "H임훈성(일)"]
+       "H박창규 GR박창규MW"     → ["H박창규", "GR박창규MW"] */
+function splitPersonChunks(text){
+  return text
+    .replace(
+      /(GR|(?<![가-힣])신장\d*|(?<![가-힣])도수|(?<![0-9가-힣])(?:1[246]|8)|[HGMNSADVFX])(?=[가-힣])/g,
+      "\u0001$1"
+    )
+    .split("\u0001")
+    .filter(Boolean);
+}
+
+const CHUNK_RE = /^(GR|신장\d*|도수|1[246]|8|[HGMNSADVFX])([가-힣]{2,4})(\d*)(.*)$/;
+
+function parseChunk(chunk){
+  const m = chunk.match(CHUNK_RE);
+  if(!m) return null;
+
+  const code = m[1];
+  const name = m[2] + m[3];
+  const rest = m[4] || "";
+
+  /* 요일 표시 (토) (일) (화목) */
+  let days = null;
+  (rest.match(/\(([^)]*)\)?/g) || []).forEach(group=>{
+    const inner = group.replace(/[()]/g,"").replace(/[,·/\s]/g,"");
+    if(inner && [...inner].every(ch => DAY_CHARS.includes(ch))){
+      days = days || new Set();
+      [...inner].forEach(ch => days.add(ch));
+    }
+  });
+
+  let robot = "";
+  if(code === "GR"){
+    const rm = rest.match(/^(RBOT|MW|AR)/i);
+    robot = rm ? robotCodes[rm[1].toUpperCase()] : "로봇";
+  }
+
+  const tokens = rest.split("+").slice(1).map(t => t.replace(/[(].*$/,"").trim());
+  const machines = [];
+  let fes = false;
+  let vital = false;
+  tokens.forEach(word=>{
+    const up = word.toUpperCase();
+    if(up === "FES"){ fes = true; return; }
+    if(up === "V"){ vital = true; return; }
+    const machine = inlineMachineWords[word] || inlineMachineWords[up];
+    if(machine && !machines.includes(machine)) machines.push(machine);
+  });
+
+  return { code, name, days, robot, machines, fes, vital, raw:chunk };
+}
+
+function codeGroup(code){
+  if(code === "H") return "H";
+  if(code === "GR") return "GR";
+  if(code === "M" || code === "G") return "MG";
+  if(code === "V") return "V";
+  if(code === "F") return "F";
+  if(/^신장/.test(code)) return "신장";
+  if(code === "도수" || /^\d+$/.test(code)) return "도수";
+  return "SP";
+}
+
+/* ================================================================
+   4. 시트 → 치료 목록(events)
+   ================================================================ */
+
+/* kind
+   one      1:1(회복기재활치료)
+   robot    로봇
+   machine  기구
+   mg       비회복기 M·G
+   electric 전기·통증
+   doshu    도수
+   special  중추운동·특수작업·일상생활·연하·신장분사 등
+   vital    바이탈
+   모두 시간 중복 검사 대상입니다.
+   예외: 같은 칸에 "+FES" "+V"로 붙여 적은 것은 그 치료와 함께 하는 것이라 중복으로 보지 않습니다. */
+const PRIMARY = new Set(["one","robot","machine","mg","electric","doshu","special","vital"]);
+
+function buildEvents(rows, layout){
+
+  const events = [];
+  const slotSet = new Set();
+
+  layout.forEach((block, blockIndex)=>{
+
+    const firstCol = block.cols[0].col;
+
+    for(let r = block.row + 1; r <= Math.min(block.endRow, rows.length - 1); r++){
+
+      const row = rows[r] || [];
+      const time = isTimeText(row[block.col]) ? normalize(row[block.col]) : findRowTime(row, firstCol);
+      if(!time) continue;
+      if(time.includes("12:30")) continue;
+
+      const minutes = timeOrder(time);
+      if(minutes === 9999) continue;
+      slotSet.add(minutes);
+
+      block.cols.forEach(col=>{
+
+        const text = compact(row[col.col]);
+        if(!text) return;
+
+        const chunks = splitPersonChunks(text).map(parseChunk).filter(Boolean);
+        if(chunks.length === 0) return;
+
+        const robotNames = new Set(chunks.filter(c => c.code === "GR").map(c => c.name));
+
+        chunks.forEach(chunk=>{
+
+          const base = {
+            name: chunk.name,
+            code: chunk.code,
+            group: codeGroup(chunk.code),
+            days: chunk.days,
+            minutes,
+            time: minutesText(minutes),
+            blockIndex,
+            blockKind: block.kind,
+            col: col.col,
+            row: r,
+            ref: cellRef(r, col.col),
+            floor: col.floor || block.floor,
+            raw: chunk.raw
+          };
+
+          const push = (kind, extra) => events.push(Object.assign({}, base, { kind }, extra || {}));
+          const g = base.group;
+
+          if(g === "V"){ push("vital"); return; }
+
+          if(block.kind === "therapist"){
+
+            if(g === "H" && robotNames.has(chunk.name)) return;   /* GR 쪽에서 로봇으로 셉니다 */
+
+            if(g === "GR")        push("robot", { robot:chunk.robot });
+            else if(g === "H")    push(chunk.machines.length ? "machine" : "one", chunk.machines.length ? { inline:true, machine:chunk.machines.join("+") } : null);
+            else if(g === "MG")   push("mg", chunk.machines.length ? { inline:true } : null);
+            else if(g === "F")    push("electric");
+            else if(g === "도수") push("doshu");
+            else                  push("special", { label: g === "신장" ? "신장분사" : (specialNames[chunk.code] || chunk.code) });
+
+            if(chunk.fes)   push("electric", { rideAlong:true });
+            if(chunk.vital) push("vital", { rideAlong:true });
+
+          }else if(block.kind === "machine"){
+
+            if(g === "MG")     push("mg", { machine:col.name });
+            else if(g === "F") push("electric");
+            else               push("machine", { machine:col.name });
+
+          }else{
+
+            push("electric", { machine:col.name });
+          }
+        });
+      });
+    }
+  });
+
+  return { events, slots: Array.from(slotSet).sort((a,b) => a - b) };
+}
+
+function appliesToDay(event, day){
+  if(!event.days || !day) return true;
+  return event.days.has(day);
+}
+
+function therapistName(layout, event, day){
+  const block = layout[event.blockIndex];
+  if(block.kind !== "therapist"){
+    const col = block.cols.find(c => c.col === event.col);
+    return col ? col.name : block.label;
+  }
+  const byDay = block.namesByDay || {};
+  const names = byDay[day] || byDay[Object.keys(byDay).pop()] || {};
+  const col = block.cols.find(c => c.col === event.col);
+  return names[event.col] || (col ? col.name : "");
+}
+
+function blockTitle(block){
+  return (block.floor === "1층" ? "1층 " : "") + block.label;
+}
+
+/* ================================================================
+   5. 검증
+   ================================================================ */
+
+const DEFAULT_SETTINGS = {
+  checks: { overlap:true, columnDup:true, continuity:true, routine:true, notes:true },
+  rec:  { one:[3], machine:[2], electric:[1] },
+  non:  { mg:[2], electric:[1] },
+  rec1: { one:[3], machine:[2], electric:[1] },   /* 1층(근골) 회복기 */
+  robotMode: "one",           /* one | machine */
+  fesCounts: true,
+  allowGap: 0,
+  floors: ["3층","1층"]
+};
+
+/* 같은 시간에 겹쳐 적힌 같은 치료는 하나로 합칩니다.
+   - 치료사 칸 "+슬라"  ↔ 기구표의 같은 환자
+   - 치료사 칸 "+FES"   ↔ 전기표의 같은 환자 */
+function mergeSameSlot(list){
+  const hasBlockMachine = list.some(e => (e.kind === "machine" || e.kind === "mg") && !e.inline && e.blockKind === "machine");
+  const hasRide = list.some(e => e.kind === "electric" && e.rideAlong);
+  return list.filter(e=>{
+    if(e.inline && hasBlockMachine) return false;
+    if(e.kind === "electric" && !e.rideAlong && hasRide) return false;
+    return true;
+  });
+}
+
+function analyzeDay(parsed, day, settings){
+
+  const { layout, events, slots } = parsed;
+
+  const dayEvents = events.filter(e => appliesToDay(e, day));
+
+  /* 1층/3층 환자 구분 : 1:1(치료사 칸) 치료가 어느 층에 들어갔는지로 정합니다.
+     3층 1:1이 하나라도 있으면 3층 환자, 1층 1:1만 있으면 1층 환자.
+     1:1이 없으면 그날 치료가 더 많이 들어간 층으로 봅니다. */
+  const floorCount = new Map();
+  dayEvents.forEach(e=>{
+    const f = floorCount.get(e.name) || { first:0, all:0, oneFirst:0, oneOther:0 };
+    f.all++;
+    if(e.floor === "1층") f.first++;
+    const isOneToOne = e.blockKind === "therapist" && !e.inline && !e.rideAlong &&
+      (e.kind === "one" || e.kind === "robot" || e.kind === "doshu" || e.kind === "mg");
+    if(isOneToOne){
+      if(e.floor === "1층") f.oneFirst++;
+      else f.oneOther++;
+    }
+    floorCount.set(e.name, f);
+  });
+  const isFirstFloorPatient = name => {
+    const f = floorCount.get(name);
+    if(!f) return false;
+    if(f.oneOther > 0) return false;
+    if(f.oneFirst > 0) return true;
+    return f.first * 2 > f.all;
+  };
+
+  /* 환자별 · 시간별 */
+  const patients = new Map();
+  dayEvents.forEach(e=>{
+    if(!patients.has(e.name)) patients.set(e.name, new Map());
+    const bySlot = patients.get(e.name);
+    if(!bySlot.has(e.minutes)) bySlot.set(e.minutes, []);
+    bySlot.get(e.minutes).push(e);
+  });
+
+  const issues = { overlap:[], columnDup:[], continuity:[], routine:[], notes:[] };
+  const patientNotes = parsed.notes || {};
+  const rows = [];
+
+  patients.forEach((bySlot, name)=>{
+
+    const merged = new Map();
+    bySlot.forEach((list, min) => merged.set(min, mergeSameSlot(list)));
+
+    const conflicts = [];
+
+    merged.forEach((list, min)=>{
+      const primary = list.filter(e => PRIMARY.has(e.kind) && !e.rideAlong);
+      if(primary.length >= 2){
+        conflicts.push(min);
+        issues.overlap.push({
+          name, floor: isFirstFloorPatient(name) ? "1층" : "3층", minutes:min,
+          detail: primary.map(e => describe(layout, e, day))
+        });
+      }
+    });
+
+    /* 개수 */
+    const count = { one:0, robot:0, machine:0, mg:0, electric:0, doshu:0, special:[], robotNames:[] };
+    let hasH = false, hasMG = false;
+
+    merged.forEach(list=>{
+      list.forEach(e=>{
+        if(e.group === "H" || e.group === "GR") hasH = true;
+        if(e.group === "MG") hasMG = true;
+        switch(e.kind){
+          case "one": count.one++; break;
+          case "robot": count.robot++; count.robotNames.push(e.robot); break;
+          case "machine": count.machine++; break;
+          case "mg": count.mg++; break;
+          case "electric":
+            if(e.rideAlong && !settings.fesCounts) break;
+            count.electric++; break;
+          case "doshu": count.doshu++; break;
+          case "special": count.special.push(e.label); break;
+        }
+      });
+    });
+
+    const type = hasH ? "회복기" : (hasMG ? "비회복기" : "기타");
+
+    /* 연속성 */
+    const occupied = new Set();
+    merged.forEach((list, min)=>{
+      if(list.length) occupied.add(min);
+    });
+
+    const gaps = [];
+    [slots.filter(s => s < LUNCH), slots.filter(s => s > LUNCH)].forEach(half=>{
+      const idx = half.map((s,i) => occupied.has(s) ? i : -1).filter(i => i >= 0);
+      if(idx.length < 2) return;
+      let run = [];
+      for(let i = idx[0]; i <= idx[idx.length-1]; i++){
+        if(!occupied.has(half[i])){ run.push(half[i]); continue; }
+        if(run.length > settings.allowGap) gaps.push(run.slice());
+        run = [];
+      }
+    });
+
+    if(settings.checks.continuity && gaps.length && !(parsed.bedPatients || []).includes(name)){
+      issues.continuity.push({ name, type, gaps, floor: isFirstFloorPatient(name) ? "1층" : "3층" });
+    }
+
+    /* 루틴 */
+    const firstFloor = isFirstFloorPatient(name);
+    const floor = firstFloor ? "1층" : "3층";
+    const note = patientNotes[name] || null;
+    const outpatient = (parsed.outpatients || []).includes(name);
+    const routine = (!settings.checks.routine || outpatient) ? { ok:true, lines:[] } : checkRoutine(type, count, settings, floor, note);
+
+    /* 특이사항 */
+    if(note && settings.checks.notes){
+      const broken = checkNote(note, merged, count);
+      if(broken.length) issues.notes.push({ name, type, floor, note: note.raw.join(" / "), lines: broken });
+    }
+    if(!routine.ok){
+      issues.routine.push({ name, type, count, lines:routine.lines, mixed: hasH && hasMG, floor: isFirstFloorPatient(name) ? "1층" : "3층" });
+    }
+
+    rows.push({
+      name, type, count, merged, conflicts, firstFloor, floor: firstFloor ? "1층" : "3층",
+      note: note ? note.raw.join(" / ") : "",
+      outpatient,
+      gapSlots: new Set(gaps.flat()),
+      routineOk: routine.ok,
+      routineLines: routine.lines,
+      mixed: hasH && hasMG
+    });
+  });
+
+  /* 한 치료사 칸에 같은 환자 2번 이상 */
+  const colMap = new Map();
+  dayEvents.forEach(e=>{
+    if(e.blockKind !== "therapist") return;
+    if(e.rideAlong) return;
+    if(e.inline) return;                       /* "+리포머" 처럼 기구를 맡긴 칸은 제외 */
+    const key = e.blockIndex + "|" + e.col;
+    if(!colMap.has(key)) colMap.set(key, new Map());
+    const names = colMap.get(key);
+    if(!names.has(e.name)) names.set(e.name, []);
+    const list = names.get(e.name);
+    if(!list.some(x => x.minutes === e.minutes)) list.push(e);
+  });
+
+  colMap.forEach((names, key)=>{
+    names.forEach((list, name)=>{
+      const first = list[0];
+      /* 1층(근골)은 환자 수가 적어 같은 치료사에게 2번까지는 허용 */
+      const limit = first.floor === "1층" ? 3 : 2;
+      if(list.length < limit) return;
+      issues.columnDup.push({
+        name,
+        floor: first.floor === "1층" ? "1층" : "3층",
+        therapist: therapistName(layout, first, day),
+        block: blockTitle(layout[first.blockIndex]),
+        column: columnName(first.col),
+        items: list.sort((a,b) => a.minutes - b.minutes).map(e => ({ time:e.time, ref:e.ref, raw:e.raw }))
+      });
+    });
+  });
+
+  if(!settings.checks.overlap) issues.overlap = [];
+  if(!settings.checks.columnDup) issues.columnDup = [];
+
+  issues.overlap.sort((a,b) => a.minutes - b.minutes || a.name.localeCompare(b.name,"ko"));
+  issues.columnDup.sort((a,b) => a.therapist.localeCompare(b.therapist,"ko"));
+  issues.continuity.sort((a,b) => a.name.localeCompare(b.name,"ko"));
+  issues.routine.sort((a,b) => a.type.localeCompare(b.type,"ko") || a.name.localeCompare(b.name,"ko"));
+  rows.sort((a,b) => a.name.localeCompare(b.name,"ko"));
+
+  return { day, issues, rows, slots };
+}
+
+function describe(layout, e, day){
+  const block = layout[e.blockIndex];
+  let what;
+  if(e.kind === "machine" || e.kind === "mg"){
+    what = e.blockKind === "therapist"
+      ? blockTitle(block) + " " + therapistName(layout, e, day) + (e.inline ? " (+기구)" : "")
+      : "기구 " + (e.machine || "");
+  }else if(e.kind === "electric"){
+    what = e.blockKind === "therapist" ? blockTitle(block) + " " + therapistName(layout, e, day) + " (전기)" : (block.label === "통증" ? "통증 " : "전기 ") + (e.machine || "");
+  }else if(e.kind === "robot"){
+    what = blockTitle(block) + " " + therapistName(layout, e, day) + " (로봇-" + e.robot + ")";
+  }else{
+    what = blockTitle(block) + " " + therapistName(layout, e, day);
+  }
+  return { ref:e.ref, what: (block.floor === "1층" && !/^1층/.test(what) ? "1층 " : "") + what, raw:e.raw };
+}
+
+function inSet(list, n){ return list.includes(n); }
+
+function setText(list){
+  if(list.length === 0) return "-";
+  return list.slice().sort((a,b)=>a-b).join("·") + "개";
+}
+
+function checkRoutine(type, c, s, floor, note){
+
+  /* 특이사항에 기구X · 전기X 가 있으면 그 개수는 루틴에서 보지 않습니다 (특이사항 검사에서 따로 봄) */
+  const skipMachine = !!(note && note.noMachine);
+  const skipElectric = !!(note && note.noElectric);
+  const inSet = (list, n, skip) => skip || list.includes(n);
+
+  if(type === "회복기"){
+    const base = floor === "1층" ? s.rec1 : s.rec;
+    const rec = {
+      one: base.one,
+      machine: note && note.machineCount !== null ? [note.machineCount] : base.machine,
+      electric: note && note.electricCount !== null ? [note.electricCount] : base.electric
+    };
+
+    const evalWith = (one, machine) => {
+      const bad = [];
+      if(!inSet(rec.one, one)) bad.push("1:1 " + one + "개 (기준 " + setText(rec.one) + ")");
+      if(!inSet(rec.machine, machine, skipMachine)) bad.push("기구 " + machine + "개 (기준 " + setText(rec.machine) + ")");
+      return bad;
+    };
+
+    /* 1층(근골)은 전기·통증 개수를 보지 않습니다 */
+    const electricBad = inSet(rec.electric, c.electric, skipElectric || floor === "1층") ? [] : ["전기 " + c.electric + "개 (기준 " + setText(rec.electric) + ")"];
+
+    if(c.robot === 0){
+      const bad = evalWith(c.one, c.machine).concat(electricBad);
+      return { ok: bad.length === 0, lines: bad };
+    }
+
+    const asOne = evalWith(c.one + c.robot, c.machine);
+    const asMachine = evalWith(c.one, c.machine + c.robot);
+
+    if(s.robotMode === "machine"){
+      const bad = asMachine.concat(electricBad);
+      return { ok: bad.length === 0, lines: bad.map(t => "로봇=기구 기준 · " + t) };
+    }
+
+    const bad = asOne.concat(electricBad);
+    return { ok: bad.length === 0, lines: bad.map(t => "로봇=1:1 기준 · " + t) };
+  }
+
+  if(type === "비회복기"){
+    const bad = [];
+    if(!inSet(s.non.mg, c.mg)) bad.push("M·G " + c.mg + "개 (기준 " + setText(s.non.mg) + ")");
+    if(!inSet(s.non.electric, c.electric, skipElectric)) bad.push("전기 " + c.electric + "개 (기준 " + setText(s.non.electric) + ")");
+    if(c.one + c.robot > 0) bad.push("1:1 " + (c.one + c.robot) + "개가 들어가 있음");
+    return { ok: bad.length === 0, lines: bad };
+  }
+
+  return { ok:true, lines:[] };
+}
+
+function parseSheet(rows, colors, underlines){
+  const masked = underlines
+    ? rows.map((row, r) => row.map((cell, c) => ((underlines[r] || [])[c] ? "" : cell)))
+    : rows;
+  const layout = detectLayout(masked, colors);
+  const built = buildEvents(masked, layout);
+  const days = [];
+  layout.forEach(b => (b.dayHeaders || []).forEach(h => { if(!days.includes(h.day)) days.push(h.day); }));
+  days.sort((a,b) => "월화수목금토일".indexOf(a) - "월화수목금토일".indexOf(b));
+  return { layout, events: built.events, slots: built.slots, days: days.length ? days : [""], bedPatients: findBedPatients(masked, built.events), notes: findPatientNotes(masked, layout, built.events), outpatients: findOutpatients(masked, built.events) };
+}
+
+/* 침상재활 환자 — 시트 어디든 "오은자 침상재활"처럼 적혀 있거나
+   환자 칸에 "(침상)" "침상재활"이 붙어 있으면 연속성 검사에서 뺍니다. */
+/* 외래환자 — "주말 외래환자 오더" 처럼 "외래"가 들어간 칸과 그 아래 3칸에 적힌 환자,
+   또는 시간표 칸에 "(외래)"가 붙은 환자 */
+function findOutpatients(rows, events){
+  const known = new Set(events.map(e => e.name));
+  const found = new Set();
+  events.forEach(e => { if(/외래/.test(e.raw)) found.add(e.name); });
+  const take = text => (normalize(text).match(/[가-힣]{2,4}\d*/g) || []).forEach(w => { if(known.has(w)) found.add(w); });
+  rows.forEach((row, r) => (row || []).forEach((cell, c)=>{
+    if(!/외래/.test(cell || "")) return;
+    take(cell);
+    for(let rr = r + 1; rr <= r + 3 && rr < rows.length; rr++) take((rows[rr] || [])[c]);
+  }));
+  return Array.from(found).sort((a,b) => a.localeCompare(b,"ko"));
+}
+
+function findBedPatients(rows, events){
+  const known = new Set(events.map(e => e.name));
+  const found = new Set();
+  events.forEach(e => { if(/침상/.test(e.raw)) found.add(e.name); });
+  rows.forEach(row => (row || []).forEach(cell=>{
+    const text = normalize(cell);
+    if(!/침상/.test(text)) return;
+    (text.match(/[가-힣]{2,4}\d*/g) || []).forEach(word=>{
+      if(known.has(word)) found.add(word);
+    });
+  }));
+  return Array.from(found).sort((a,b) => a.localeCompare(b,"ko"));
+}
+
+/* ================================================================
+   6. 특이사항 — 환자 이름 옆(왼쪽 칸)에 적어 둔 메모
+   예) 기구X / 전기X / 로봇X / 아크X / 런닝,아크 고정 / 14:40 이후
+   ================================================================ */
+
+function machineKey(name){
+  const base = compact(name).replace(/\(.*?\)/g,"").replace(/[0-9]/g,"");
+  return inlineMachineWords[base] || inlineMachineWords[base.toUpperCase()] || base;
+}
+
+const NOTE_MACHINE_WORDS = Object.keys(inlineMachineWords).filter(w => w.length >= 2).sort((a,b) => b.length - a.length);
+
+function parseNote(text){
+  const t = compact(text).replace(/[xX×✕]/g,"X");
+  const note = { raw:[normalize(text)], noMachine:false, noElectric:false, noRobot:false, banned:[], fixed:[], after:null, before:null, understood:false };
+
+  if(/기구X|기구안|기구거부/.test(t)){ note.noMachine = true; }
+  if(/(전기|통증)X|전기안|전기거부/.test(t)){ note.noElectric = true; }
+  if(/로봇X|로봇안|로봇거부/.test(t)){ note.noRobot = true; }
+
+  NOTE_MACHINE_WORDS.forEach(w=>{
+    if(w === "CPM" ) return;
+    if(t.includes(w + "X")){
+      const key = inlineMachineWords[w];
+      if(!note.banned.includes(key)) note.banned.push(key);
+    }
+  });
+
+  const fixedMatch = t.match(/^(.*?)고정/);
+  if(fixedMatch){
+    let part = fixedMatch[1];
+    NOTE_MACHINE_WORDS.forEach(w=>{
+      if(part.includes(w)){
+        const key = inlineMachineWords[w];
+        if(!note.fixed.includes(key)) note.fixed.push(key);
+        part = part.split(w).join("");
+      }
+    });
+  }
+
+  const mc = t.match(/^기구(\d)개|[^가-힣]기구(\d)개/);
+  note.machineCount = mc ? Number(mc[1] || mc[2]) : null;
+  const ec = t.match(/^전기(\d)개|[^가-힣]전기(\d)개/);
+  note.electricCount = ec ? Number(ec[1] || ec[2]) : null;
+
+  const after = t.match(/(\d{1,2})(?::(\d{2})|시)(?:\d{2}분)?(?:이후|부터)/);
+  if(after) note.after = timeOrder(after[1] + ":" + (after[2] || "00"));
+  const before = t.match(/(\d{1,2})(?::(\d{2})|시)(?:\d{2}분)?(?:이전|까지)/);
+  if(before) note.before = timeOrder(before[1] + ":" + (before[2] || "00"));
+
+  note.understood = note.machineCount !== null || note.electricCount !== null || note.noMachine || note.noElectric || note.noRobot || note.banned.length > 0 || note.fixed.length > 0 || note.after !== null || note.before !== null;
+  return note;
+}
+
+function mergeNote(a, b){
+  if(!a) return b;
+  a.raw = a.raw.concat(b.raw.filter(x => !a.raw.includes(x)));
+  a.noMachine = a.noMachine || b.noMachine;
+  a.noElectric = a.noElectric || b.noElectric;
+  a.noRobot = a.noRobot || b.noRobot;
+  b.banned.forEach(x => { if(!a.banned.includes(x)) a.banned.push(x); });
+  b.fixed.forEach(x => { if(!a.fixed.includes(x)) a.fixed.push(x); });
+  if(b.machineCount !== null) a.machineCount = b.machineCount;
+  if(b.electricCount !== null) a.electricCount = b.electricCount;
+  if(b.after !== null) a.after = a.after === null ? b.after : Math.max(a.after, b.after);
+  if(b.before !== null) a.before = a.before === null ? b.before : Math.min(a.before, b.before);
+  a.understood = a.understood || b.understood;
+  return a;
+}
+
+function noteMeaning(note){
+  const out = [];
+  if(note.machineCount !== null) out.push("기구 " + note.machineCount + "개");
+  if(note.electricCount !== null) out.push("전기 " + note.electricCount + "개");
+  if(note.noMachine) out.push("기구 없음");
+  if(note.noElectric) out.push("전기 없음");
+  if(note.noRobot) out.push("로봇 없음");
+  if(note.banned.length) out.push(note.banned.join("·") + " 제외");
+  if(note.fixed.length) out.push("기구는 " + note.fixed.join("·") + "만");
+  if(note.after !== null) out.push(minutesText(note.after) + " 이후만");
+  if(note.before !== null) out.push(minutesText(note.before) + " 까지만");
+  return out.length ? out.join(", ") : "검사 안 함 (참고용 메모)";
+}
+
+function findPatientNotes(rows, layout, events){
+
+  const known = new Set(events.map(e => e.name));
+
+  /* 시간표 칸 안은 메모로 보지 않습니다 */
+  const inBlock = new Set();
+  layout.forEach(b=>{
+    for(let r = b.row; r <= b.endRow; r++){
+      inBlock.add(r + "," + b.col);
+      b.cols.forEach(col => inBlock.add(r + "," + col.col));
+    }
+  });
+
+  const notes = {};
+  const add = (name, text) => {
+    const n = parseNote(text);
+    notes[name] = mergeNote(notes[name], n);
+  };
+
+  rows.forEach((row, r)=>{
+    (row || []).forEach((cell, c)=>{
+      if(c === 0 || inBlock.has(r + "," + c)) return;
+      const name = compact(cell);
+      if(!known.has(name)) return;
+      const left = normalize(row[c - 1]);
+      const leftCompact = compact(left);
+      if(!leftCompact) return;
+      if(known.has(leftCompact)) return;
+      if(isTimeText(left) || /^[\d.,:\s-]+$/.test(left)) return;
+      if(CHUNK_RE.test(leftCompact)) return;
+      if(/리스트|=|COUNT/i.test(leftCompact)) return;
+      add(name, left);
+    });
+  });
+
+  /* 시간표 칸 안 괄호 메모 — 예) H홍거상(기구X) */
+  events.forEach(e=>{
+    (e.raw.match(/\(([^)]*)\)/g) || []).forEach(group=>{
+      const inner = group.slice(1, -1);
+      const n = parseNote(inner);
+      if(n.understood) notes[e.name] = mergeNote(notes[e.name], n);
+    });
+  });
+
+  return notes;
+}
+
+function checkNote(note, merged, count){
+  const out = [];
+  const all = [];
+  merged.forEach(list => list.forEach(e => all.push(e)));
+  const machines = all.filter(e => e.kind === "machine" || (e.kind === "mg" && e.blockKind === "machine") || (e.kind === "mg" && e.inline));
+  const refs = list => list.map(e => e.ref + "(" + e.time + ")").join(" ");
+
+  if(note.noMachine && machines.length) out.push("기구X인데 기구 " + machines.length + "개 — " + refs(machines));
+  const electric = all.filter(e => e.kind === "electric" && !e.rideAlong);
+  if(note.noElectric && electric.length) out.push("전기X인데 전기 " + electric.length + "개 — " + refs(electric));
+  const robots = all.filter(e => e.kind === "robot");
+  if(note.noRobot && robots.length) out.push("로봇X인데 로봇 " + robots.length + "개 — " + refs(robots));
+
+  const keysOf = e => String(e.machine || "").split("+").filter(Boolean).map(machineKey);
+
+  if(note.banned.length){
+    const hit = machines.filter(e => keysOf(e).some(k => note.banned.includes(k)));
+    if(hit.length) out.push(note.banned.join("·") + " 제외인데 들어감 — " + hit.map(e => e.ref + "(" + e.time + " " + keysOf(e).join("+") + ")").join(" "));
+  }
+  if(note.fixed.length){
+    const hit = machines.filter(e => { const k = keysOf(e); return k.length && !k.some(x => note.fixed.includes(x)); });
+    if(hit.length) out.push(note.fixed.join("·") + " 고정인데 다른 기구 — " + hit.map(e => e.ref + "(" + e.time + " " + keysOf(e).join("+") + ")").join(" "));
+  }
+  if(note.after !== null){
+    const hit = all.filter(e => e.minutes < note.after);
+    if(hit.length) out.push(minutesText(note.after) + " 이후만인데 더 이른 시간 — " + refs(hit));
+  }
+  if(note.before !== null){
+    const hit = all.filter(e => e.minutes > note.before);
+    if(hit.length) out.push(minutesText(note.before) + " 까지만인데 더 늦은 시간 — " + refs(hit));
+  }
+  return out;
+}
+
+
+/* ================================================================
+   6. 붙여넣기 (시간표 생성기와 같은 읽기 방식)
+   ================================================================ */
+
+function hasUnderlineStyle(styleText){
+  const m = String(styleText || "").toLowerCase().match(/text-decoration(?:-line)?\s*:\s*([^;"']+)/);
+  return !!m && m[1].includes("underline");
+}
+
+function buildClassMap(doc, test){
+  const map = {};
+  Array.from(doc.querySelectorAll("style")).forEach(tag=>{
+    tag.textContent.split("}").forEach(chunk=>{
+      const parts = chunk.split("{");
+      if(parts.length < 2) return;
+      const value = test(parts[1]);
+      if(!value) return;
+      parts[0].split(",").forEach(sel=>{
+        const name = sel.trim().replace(/^\./,"");
+        if(name) map[name] = value;
+      });
+    });
+  });
+  return map;
+}
+
+function cellBackground(cell, classColors){
+  const inline = cell.getAttribute("style") || "";
+  const m = inline.match(/background(?:-color)?\s*:\s*([^;"']+)/i);
+  if(m) return m[1].trim();
+  const bg = cell.getAttribute("bgcolor");
+  if(bg) return bg.trim();
+  for(const name of (cell.getAttribute("class") || "").split(/\s+/)){
+    if(classColors[name]) return classColors[name];
+  }
+  return "";
+}
+
+function cellUnderline(cell, classUnderlines){
+  if(cell.querySelector("u,ins")) return true;
+  const nodes = [cell].concat(Array.from(cell.querySelectorAll("*")));
+  for(const node of nodes){
+    if(hasUnderlineStyle(node.getAttribute("style"))) return true;
+    for(const name of (node.getAttribute("class") || "").split(/\s+/)){
+      if(classUnderlines[name]) return true;
+    }
+  }
+  return false;
+}
+
+function cellText(cell){
+  /* 칸 안 줄바꿈(<br>)을 띄어쓰기로 살려 둡니다. */
+  const clone = cell.cloneNode(true);
+  clone.querySelectorAll("br").forEach(br => br.replaceWith(" "));
+  return normalize(clone.textContent);
+}
+
+function parseHtmlTable(html){
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const table = doc.querySelector("table");
+  if(!table) return null;
+
+  const classColors = buildClassMap(doc, body => {
+    const m = body.match(/background(?:-color)?\s*:\s*([^;]+)/i);
+    return m ? m[1].trim() : "";
+  });
+  const classUnderlines = buildClassMap(doc, body => hasUnderlineStyle(body));
+
+  const values = [], colors = [], underlines = [];
+  const occupied = {};
+
+  Array.from(table.querySelectorAll("tr")).forEach((tr, r)=>{
+    values[r] = values[r] || [];
+    colors[r] = colors[r] || [];
+    underlines[r] = underlines[r] || [];
+    let c = 0;
+    Array.from(tr.children).forEach(cell=>{
+      while(occupied[r + "," + c]) c++;
+      const value = cellText(cell);
+      const color = cellBackground(cell, classColors);
+      const under = cellUnderline(cell, classUnderlines);
+      const rs = parseInt(cell.getAttribute("rowspan") || "1", 10);
+      const cs = parseInt(cell.getAttribute("colspan") || "1", 10);
+      for(let rr = 0; rr < rs; rr++){
+        for(let cc = 0; cc < cs; cc++){
+          const tr2 = r + rr, tc = c + cc;
+          values[tr2] = values[tr2] || [];
+          colors[tr2] = colors[tr2] || [];
+          underlines[tr2] = underlines[tr2] || [];
+          values[tr2][tc] = value;
+          colors[tr2][tc] = color;
+          underlines[tr2][tc] = under;
+          occupied[tr2 + "," + tc] = true;
+        }
+      }
+      c += cs;
+    });
+  });
+
+  return { values: fillRows(values), colors: fillRows(colors), underlines: fillRows(underlines, false) };
+}
+
+function fillRows(rows, empty){
+  const fill = empty === undefined ? "" : empty;
+  const width = rows.reduce((m, row) => Math.max(m, (row || []).length), 0);
+  const out = [];
+  for(let r = 0; r < rows.length; r++){
+    const row = rows[r] || [];
+    const line = [];
+    for(let c = 0; c < width; c++) line.push(row[c] === undefined ? fill : row[c]);
+    out.push(line);
+  }
+  return out;
+}
+
+/* 텍스트로만 붙여넣어진 경우 — 칸 안 줄바꿈은 "..."로 감싸져 옵니다. */
+function parseTsv(text){
+  const rows = [];
+  let row = [], field = "", quoted = false;
+  const src = text.replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  for(let i = 0; i < src.length; i++){
+    const ch = src[i];
+    if(quoted){
+      if(ch === '"'){
+        if(src[i+1] === '"'){ field += '"'; i++; }
+        else quoted = false;
+      }else field += ch;
+      continue;
+    }
+    if(ch === '"' && field === ""){ quoted = true; continue; }
+    if(ch === "\t"){ row.push(field); field = ""; continue; }
+    if(ch === "\n"){ row.push(field); rows.push(row); row = []; field = ""; continue; }
+    field += ch;
+  }
+  if(field !== "" || row.length){ row.push(field); rows.push(row); }
+  return fillRows(rows.map(r => r.map(normalize)));
+}
+
+/* ================================================================
+   7. 화면
+   ================================================================ */
+
+let parsed = null;
+let lastRows = {};
+let settings = loadSettings();
+
+const DAY_FULL = { "월":"월요일","화":"화요일","수":"수요일","목":"목요일","금":"금요일","토":"토요일","일":"일요일","":"붙여넣은 시트" };
+
+function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+function loadSettings(){
+  try{
+    const saved = JSON.parse(localStorage.getItem("weekendCheckSettings") || "null");
+    if(saved && saved.rec && saved.non && saved.checks){
+      const merged = Object.assign(clone(DEFAULT_SETTINGS), saved);
+      if(merged.robotMode !== "machine") merged.robotMode = "one";
+      if(!Array.isArray(merged.floors)) merged.floors = ["3층","1층"];
+      delete merged.includeFirstFloor;
+      merged.allowGap = 0;
+      /* 예전에 여러 개 골라 둔 값은 하나만 남깁니다 */
+      ["rec","rec1","non"].forEach(g => Object.keys(merged[g]).forEach(k => {
+        const v = merged[g][k];
+        if(!Array.isArray(v) || v.length !== 1) merged[g][k] = clone(DEFAULT_SETTINGS[g][k]);
+      }));
+      if(merged.checks.notes === undefined) merged.checks.notes = true;
+      merged.fesCounts = true;
+      return merged;
+    }
+  }catch(e){}
+  return clone(DEFAULT_SETTINGS);
+}
+
+function saveSettings(){
+  try{ localStorage.setItem("weekendCheckSettings", JSON.stringify(settings)); }catch(e){}
+}
+
+function getPath(obj, path){ return path.split(".").reduce((o,k) => o[k], obj); }
+function setPath(obj, path, value){
+  const keys = path.split(".");
+  const last = keys.pop();
+  keys.reduce((o,k) => o[k], obj)[last] = value;
+}
+
+function el(tag, attrs, children){
+  const node = document.createElement(tag);
+  if(attrs) Object.entries(attrs).forEach(([k,v])=>{
+    if(k === "class") node.className = v;
+    else if(k === "text") node.textContent = v;
+    else if(k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v);
+  });
+  (children || []).forEach(ch => { if(ch !== null && ch !== undefined) node.append(ch); });
+  return node;
+}
+
+/* ---- 설정 칸 그리기 ---- */
+
+function renderSettings(){
+
+  document.querySelectorAll("[data-check]").forEach(box=>{
+    box.checked = !!settings.checks[box.dataset.check];
+    box.onchange = () => { settings.checks[box.dataset.check] = box.checked; saveSettings(); };
+  });
+
+  document.querySelectorAll("[data-chips]").forEach(field=>{
+    const path = field.dataset.chips;
+    const [from, to] = field.dataset.range.split("-").map(Number);
+    field.innerHTML = "";
+    for(let n = from; n <= to; n++){
+      /* 개수는 하나만 고릅니다 */
+      const input = el("input", { type:"radio", name:"chip-" + path, value:String(n) });
+      input.checked = getPath(settings, path)[0] === n;
+      input.onchange = () => {
+        if(!input.checked) return;
+        setPath(settings, path, [n]);
+        saveSettings();
+      };
+      field.append(el("label", { class:"chip" }, [input, el("span", { text: n + "개" })]));
+    }
+    field.append(el("span", { class:"dist", "data-dist-for":path }));
+  });
+
+  document.querySelectorAll('input[name="robotMode"]').forEach(r=>{
+    r.checked = settings.robotMode === r.value;
+    r.onchange = () => { if(r.checked){ settings.robotMode = r.value; saveSettings(); } };
+  });
+
+
+  const floorWrap = document.getElementById("floorChoices");
+  floorWrap.innerHTML = "";
+  ["3층","1층"].forEach(f=>{
+    const input = el("input", { type:"checkbox", value:f });
+    input.checked = settings.floors.includes(f);
+    input.onchange = () => {
+      settings.floors = Array.from(floorWrap.querySelectorAll("input")).filter(i => i.checked).map(i => i.value);
+      saveSettings();
+    };
+    floorWrap.append(el("label", { class:"chip" }, [input, el("span", { text: f === "1층" ? "1층(근골)" : "3층" })]));
+  });
+
+  renderDistribution();
+}
+
+/* 이번 시간표에서 실제로 몇 개씩 들어갔는지 — 기준 고를 때 참고용 */
+function renderDistribution(){
+
+  document.querySelectorAll("[data-dist-for]").forEach(span => span.textContent = "");
+  if(!parsed) return;
+
+  const chosen = selectedDays();
+  if(chosen.length === 0) return;
+
+  /* 여러 요일을 골랐으면 토요일(없으면 첫 요일) 하나로 보여줍니다. */
+  const days = [chosen.includes("토") ? "토" : chosen[0]];
+  const dayLabel = DAY_FULL[days[0]] || "이번 시간표";
+
+  const tally = { "rec.one":{}, "rec.machine":{}, "rec.electric":{}, "rec1.one":{}, "rec1.machine":{}, "rec1.electric":{}, "non.mg":{}, "non.electric":{} };
+  const add = (key, n) => { tally[key][n] = (tally[key][n] || 0) + 1; };
+
+  days.forEach(day=>{
+    const a = analyzeDay(parsed, day, Object.assign(clone(settings), { checks:{ overlap:false, columnDup:false, continuity:false, routine:false } }));
+    a.rows.forEach(row=>{
+      const c = row.count;
+      const r = row.firstFloor ? "rec1" : "rec";
+      if(row.type === "회복기"){
+        if(c.robot === 0){ add(r + ".one", c.one); add(r + ".machine", c.machine); }
+        add(r + ".electric", c.electric);
+      }else if(row.type === "비회복기"){
+        add("non.mg", c.mg);
+        add("non.electric", c.electric);
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-dist-for]").forEach(span=>{
+    const t = tally[span.dataset.distFor];
+    const keys = Object.keys(t).map(Number).sort((a,b) => a - b);
+    if(keys.length === 0) return;
+    span.innerHTML = "";
+    span.append(dayLabel + " 현재 → ");
+    keys.forEach((k, i)=>{
+      if(i) span.append(" · ");
+      span.append(el("b", { text: k + "개" }), " " + t[k] + "명");
+    });
+    if(/^rec1?\.(one|machine)$/.test(span.dataset.distFor)) span.append(" (로봇 환자 제외)");
+  });
+}
+
+function selectedDays(){
+  if(!parsed) return [];
+  const boxes = Array.from(document.querySelectorAll("#dayChoices input"));
+  if(boxes.length === 0) return parsed.days;
+  return boxes.filter(b => b.checked).map(b => b.value);
+}
+
+function renderDays(){
+  const wrap = document.getElementById("dayChoices");
+  wrap.innerHTML = "";
+  parsed.days.forEach(day=>{
+    const input = el("input", { type:"checkbox", value:day });
+    input.checked = true;
+    input.onchange = renderDistribution;
+    wrap.append(el("label", { class:"chip" }, [input, el("span", { text: DAY_FULL[day] || day })]));
+  });
+}
+
+/* ---- 붙여넣기 ---- */
+
+function handlePaste(event){
+
+  event.preventDefault();
+
+  const html = event.clipboardData.getData("text/html");
+  const text = event.clipboardData.getData("text/plain");
+
+  let grid = null;
+  if(html && html.includes("<table")) grid = parseHtmlTable(html);
+  if(!grid && text) grid = { values: parseTsv(text), colors: [], underlines: null };
+
+  const zone = document.getElementById("pasteZone");
+  const status = document.getElementById("pasteStatus");
+
+  if(!grid || grid.values.length === 0){
+    status.className = "status error";
+    status.textContent = "붙여넣은 내용에서 표를 찾지 못했습니다.";
+    return;
+  }
+
+  const result = parseSheet(grid.values, grid.colors, grid.underlines);
+
+  if(result.layout.length === 0){
+    parsed = null;
+    status.className = "status error";
+    status.textContent = "PT(토) · OT(일) · 기구 · 전기 같은 머리글을 찾지 못했습니다. 시트 전체를 복사했는지 확인해주세요.";
+    document.getElementById("runButton").disabled = true;
+    return;
+  }
+
+  parsed = result;
+
+  const names = new Set(result.events.map(e => e.name));
+  const acting = grid.underlines ? grid.underlines.flat().filter(Boolean).length : 0;
+
+  zone.classList.add("loaded");
+  zone.textContent = "✓ 붙여넣기 완료 — 다른 시트로 바꾸려면 다시 클릭하고 Ctrl+V";
+
+  status.className = "status";
+  status.textContent =
+    "표 " + result.layout.length + "개 인식 · " +
+    "요일 " + result.days.map(d => DAY_FULL[d] || d).join(", ") + " · " +
+    "환자 " + names.size + "명" +
+    (acting ? " · 액팅선(밑줄) " + acting + "칸은 빼고 봅니다" : "");
+
+  renderLayout(result.layout);
+  renderDays();
+  renderDistribution();
+
+  document.getElementById("runButton").disabled = false;
+  document.getElementById("result").innerHTML = "";
+  document.getElementById("printButton").disabled = true;
+  zone.blur();
+}
+
+function renderLayout(layout){
+  const box = document.getElementById("layoutBox");
+  box.innerHTML = "";
+  const table = el("table");
+  layout.forEach(b=>{
+    const first = b.cols[0].col, last = b.cols[b.cols.length - 1].col;
+    const kind = b.kind === "therapist" ? "치료사" : b.kind === "machine" ? "기구" : "전기";
+    table.append(el("tr", null, [
+      el("td", { text: b.floor + " " + b.label }),
+      el("td", { text: kind + (b.dayHeaders && b.dayHeaders.length ? " · " + b.dayHeaders.map(h => h.day).join("/") : "") }),
+      el("td", { text: (b.row + 1) + "~" + (b.endRow + 1) + "행 / " + columnName(first) + "~" + columnName(last) + "열" })
+    ]));
+  });
+  box.append(el("details", { class:"layout" }, [el("summary", { text:"인식된 표 위치 보기" }), table]));
+}
+
+/* ---- 검증 실행 ---- */
+
+function run(){
+
+  if(!parsed) return;
+
+  const days = selectedDays();
+  const result = document.getElementById("result");
+  result.innerHTML = "";
+
+  if(days.length === 0 || settings.floors.length === 0){
+    result.append(el("p", { class:"hint", text:"검증할 요일과 층을 하나 이상 골라주세요." }));
+    return;
+  }
+
+  days.forEach(day => result.append(renderDay(analyzeDay(parsed, day, settings))));
+
+  document.getElementById("printButton").disabled = false;
+  result.firstChild.scrollIntoView({ behavior:"smooth", block:"start" });
+}
+
+const ISSUE_INFO = {
+  overlap:    { title:"환자 시간 중복", note:"같은 시간에 두 곳 이상 들어간 환자입니다. 중추운동(N)·특수작업(S)·일상생활(A)·연하(D)·바이탈(V)도 포함합니다. 한 칸 안에 \"+슬라\" \"+FES\" \"+V\"처럼 붙여 적은 것만 같은 치료로 봅니다." },
+  columnDup:  { title:"한 치료사 칸에 같은 환자 2번 이상", note:"같은 날 같은 치료사 칸에 두 번 이상 들어간 환자입니다. 1층(근골)은 2번까지 허용하고 3번부터 표시합니다." },
+  continuity: { title:"치료 연속성 (빈 시간)", note:"치료 사이에 빈 시간이 있는 환자입니다. 오전 · 오후는 따로 보고, 점심시간은 빈 시간이 아닙니다. 침상재활 환자는 뺍니다." },
+  routine:    { title:"루틴 개수", note:"" },
+  notes:      { title:"특이사항", note:"환자 이름 왼쪽 칸에 적은 메모를 읽어서 확인합니다. 기구X · 전기X · 로봇X · 아크X(특정 기구 제외) · 런닝,아크 고정 · 기구3개 · 14:40 이후 를 알아봅니다." }
+};
+
+function renderDay(a){
+
+  const wrap = el("section");
+
+  wrap.append(el("div", { class:"day-head" }, [
+    el("h2", { text: (DAY_FULL[a.day] || a.day) + " 검증 결과" })
+  ]));
+
+  ["3층","1층"].filter(f => settings.floors.includes(f)).forEach(floor=>{
+    wrap.append(renderFloor(a, floor));
+  });
+
+  return wrap;
+}
+
+function renderFloor(a, floor){
+
+  const issues = {};
+  Object.keys(a.issues).forEach(k => issues[k] = a.issues[k].filter(i => i.floor === floor));
+  const rows = a.rows.filter(r => r.floor === floor);
+  lastRows[floor] = rows;
+  const view = { day:a.day, issues, rows, slots:a.slots };
+
+  const total = Object.values(issues).reduce((s, list) => s + list.length, 0);
+  const panel = el("div", { class:"floor-panel" });
+
+  panel.append(el("div", { class:"floor-head" }, [
+    el("h3", { text: floor === "1층" ? "1층 (근골)" : "3층" }),
+    el("span", { text: "환자 " + rows.length + "명 · 확인할 곳 " + total + "건" })
+  ]));
+
+  const sections = {};
+  const tiles = el("div", { class:"tiles" });
+
+  Object.keys(ISSUE_INFO).forEach(key=>{
+    const on = settings.checks[key];
+    const n = issues[key].length;
+    const tile = el("button", { type:"button", class:"tile " + (!on ? "off" : n ? "bad" : "good") }, [
+      el("div", { class:"t-name", text: ISSUE_INFO[key].title }),
+      el("div", { class:"t-num", text: on ? String(n) : "-" }),
+      on && n === 0 ? el("div", { class:"t-ok", text:"이상 없음" }) : null
+    ]);
+    tile.onclick = () => {
+      if(!sections[key]) return;
+      sections[key].open = true;
+      sections[key].scrollIntoView({ behavior:"smooth", block:"start" });
+    };
+    tiles.append(tile);
+  });
+
+  panel.append(tiles);
+
+  if(settings.checks.overlap)    panel.append(sections.overlap = issueBox("overlap", issues.overlap, renderOverlap, floor));
+  if(settings.checks.columnDup)  panel.append(sections.columnDup = issueBox("columnDup", issues.columnDup, renderColumnDup, floor));
+  if(settings.checks.continuity) panel.append(sections.continuity = issueBox("continuity", issues.continuity, renderContinuity, floor));
+  if(settings.checks.routine)    panel.append(sections.routine = issueBox("routine", issues.routine, renderRoutine, floor));
+  if(settings.checks.notes)      panel.append(sections.notes = issueBox("notes", issues.notes, renderNotes, floor));
+
+  panel.append(renderBoard(view));
+
+  return panel;
+}
+
+function issueBox(key, list, render, floor){
+  const box = el("details", { class:"issue" });
+  box.open = list.length > 0 && list.length <= 40;
+  box.append(el("summary", null, [
+    ISSUE_INFO[key].title,
+    el("span", { class:"count" + (list.length ? "" : " zero"), text: list.length ? list.length + "건" : "0" })
+  ]));
+  const body = el("div", { class:"issue-body" });
+  let note = key === "routine" ? routineNote(floor) : ISSUE_INFO[key].note;
+  if(key === "routine" && parsed.outpatients.length) note += " / 외래환자 제외: " + parsed.outpatients.join(", ");
+  if(key === "continuity" && parsed.bedPatients.length) note += " (침상재활: " + parsed.bedPatients.join(", ") + ")";
+  if(note) body.append(el("p", { class:"note", text: note }));
+  if(list.length === 0) body.append(el("div", { class:"empty-msg", text:"이상 없음" }));
+  else body.append(render(list));
+  if(key === "notes") body.append(renderNoteList(floor));
+  box.append(body);
+  return box;
+}
+
+function routineNote(floor){
+  const t = list => list.length ? list.slice().sort((a,b)=>a-b).join("·") + "개" : "없음";
+  const rec = floor === "1층" ? settings.rec1 : settings.rec;
+  const robot = settings.robotMode === "machine" ? "로봇은 기구로 계산" : "로봇은 1:1로 계산";
+  return "기준 — 회복기: 1:1 " + t(rec.one) + ", 기구 " + t(rec.machine) + (floor === "1층" ? " (전기·통증은 안 봄)" : ", 전기 " + t(rec.electric)) +
+    " / 비회복기: M·G " + t(settings.non.mg) + ", 전기 " + t(settings.non.electric) + " / " + robot;
+}
+
+function refs(list){
+  const span = el("span");
+  list.forEach(item => span.append(el("span", { class:"ref", text:item.ref })));
+  return span;
+}
+
+function typeTag(type, firstFloor){
+  const frag = document.createDocumentFragment();
+  frag.append(el("span", { class:"tag " + (type === "회복기" ? "rec" : type === "비회복기" ? "non" : ""), text:type }));
+  if(firstFloor) frag.append(" ", el("span", { class:"tag ff", text:"1층" }));
+  return frag;
+}
+
+function renderOverlap(list){
+  const table = el("table", { class:"list" });
+  table.append(el("tr", null, [el("th",{text:"시간"}), el("th",{text:"환자"}), el("th",{text:"겹친 곳"})]));
+  list.forEach(item=>{
+    const where = el("div");
+    item.detail.forEach(d => where.append(el("div", null, [el("span", { class:"ref", text:d.ref }), d.what + " ", el("span", { class:"raw", text:d.raw })])));
+    table.append(el("tr", null, [
+      el("td", { class:"time", text: minutesText(item.minutes) }),
+      el("td", { class:"nm", text:item.name }),
+      el("td", null, [where])
+    ]));
+  });
+  return table;
+}
+
+function renderColumnDup(list){
+  const table = el("table", { class:"list" });
+  table.append(el("tr", null, [el("th",{text:"치료사"}), el("th",{text:"환자"}), el("th",{text:"시간 · 칸"})]));
+  list.forEach(item=>{
+    const where = el("div");
+    item.items.forEach(x => where.append(el("span", { style:"margin-right:12px;white-space:nowrap" }, [el("span", { class:"time", text:x.time + " " }), el("span", { class:"ref", text:x.ref })])));
+    table.append(el("tr", null, [
+      el("td", { text: item.block + " · " + item.therapist + " (" + item.column + "열)" }),
+      el("td", { class:"nm", text:item.name }),
+      el("td", null, [where])
+    ]));
+  });
+  return table;
+}
+
+function renderContinuity(list){
+  const table = el("table", { class:"list" });
+  table.append(el("tr", null, [el("th",{text:"환자"}), el("th",{text:"구분"}), el("th",{text:"빈 시간"})]));
+  list.forEach(item=>{
+    table.append(el("tr", null, [
+      el("td", { class:"nm", text:item.name }),
+      el("td", null, [typeTag(item.type)]),
+      el("td", { class:"time", text: item.gaps.map(g => g.map(minutesText).join(", ")).join("  /  ") })
+    ]));
+  });
+  return table;
+}
+
+function countText(type, c){
+  if(type === "비회복기") return "M·G " + c.mg + " · 전기 " + c.electric;
+  return "1:1 " + c.one + (c.robot ? " · 로봇 " + c.robot : "") + " · 기구 " + c.machine + " · 전기 " + c.electric;
+}
+
+function renderRoutine(list){
+  const table = el("table", { class:"list" });
+  table.append(el("tr", null, [el("th",{text:"환자"}), el("th",{text:"구분"}), el("th",{text:"지금"}), el("th",{text:"맞지 않는 부분"})]));
+  list.forEach(item=>{
+    const lines = el("div");
+    item.lines.forEach(t => lines.append(el("div", { text:t })));
+    if(item.mixed) lines.append(el("div", { class:"raw", text:"※ H와 M·G 코드가 함께 있습니다" }));
+    table.append(el("tr", null, [
+      el("td", { class:"nm", text:item.name }),
+      el("td", null, [typeTag(item.type)]),
+      el("td", { style:"white-space:nowrap", text: countText(item.type, item.count) }),
+      el("td", null, [lines])
+    ]));
+  });
+  return table;
+}
+
+function renderNotes(list){
+  const table = el("table", { class:"list" });
+  table.append(el("tr", null, [el("th",{text:"환자"}), el("th",{text:"메모"}), el("th",{text:"맞지 않는 부분"})]));
+  list.forEach(item=>{
+    const lines = el("div");
+    item.lines.forEach(t => lines.append(el("div", { text:t })));
+    table.append(el("tr", null, [
+      el("td", { class:"nm", text:item.name }),
+      el("td", { style:"white-space:nowrap", text:item.note }),
+      el("td", null, [lines])
+    ]));
+  });
+  return table;
+}
+
+/* 읽어 들인 메모 전체 — 제대로 읽었는지 확인용 */
+function renderNoteList(floor){
+  const names = Object.keys(parsed.notes || {}).filter(name=>{
+    const row = (lastRows[floor] || []).find(r => r.name === name);
+    return !!row;
+  }).sort((a,b) => a.localeCompare(b,"ko"));
+  if(names.length === 0) return el("p", { class:"note", text:"이 층 환자에게 적힌 메모가 없습니다." });
+  const table = el("table", { class:"list" });
+  table.append(el("tr", null, [el("th",{text:"환자"}), el("th",{text:"적힌 메모"}), el("th",{text:"이렇게 검사합니다"})]));
+  names.forEach(name=>{
+    const n = parsed.notes[name];
+    table.append(el("tr", null, [
+      el("td", { class:"nm", text:name }),
+      el("td", { text:n.raw.join(" / ") }),
+      el("td", { class: n.understood ? "" : "raw", text: noteMeaning(n) })
+    ]));
+  });
+  return el("details", { class:"layout", style:"margin-top:12px" }, [el("summary", { text:"읽어 들인 메모 " + names.length + "개 보기" }), table]);
+}
+
+/* ---- 환자별 한눈에 보기 ---- */
+
+const KIND_SHORT = { one:"1:1", robot:"로봇", machine:"기구", electric:"전기", mg:"MG", doshu:"도수", vital:"바이" };
+
+function slotView(list){
+  const main = list.filter(e => !e.rideAlong);
+  if(main.length === 0) return null;
+  const order = ["robot","one","doshu","mg","machine","electric","special","vital"];
+  const top = main.slice().sort((a,b) => order.indexOf(a.kind) - order.indexOf(b.kind))[0];
+  let text = KIND_SHORT[top.kind] || (top.label || "").slice(0,2);
+  if(main.length > 1) text += "+";
+  return { kind: top.kind, text };
+}
+
+function renderBoard(a){
+
+  const box = el("details", { class:"issue", open:"" });
+  box.append(el("summary", null, ["환자별 한눈에 보기", el("span", { class:"tag", text: a.rows.length + "명" })]));
+
+  const search = el("input", { type:"search", placeholder:"환자 이름 찾기" });
+  const onlyBad = el("input", { type:"checkbox" });
+  const legend = el("div", { class:"legend" });
+  [["one","1:1"],["robot","로봇"],["machine","기구"],["electric","전기"],["mg","M·G"],["special","중추·특수·연하 등"],["doshu","도수"]]
+    .forEach(([k,t]) => legend.append(el("span", null, [el("i", { class:"k-" + k }), t])));
+  legend.append(el("span", null, [el("i", { class:"slot gap", style:"min-width:0;height:11px" }), "빈 시간"]));
+  legend.append(el("span", null, [el("i", { style:"box-shadow:0 0 0 2px var(--bad)" }), "중복"]));
+
+  box.append(el("div", { class:"board-tools" }, [
+    search,
+    el("label", { class:"check" }, [onlyBad, "확인할 곳 있는 환자만"]),
+    legend
+  ]));
+
+  const table = el("table", { class:"board" });
+  const head = el("tr", null, [
+    el("th", { style:"text-align:left", text:"환자" }), el("th", { text:"구분" }),
+    el("th", { text:"1:1" }), el("th", { text:"로봇" }), el("th", { text:"기구" }), el("th", { text:"전기" }), el("th", { text:"M·G" })
+  ]);
+  let lunchDone = false;
+  a.slots.forEach(s=>{
+    if(!lunchDone && s > LUNCH){ head.append(el("th", { class:"lunch" })); lunchDone = true; }
+    head.append(el("th", { class:"time", text: minutesText(s) }));
+  });
+  head.append(el("th", { style:"text-align:left", text:"확인" }));
+  table.append(el("thead", null, [head]));
+
+  const tbody = el("tbody");
+
+  const overlapNames = new Set(a.issues.overlap.map(i => i.name));
+  const dupNames = new Set(a.issues.columnDup.map(i => i.name));
+  const gapNames = new Set(a.issues.continuity.map(i => i.name));
+  const routineNames = new Set(a.issues.routine.map(i => i.name));
+
+  a.rows.forEach(row=>{
+
+    const flags = [];
+    if(overlapNames.has(row.name)) flags.push("시간 중복");
+    if(dupNames.has(row.name)) flags.push("치료사 칸 중복");
+    if(gapNames.has(row.name)) flags.push("빈 시간");
+    if(routineNames.has(row.name)) flags.push("루틴");
+
+    const c = row.count;
+    const num = n => el("td", { class:"num" + (n ? " hit" : ""), text: n ? String(n) : "·" });
+
+    const tr = el("tr", { class: flags.length ? "has-issue" : "" }, [
+      el("td", { class:"name" }, [row.name, row.note ? el("span", { class:"memo", title:row.note, text:"메모" }) : null]),
+      el("td", null, [row.outpatient ? el("span", { class:"tag", text:"외래" }) : typeTag(row.type)]),
+      num(c.one), num(c.robot), num(c.machine), num(c.electric), num(c.mg)
+    ]);
+
+    let lunch = false;
+    a.slots.forEach(s=>{
+      if(!lunch && s > LUNCH){ tr.append(el("td", { class:"lunch" })); lunch = true; }
+      const list = row.merged.get(s) || [];
+      const view = slotView(list);
+      const td = el("td");
+      if(view){
+        const tip = list.filter(e => !e.rideAlong).map(e => e.ref + " " + e.raw).join("\n");
+        td.append(el("span", {
+          class:"slot k-" + view.kind + (row.conflicts.includes(s) ? " conflict" : ""),
+          title: tip, text: view.text
+        }));
+      }else if(row.gapSlots.has(s)){
+        td.append(el("span", { class:"slot gap", title:"빈 시간" }));
+      }
+      tr.append(td);
+    });
+
+    tr.append(el("td", { class:"state" }, [
+      flags.length ? el("span", { class:"bad", text: flags.join(" · ") }) : el("span", { class:"ok", text:"✓" })
+    ]));
+
+    tr.dataset.name = row.name;
+    tr.dataset.bad = flags.length ? "1" : "";
+    tbody.append(tr);
+  });
+
+  table.append(tbody);
+
+  const filter = () => {
+    const q = search.value.replace(/\s+/g,"");
+    tbody.querySelectorAll("tr").forEach(tr=>{
+      const show = (!q || tr.dataset.name.includes(q)) && (!onlyBad.checked || tr.dataset.bad);
+      tr.style.display = show ? "" : "none";
+    });
+  };
+  search.oninput = filter;
+  onlyBad.onchange = filter;
+
+  box.append(el("div", { class:"board-wrap" }, [table]));
+  return box;
+}
+
+/* ---- 시작 ---- */
+
+window.addEventListener("DOMContentLoaded", ()=>{
+
+  const zone = document.getElementById("pasteZone");
+  zone.addEventListener("paste", handlePaste);
+  zone.addEventListener("beforeinput", e => { if(e.inputType !== "insertFromPaste") e.preventDefault(); });
+  zone.addEventListener("drop", e => e.preventDefault());
+
+  document.getElementById("runButton").onclick = run;
+  document.getElementById("printButton").onclick = () => window.print();
+  document.getElementById("resetButton").onclick = () => {
+    settings = clone(DEFAULT_SETTINGS);
+    saveSettings();
+    renderSettings();
+  };
+
+  renderSettings();
+});
+</script>
+
+</body>
+</html>

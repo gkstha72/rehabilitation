@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-12 b86</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-12 b87</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -336,6 +336,7 @@ ICT(15) + MI(5) = <b>20분</b> · ICT(15) + HP(15) = <b>30분</b> · ICT(15) + B
 <div id="dosuConflictArea"></div>
 <div id="painTimeArea"></div>
 <div id="dupNameArea"></div>
+<div id="absentActArea"></div>
 </div>
 
 <div class="container">
@@ -1305,6 +1306,7 @@ else { initOnLoad(); }
         wardBuffers[ward] = null; wardDates[ward] = "";
         redistributeWards();
     };
+    window.wardLoaded = function() { return { neuro: !!wardBuffers.neuro, msk: !!wardBuffers.msk }; };
     window.resetWardBuffers = function() {
         wardBuffers = { neuro: null, msk: null };
         wardDates   = { neuro: "", msk: "" };
@@ -1543,7 +1545,7 @@ function clearResultAreas() {
     ["ptTripleArea","otTripleArea","stTripleArea","painTripleArea","evalArea",
      "orderIssueArea","crPairArea","qtyCheckArea","robotGaitArea","overlapArea",
      "slipDetailArea","dosuConflictArea","painTimeArea","dupNameArea",
-     "dischargeArea","evalCheckArea","otIncArea","excludeResultArea"].forEach(function(id) {
+     "dischargeArea","evalCheckArea","otIncArea","absentActArea","excludeResultArea"].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.innerHTML = "";
     });
@@ -4912,7 +4914,8 @@ function analyzeOrderCheckAll() {
         ["⑥ 담당 불일치",    analyzeSlipDetailLogic,   "slipDetailArea"],
         ["⑦ 도수 충돌",      analyzeDosuConflictLogic, "dosuConflictArea"],
         ["⑧ 통증 시간",      analyzePainTimeLogic,     "painTimeArea"],
-        ["⑨ 동명이인",       analyzeDupNameLogic,      "dupNameArea"]
+        ["⑨ 동명이인",       analyzeDupNameLogic,      "dupNameArea"],
+        ["⑩ 근무자 외 액팅", analyzeAbsentActLogic,    "absentActArea"]
     ];
     var failed = [];
     steps.forEach(function(st) {
@@ -4929,6 +4932,102 @@ function analyzeOrderCheckAll() {
             "background:#fff8e8;color:#8a6d3b;font-weight:700;'>⚠️ " + failed.join(" · ") +
             " 점검에서 오류가 나 결과가 빠졌습니다. 나머지 결과는 정상입니다.</div>");
     }
+}
+
+// ── ⑩ 시간표에 없는 치료사 이름으로 넘어간 액팅 ─────────────────────────
+// 출근하지 않은 사람(시간표 어디에도 이름이 없는 사람) 이름으로 액팅이 넘어간 건을 찾는다.
+//   시간표 담당 머리글 · 전기/통증 담당 칸 · 그 밖의 칸 어디든 이름이 있으면 근무자로 본다.
+function scheduleStaffSet() {
+    var set = {};
+    function addName(n) { n = cleanTherapistName(n); if (n) set[n] = 1; }
+    ["ptGridTable","otGridTable","stGridTable"].forEach(function(g) {
+        extractMembers(g).members.forEach(addName);
+    });
+    var ec = etTherapistCol();
+    var pcs = painTherapistCols();
+    for (var r = 1; r < ROW_COUNT; r++) {
+        ["etGridTable","mtGridTable"].forEach(function(g) {
+            var el = document.getElementById(g+"-cell-"+r+"-"+ec);
+            if (el && el.value.trim()) addName(el.value.trim());
+        });
+        pcs.forEach(function(c) {
+            var el = document.getElementById("painGridTable-cell-"+r+"-"+c);
+            if (el && el.value.trim()) addName(el.value.trim());
+        });
+    }
+    // 모든 칸의 글자 — 메모 · 비고에 이름만 적힌 경우도 근무자로 본다
+    var all = [];
+    ["ptGridTable","otGridTable","stGridTable","etGridTable","mtGridTable","painGridTable"].forEach(function(g) {
+        for (var r2 = 0; r2 < ROW_COUNT; r2++) for (var c2 = 0; c2 < COL_COUNT; c2++) {
+            var e = document.getElementById(g+"-cell-"+r2+"-"+c2);
+            if (e && e.value) all.push(e.value);
+        }
+    });
+    return { set: set, text: nfc(all.join(" | ")) };
+}
+function analyzeAbsentActLogic() {
+    var area = document.getElementById("absentActArea");
+    if (!area) return;
+    if (!globalEmrRows || globalEmrNameIdx === -1) return;
+    var st = scheduleStaffSet();
+    if (!Object.keys(st.set).length) return;          // 시간표가 없으면 점검하지 않는다
+    function present(n) {
+        if (!n) return true;
+        var c = cleanTherapistName(n) || n;
+        if (st.set[n] || st.set[c]) return true;
+        var base = n.replace(/\d+$/, "");
+        // 시간표 글자에 이름이 그대로 있으면 근무자 (앞뒤로 한글이 붙지 않은 경우만)
+        return [n, base].some(function(x) {
+            if (x.length < 2) return false;
+            var re = new RegExp("(^|[^가-힣])" + x + "(?![가-힣])");
+            return re.test(st.text);
+        });
+    }
+    var by = {}, order = [];
+    globalEmrRows.forEach(function(row) {
+        if (!row) return;
+        if (globalEmrDcIdx !== -1 && String(row[globalEmrDcIdx]||"").trim() !== "") return;
+        var code = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
+        var slip = globalEmrSlipNameIdx !== -1 ? String(row[globalEmrSlipNameIdx]||"").trim() : "";
+        if (!code || isNonTherapySlip(code, slip)) return;
+        var who = nfc(String(row[globalEmrNameIdx]||"").trim());
+        if (!who || present(who)) return;
+        var pt = String(row[globalEmrPatientIdx]||"").trim();
+        var tm = globalEmrTimeIdx !== -1 ? String(row[globalEmrTimeIdx]||"").trim() : "";
+        if (!by[who]) { by[who] = []; order.push(who); }
+        var k = pt + "|" + tm + "|" + code;
+        if (by[who].some(function(x){ return x.k === k; })) return;
+        by[who].push({ k:k, patient:pt, time:tm, slip:slip || code });
+    });
+    var total = 0;
+    order.forEach(function(w) {
+        by[w].sort(function(a,b){ return a.time < b.time ? -1 : 1; });
+        by[w].forEach(function(x) {
+            total++;
+            pushIssue("근무자 외 액팅", w, x.patient, x.time, "시간표에 없는 " + w + " 이름으로 액팅 — " + x.slip);
+        });
+    });
+    var wl = (typeof wardLoaded === "function") ? wardLoaded() : { neuro:true, msk:true };
+    var html = "<h3 class='result-header' style='font-size:17px;border-color:" + (total ? "#c0392b" : "#16a085") +
+               ";'>⑩ 시간표에 없는 치료사 이름으로 넘어간 액팅 — " + total + "건</h3>";
+    if (total && (!wl.neuro || !wl.msk)) {
+        html += "<p style='margin:0 0 8px;color:#a04000;font-size:12.5px;font-weight:700;'>⚠️ " +
+                (!wl.msk ? "근골" : "신경계") + " 시간표를 넣지 않아 그쪽 치료사가 모두 여기에 뜰 수 있습니다.</p>";
+    }
+    if (total) {
+        html += "<div style='max-height:340px;overflow:auto;border:1px solid #ccc;border-radius:6px;'>";
+        html += "<table class='result-table' style='table-layout:auto;margin-bottom:0;'><thead><tr>";
+        ["액팅 이름","건수","환자 · 시간 · 처방"].forEach(function(x){ html += "<th class='th-sub-label'>" + x + "</th>"; });
+        html += "</tr></thead><tbody>";
+        order.forEach(function(w) {
+            html += "<tr class='error-cell'><td style='font-weight:700;white-space:nowrap;'>" + w + "</td><td>" + by[w].length +
+                    "</td><td style='text-align:left;font-weight:400;color:#333;'>" +
+                    by[w].map(function(x){ return x.patient + " " + (x.time||"") + " · " + x.slip; }).join("<br>") +
+                    "</td></tr>";
+        });
+        html += "</tbody></table></div>";
+    }
+    area.innerHTML = html;
 }
 
 // 오더 점검 결과는 틀린 것만 보여 준다.

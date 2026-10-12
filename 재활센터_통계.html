@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-12 b85</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-12 b86</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -380,7 +380,7 @@ ICT(15) + MI(5) = <b>20분</b> · ICT(15) + HP(15) = <b>30분</b> · ICT(15) + B
 <h2 class="result-header" style="border-color:#d35400;font-size:22px;">&#127942; [13] OT 인센티브 카운팅</h2>
 <p>시간표(작업치료)의 <b>평가 메모</b>와 <b>MBI_SCIM 시행확인방</b> 대화를 읽어 인센티브 시트에 붙일 <b>날짜 · 이름 · 평가 구분</b> 목록을 만듭니다.<br>
 모든 건은 <b>인센 날짜</b>로 들어갑니다 (챗에 적힌 평가 날짜는 쓰지 않음). 비워 두면 시간표 날짜로 채웁니다.<br>
-OT평가·신환평가 1점 · 월재평가 0.5점 · 교차확인 0.25점 · 치매척도/MMSE 제외 · <b>(신환)</b> 챗은 교차확인자만 · 감점은 직접 확인</p>
+OT평가·신환평가 1점 · 월재평가 0.5점 · 교차확인 0.25점 · 치매척도/MMSE 제외 · <b>(신환)</b> 챗은 작성자 신환평가 1점 + 교차확인 · 감점은 직접 확인</p>
 <textarea id="otIncChat" placeholder="MBI_SCIM 시행확인방 대화를 복사해서 붙여넣기 (시간표 평가만 셀 때는 비워 두세요)"
           style="width:100%;height:130px;box-sizing:border-box;padding:8px;font-size:12.5px;border:1px solid #e0b48a;border-radius:6px;"></textarea>
 <div class="action-area">
@@ -6813,9 +6813,16 @@ function analyzeOtIncentive() {
         var pt = c.patient || "?";
         if (!c.writer) warns.push({ who:"-", text:"글쓴이를 못 읽음 〈" + c.raw + "〉" });
         if (c.isNew) {
-            // 신환 평가자 점수는 시간표에서 준다 — 시간표에 신환평가가 없으면 점수 없음
-            if (ev && c.date === tDate && !schedNewPts[pt]) {
-                warns.push({ who: otIncName(c.writer), text: c.date + " " + pt + " (신환) — 시간표에 신환평가 기입 없음, 평가자 점수 없음" });
+            // (신환) 챗을 올린 사람도 신환평가 1점.
+            //   같은 날 시간표에서 이미 받았으면 같은 줄이라 한 번만 들어간다.
+            //   다른 날 챗이면 그날 시간표로 이미 받았는지 여기서는 알 수 없으므로 표시만 한다.
+            if (c.writer) {
+                var already = ev && c.date === tDate && schedNewPts[pt];
+                add(c.date, c.writer, "신환평가", pt, "챗 " + c.date + " · 신환");
+                if (!already && c.date !== tDate) {
+                    warns.push({ who: otIncName(c.writer),
+                                 text: c.date + " " + pt + " (신환) — 챗으로 신환평가 인정, " + c.date + " 인센에 이미 들어갔는지 확인" });
+                }
             }
         } else if (c.writer) {
             add(c.date, c.writer, "월재평가", pt, "챗 " + c.date + (c.discharge ? " · 퇴원" : ""));

@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-11 b84</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-12 b85</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -6417,6 +6417,9 @@ var EVAL_TOKENS = [
     { re: /신경인지\s*검사|신경인지\s*전체|인지\s*평가|총집합|LOTCA\s*\+/i,  label: "신경인지기능검사(전체)" },
     { re: /무시\s*(증후군)?\s*총집|무시|NEGLECT/i,                            label: "신경인지기능검사-무시증후군 총집" },
     { re: /유형\s*[1１ⅠI]\s*[,，·]?\s*[2２ⅡI]|유형\s*12|시지각|MVPT|인식력|LOTCA/i, label: "신경인지기능검사 유형1,2" },
+    // "신경인지기능검사" 라고만 적으면 전체 · 유형1,2 · 무시 중 하나 — EMR 오더와 맞춰 본다
+    //   (뒤에 전체 · 유형 · 무시가 붙은 건 위에서 이미 잡힌다)
+    { re: /신경인지\s*기능\s*검사(?!\s*[-(（]?\s*(전체|유형|무시|개별))/,          label: "신경인지기능검사" },
     { re: /NCSE/i,                                                            label: "신경행동학적 인지기능검사" },
     { re: /간이\s*인지|MMSE/i,                 label: "간이정신진단검사" },
     { re: /치매\s*척도|GDS/i,                  label: "치매척도검사" },
@@ -6711,6 +6714,7 @@ function otIncEmrOrders(patient, who) {
 function analyzeOtIncentive() {
     var area = document.getElementById("otIncArea");
     if (!area) return;
+    otIncText = "";
     var rows = [], warns = [], seen = {};
     // sub — OT평가는 검사 종류(수지 · 후글 …)마다 따로 센다
     function add(date, name, kind, patient, note, warn, sub) {
@@ -6764,6 +6768,11 @@ function analyzeOtIncentive() {
             var lb = sc.slip ? sc.slip.label : sc.labels[0];
             if (sc.slip && OT_INC_SKIP_RE.test(lb)) return;
             add(tDate, who, "OT평가", sc.patient, sc.slip ? lb : lb + " — EMR 슬립 없음", !sc.slip, lb);
+        });
+        // "신경인지" 라고만 적은 칸 — 어떤 검사인지 몰라 세지 않는다
+        (ev.ambig || []).forEach(function(a) {
+            warns.push({ who: otIncName(String(a.who||"").split("·")[0]) || "-",
+                         text: a.patient + " — '신경인지'만 적힘, 검사명 확인 후 직접 추가 〈" + a.raw + "〉" });
         });
         ev.newPt.forEach(function(n) {
             schedNewPts[n.patient] = true;
@@ -6983,11 +6992,12 @@ function analyzeEvalCheck(silent) {
                 // "신경인지" 라고만 적으면 어떤 검사인지 알 수 없다.
                 // 조용히 엉뚱한 코드로 보내지 않고 오류로 띄운다.
                 //   신경인지검사(FB000) · 무시(FB004030) · 유형1,2(FB001) · NCSE(FX704)
+                //   같은 칸의 다른 검사(수지 · 후글 …)는 그대로 대조한다.
                 if (/신경인지/.test(vv) &&
-                    !/신경인지\s*검사|무시|유형|NCSE/i.test(vv)) {
+                    !/신경인지\s*(기능\s*)?검사|무시|유형|NCSE/i.test(vv)) {
                     ambigList.push({ patient: (pats[0] ? pats[0].name : "-"),
                                      who: who, slot: slot, raw: v });
-                    continue;
+                    if (!groups.length) continue;
                 }
                 if (!groups.length && !isNew) {
                     // 평가·검사 표기가 전혀 없는 칸은 평가가 아니다 (예: "고민식" 만 적힌 시행 칸)
@@ -7168,7 +7178,7 @@ function analyzeEvalCheck(silent) {
                     note:"시간표에 평가 표기 없음", raw:"-" });
     });
 
-    if (silent) return { sched: schedList, newPt: newPtList, outEval: outEval };
+    if (silent) return { sched: schedList, newPt: newPtList, outEval: outEval, ambig: ambigList };
 
     // ④ 표 그리기 — 환자 · 담당 · 오류 이유 세 칸만
     function whoOf(r) {

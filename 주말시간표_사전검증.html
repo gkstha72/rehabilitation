@@ -829,7 +829,7 @@ function codeGroup(code){
    예외: 같은 칸에 "+FES" "+V"로 붙여 적은 것은 그 치료와 함께 하는 것이라 중복으로 보지 않습니다. */
 const PRIMARY = new Set(["one","robot","machine","mg","electric","doshu","special","vital"]);
 
-function buildEvents(rows, layout){
+function buildEvents(rows, layout, fontColors){
 
   const events = [];
   const slotSet = new Set();
@@ -873,6 +873,7 @@ function buildEvents(rows, layout){
             col: col.col,
             row: r,
             ref: cellRef(r, col.col),
+            red: isRedColor(((fontColors || [])[r] || [])[col.col]),
             floor: col.floor || block.floor,
             raw: chunk.raw
           };
@@ -1075,11 +1076,12 @@ function analyzeDay(parsed, day, settings){
     const floor = firstFloor ? "1층" : "3층";
     const note = patientNotes[name] || null;
     const outpatient = (parsed.outpatients || []).includes(name);
-    const routine = (!settings.checks.routine || outpatient) ? { ok:true, lines:[] } : checkRoutine(type, count, settings, floor, note);
+    const timeOnlyToday = !!(note && note.dayOnly.some(d => d.day === day));
+    const routine = (!settings.checks.routine || outpatient || timeOnlyToday) ? { ok:true, lines:[] } : checkRoutine(type, count, settings, floor, note);
 
     /* 특이사항 */
     if(note && settings.checks.notes){
-      const broken = checkNote(note, merged, count);
+      const broken = checkNote(note, merged, count, day);
       if(broken.length) issues.notes.push({ name, type, floor, note: note.raw.join(" / "), lines: broken });
     }
     if(!routine.ok){
@@ -1217,12 +1219,19 @@ function checkRoutine(type, c, s, floor, note){
   return { ok:true, lines:[] };
 }
 
-function parseSheet(rows, colors, underlines){
+/* 빨간 글씨 — 시트 규칙상 빨간색 이름은 PWB 착용 */
+function isRedColor(color){
+  if(!color) return false;
+  const rgb = toRgb(color) || ({ red:[255,0,0] })[String(color).trim().toLowerCase()];
+  return !!rgb && rgb[0] >= 170 && rgb[1] <= 90 && rgb[2] <= 90;
+}
+
+function parseSheet(rows, colors, underlines, fontColors){
   const masked = underlines
     ? rows.map((row, r) => row.map((cell, c) => ((underlines[r] || [])[c] ? "" : cell)))
     : rows;
   const layout = detectLayout(masked, colors);
-  const built = buildEvents(masked, layout);
+  const built = buildEvents(masked, layout, fontColors);
   const days = [];
   layout.forEach(b => (b.dayHeaders || []).forEach(h => { if(!days.includes(h.day)) days.push(h.day); }));
   days.sort((a,b) => "월화수목금토일".indexOf(a) - "월화수목금토일".indexOf(b));
@@ -1272,77 +1281,8 @@ function machineKey(name){
 
 const NOTE_MACHINE_WORDS = Object.keys(inlineMachineWords).filter(w => w.length >= 2).sort((a,b) => b.length - a.length);
 
-function parseNote(text){
-  const t = compact(text).replace(/[xX×✕]/g,"X");
-  const note = { raw:[normalize(text)], noMachine:false, noElectric:false, noRobot:false, banned:[], fixed:[], after:null, before:null, understood:false };
 
-  if(/기구X|기구안|기구거부/.test(t)){ note.noMachine = true; }
-  if(/(전기|통증)X|전기안|전기거부/.test(t)){ note.noElectric = true; }
-  if(/로봇X|로봇안|로봇거부/.test(t)){ note.noRobot = true; }
 
-  NOTE_MACHINE_WORDS.forEach(w=>{
-    if(w === "CPM" ) return;
-    if(t.includes(w + "X")){
-      const key = inlineMachineWords[w];
-      if(!note.banned.includes(key)) note.banned.push(key);
-    }
-  });
-
-  const fixedMatch = t.match(/^(.*?)고정/);
-  if(fixedMatch){
-    let part = fixedMatch[1];
-    NOTE_MACHINE_WORDS.forEach(w=>{
-      if(part.includes(w)){
-        const key = inlineMachineWords[w];
-        if(!note.fixed.includes(key)) note.fixed.push(key);
-        part = part.split(w).join("");
-      }
-    });
-  }
-
-  const mc = t.match(/^기구(\d)개|[^가-힣]기구(\d)개/);
-  note.machineCount = mc ? Number(mc[1] || mc[2]) : null;
-  const ec = t.match(/^전기(\d)개|[^가-힣]전기(\d)개/);
-  note.electricCount = ec ? Number(ec[1] || ec[2]) : null;
-
-  const after = t.match(/(\d{1,2})(?::(\d{2})|시)(?:\d{2}분)?(?:이후|부터)/);
-  if(after) note.after = timeOrder(after[1] + ":" + (after[2] || "00"));
-  const before = t.match(/(\d{1,2})(?::(\d{2})|시)(?:\d{2}분)?(?:이전|까지)/);
-  if(before) note.before = timeOrder(before[1] + ":" + (before[2] || "00"));
-
-  note.understood = note.machineCount !== null || note.electricCount !== null || note.noMachine || note.noElectric || note.noRobot || note.banned.length > 0 || note.fixed.length > 0 || note.after !== null || note.before !== null;
-  return note;
-}
-
-function mergeNote(a, b){
-  if(!a) return b;
-  a.raw = a.raw.concat(b.raw.filter(x => !a.raw.includes(x)));
-  a.noMachine = a.noMachine || b.noMachine;
-  a.noElectric = a.noElectric || b.noElectric;
-  a.noRobot = a.noRobot || b.noRobot;
-  b.banned.forEach(x => { if(!a.banned.includes(x)) a.banned.push(x); });
-  b.fixed.forEach(x => { if(!a.fixed.includes(x)) a.fixed.push(x); });
-  if(b.machineCount !== null) a.machineCount = b.machineCount;
-  if(b.electricCount !== null) a.electricCount = b.electricCount;
-  if(b.after !== null) a.after = a.after === null ? b.after : Math.max(a.after, b.after);
-  if(b.before !== null) a.before = a.before === null ? b.before : Math.min(a.before, b.before);
-  a.understood = a.understood || b.understood;
-  return a;
-}
-
-function noteMeaning(note){
-  const out = [];
-  if(note.machineCount !== null) out.push("기구 " + note.machineCount + "개");
-  if(note.electricCount !== null) out.push("전기 " + note.electricCount + "개");
-  if(note.noMachine) out.push("기구 없음");
-  if(note.noElectric) out.push("전기 없음");
-  if(note.noRobot) out.push("로봇 없음");
-  if(note.banned.length) out.push(note.banned.join("·") + " 제외");
-  if(note.fixed.length) out.push("기구는 " + note.fixed.join("·") + "만");
-  if(note.after !== null) out.push(minutesText(note.after) + " 이후만");
-  if(note.before !== null) out.push(minutesText(note.before) + " 까지만");
-  return out.length ? out.join(", ") : "검사 안 함 (참고용 메모)";
-}
 
 function findPatientNotes(rows, layout, events){
 
@@ -1379,7 +1319,17 @@ function findPatientNotes(rows, layout, events){
     });
   });
 
-  /* 시간표 칸 안 괄호 메모 — 예) H홍거상(기구X) */
+  /* 시트 메모 칸 — 예) "오은자 침상재활(기구홀드)" */
+  rows.forEach((row, r) => (row || []).forEach((cell, c)=>{
+    if(inBlock.has(r + "," + c)) return;
+    const text = normalize(cell);
+    if(!/침상|홀드|HOLD/i.test(text)) return;
+    const n = parseNote(text);
+    if(!n.understood) return;
+    (text.match(/[가-힣]{2,4}\d*/g) || []).forEach(w => { if(known.has(w)) notes[w] = mergeNote(notes[w], parseNote(text)); });
+  }));
+
+  /* 시간표 칸 안 괄호 메모 — 예) H홍거상(기구X) H김금덕(격리) */
   events.forEach(e=>{
     (e.raw.match(/\(([^)]*)\)/g) || []).forEach(group=>{
       const inner = group.slice(1, -1);
@@ -1391,29 +1341,176 @@ function findPatientNotes(rows, layout, events){
   return notes;
 }
 
-function checkNote(note, merged, count){
+function parseNote(text){
+  const t = compact(text).replace(/[xX×✕]/g,"X").toUpperCase();
+  const note = {
+    raw:[normalize(text)], noMachine:false, noElectric:false, noRobot:false,
+    banned:[], fixed:[], limits:{}, pwb:false, dayOnly:[],
+    machineCount:null, electricCount:null, after:null, before:null, understood:false
+  };
+
+  const machineWordsIn = part => {
+    const found = [];
+    let rest = part;
+    NOTE_MACHINE_WORDS.forEach(w=>{
+      if(w === "CPM" || w.length < 2) return;
+      if(rest.includes(w)){
+        const key = inlineMachineWords[w];
+        if(!found.includes(key)) found.push(key);
+        rest = rest.split(w).join("");
+      }
+    });
+    return { found, rest };
+  };
+  const addFixed = list => list.forEach(k => { if(!note.fixed.includes(k)) note.fixed.push(k); });
+
+  /* 기구 안 함 — 기구X · 기구 HOLD · 기구홀드 · 격리 */
+  if(/기구X|기구안|기구거부|기구HOL:?D|기구홀드|격리/.test(t)) note.noMachine = true;
+  if(/(전기|통증)X|전기안|전기거부/.test(t)) note.noElectric = true;
+  if(/로봇X|로봇안|로봇거부/.test(t)) note.noRobot = true;
+
+  /* 특정 기구 제외 — 아크X */
+  NOTE_MACHINE_WORDS.forEach(w=>{
+    if(w === "CPM" || w.length < 2) return;
+    if(t.includes(w + "X")){
+      const key = inlineMachineWords[w];
+      if(!note.banned.includes(key)) note.banned.push(key);
+    }
+  });
+
+  /* 정해진 기구만 — "런닝,아크 고정" / "오토사이클만" */
+  const fixedMatch = t.match(/^(.*?)고정/);
+  if(fixedMatch) addFixed(machineWordsIn(fixedMatch[1]).found);
+  (t.match(/[가-힣,.·]+만/g) || []).forEach(part=>{
+    if(/시만$/.test(part)) return;
+    addFixed(machineWordsIn(part).found);
+  });
+
+  /* 기구 이름만 나열 — "워킹,슬라" / "슬라,런닝+PWB필수" */
+  {
+    const { found, rest } = machineWordsIn(t);
+    if(found.length && rest.replace(/[,.·/+\s]|PWB|필수|착용/g,"") === "") addFixed(found);
+  }
+
+  if(/PWB/.test(t) && /필수|착용/.test(t)) note.pwb = true;
+
+  /* 특정 기구 개수
+     "기구 경사1개" → 기구는 경사 1개만 (다른 기구 X, 기구 총 1개)
+     "경사1개"      → 경사는 1개까지 */
+  NOTE_MACHINE_WORDS.forEach(w=>{
+    if(w.length < 2) return;
+    const m = t.match(new RegExp("(기구)?" + w + "(\\d)개"));
+    if(!m) return;
+    const key = inlineMachineWords[w];
+    if(m[1]){
+      addFixed([key]);
+      note.machineCount = Number(m[2]);
+    }else{
+      note.limits[key] = Number(m[2]);
+    }
+  });
+
+  const mc = t.match(/(?:^|[^가-힣])기구(\d)개/);
+  if(mc) note.machineCount = Number(mc[1]);
+  const ec = t.match(/(?:^|[^가-힣])전기(\d)개/);
+  note.electricCount = ec ? Number(ec[1]) : null;
+
+  /* 요일 + 시간 한 타임 — "일9시만" / "매주 일요일 9시 한타임" */
+  const dm = t.match(/([월화수목금토일])(?:요일)?(\d{1,2})(?::(\d{2})|시)(?:\d{2}분)?(?:만|한타임)/);
+  if(dm) note.dayOnly.push({ day:dm[1], minutes: timeOrder(dm[2] + ":" + (dm[3] || "00")) });
+
+  const after = t.match(/(\d{1,2})(?::(\d{2})|시)(?:\d{2}분)?(?:이후|부터)/);
+  if(after) note.after = timeOrder(after[1] + ":" + (after[2] || "00"));
+  const before = t.match(/(\d{1,2})(?::(\d{2})|시)(?:\d{2}분)?(?:이전|까지)/);
+  if(before) note.before = timeOrder(before[1] + ":" + (before[2] || "00"));
+
+  /* 정해진 기구가 있으면 "기구X"는 그 기구 외에는 안 된다는 뜻 — 예) 기구X 오토사이클만 */
+  if(note.fixed.length) note.noMachine = false;
+
+  note.understood =
+    note.machineCount !== null || note.electricCount !== null ||
+    note.noMachine || note.noElectric || note.noRobot || note.pwb ||
+    note.banned.length > 0 || note.fixed.length > 0 || Object.keys(note.limits).length > 0 ||
+    note.dayOnly.length > 0 || note.after !== null || note.before !== null;
+  return note;
+}
+
+function mergeNote(a, b){
+  if(!a) return b;
+  a.raw = a.raw.concat(b.raw.filter(x => !a.raw.includes(x)));
+  a.noElectric = a.noElectric || b.noElectric;
+  a.noRobot = a.noRobot || b.noRobot;
+  a.pwb = a.pwb || b.pwb;
+  b.banned.forEach(x => { if(!a.banned.includes(x)) a.banned.push(x); });
+  b.fixed.forEach(x => { if(!a.fixed.includes(x)) a.fixed.push(x); });
+  Object.assign(a.limits, b.limits);
+  a.dayOnly = a.dayOnly.concat(b.dayOnly);
+  a.noMachine = (a.noMachine || b.noMachine) && a.fixed.length === 0;
+  if(b.machineCount !== null) a.machineCount = b.machineCount;
+  if(b.electricCount !== null) a.electricCount = b.electricCount;
+  if(b.after !== null) a.after = a.after === null ? b.after : Math.max(a.after, b.after);
+  if(b.before !== null) a.before = a.before === null ? b.before : Math.min(a.before, b.before);
+  a.understood = a.understood || b.understood;
+  return a;
+}
+
+function noteMeaning(note){
+  const out = [];
+  if(note.noMachine) out.push("기구 없음");
+  if(note.fixed.length) out.push("기구는 " + note.fixed.join("·") + "만");
+  if(note.machineCount !== null) out.push("기구 " + note.machineCount + "개");
+  Object.entries(note.limits).forEach(([k,n]) => out.push(k + " " + n + "개까지"));
+  if(note.banned.length) out.push(note.banned.join("·") + " 제외");
+  if(note.pwb) out.push("기구에 PWB 필수 (+PWB 또는 빨간 글씨)");
+  if(note.noElectric) out.push("전기 없음");
+  if(note.electricCount !== null) out.push("전기 " + note.electricCount + "개");
+  if(note.noRobot) out.push("로봇 없음");
+  note.dayOnly.forEach(d => out.push(DAY_NAME[d.day] + " " + minutesText(d.minutes) + " 한 타임만"));
+  if(note.after !== null) out.push(minutesText(note.after) + " 이후만");
+  if(note.before !== null) out.push(minutesText(note.before) + " 까지만");
+  return out.length ? out.join(", ") : "검사 안 함 (참고용 메모)";
+}
+
+const DAY_NAME = { "월":"월요일","화":"화요일","수":"수요일","목":"목요일","금":"금요일","토":"토요일","일":"일요일" };
+
+function checkNote(note, merged, count, day){
   const out = [];
   const all = [];
   merged.forEach(list => list.forEach(e => all.push(e)));
   const machines = all.filter(e => e.kind === "machine" || (e.kind === "mg" && e.blockKind === "machine") || (e.kind === "mg" && e.inline));
   const refs = list => list.map(e => e.ref + "(" + e.time + ")").join(" ");
+  const keysOf = e => String(e.machine || "").split("+").filter(Boolean).map(machineKey);
+  const withName = list => list.map(e => e.ref + "(" + e.time + " " + keysOf(e).join("+") + ")").join(" ");
 
-  if(note.noMachine && machines.length) out.push("기구X인데 기구 " + machines.length + "개 — " + refs(machines));
+  if(note.noMachine && machines.length) out.push("기구 안 함인데 기구 " + machines.length + "개 — " + refs(machines));
+  if(note.fixed.length){
+    const hit = machines.filter(e => { const k = keysOf(e); return k.length && !k.some(x => note.fixed.includes(x)); });
+    if(hit.length) out.push(note.fixed.join("·") + "만인데 다른 기구 — " + withName(hit));
+  }
+  if(note.banned.length){
+    const hit = machines.filter(e => keysOf(e).some(k => note.banned.includes(k)));
+    if(hit.length) out.push(note.banned.join("·") + " 제외인데 들어감 — " + withName(hit));
+  }
+  Object.entries(note.limits).forEach(([k, n])=>{
+    const hit = machines.filter(e => keysOf(e).includes(k));
+    if(hit.length > n) out.push(k + " " + n + "개까지인데 " + hit.length + "개 — " + refs(hit));
+  });
+  if(note.pwb){
+    const hit = machines.filter(e => !e.red && !/PWB/i.test(e.raw) && !/PWB/i.test(e.machine || ""));
+    if(hit.length) out.push("+PWB 필수인데 빠짐 — " + withName(hit));
+  }
+
   const electric = all.filter(e => e.kind === "electric" && !e.rideAlong);
   if(note.noElectric && electric.length) out.push("전기X인데 전기 " + electric.length + "개 — " + refs(electric));
   const robots = all.filter(e => e.kind === "robot");
   if(note.noRobot && robots.length) out.push("로봇X인데 로봇 " + robots.length + "개 — " + refs(robots));
 
-  const keysOf = e => String(e.machine || "").split("+").filter(Boolean).map(machineKey);
+  note.dayOnly.filter(d => d.day === day).forEach(d=>{
+    const hit = all.filter(e => e.minutes !== d.minutes);
+    if(hit.length) out.push(DAY_NAME[d.day] + " " + minutesText(d.minutes) + " 한 타임만인데 다른 시간 — " + refs(hit));
+    else if(all.length === 0) out.push(DAY_NAME[d.day] + " " + minutesText(d.minutes) + " 치료가 빠짐");
+  });
 
-  if(note.banned.length){
-    const hit = machines.filter(e => keysOf(e).some(k => note.banned.includes(k)));
-    if(hit.length) out.push(note.banned.join("·") + " 제외인데 들어감 — " + hit.map(e => e.ref + "(" + e.time + " " + keysOf(e).join("+") + ")").join(" "));
-  }
-  if(note.fixed.length){
-    const hit = machines.filter(e => { const k = keysOf(e); return k.length && !k.some(x => note.fixed.includes(x)); });
-    if(hit.length) out.push(note.fixed.join("·") + " 고정인데 다른 기구 — " + hit.map(e => e.ref + "(" + e.time + " " + keysOf(e).join("+") + ")").join(" "));
-  }
   if(note.after !== null){
     const hit = all.filter(e => e.minutes < note.after);
     if(hit.length) out.push(minutesText(note.after) + " 이후만인데 더 이른 시간 — " + refs(hit));
@@ -1476,6 +1573,21 @@ function cellUnderline(cell, classUnderlines){
   return false;
 }
 
+/* 글자색 — 칸 또는 안쪽 글자에 지정된 color */
+function cellFontColor(cell, classFonts){
+  const nodes = [cell].concat(Array.from(cell.querySelectorAll("*")));
+  for(const node of nodes){
+    const style = node.getAttribute("style") || "";
+    const m = style.match(/(?:^|;|\s)color\s*:\s*([^;"']+)/i);
+    if(m) return m[1].trim();
+    if(node.tagName === "FONT" && node.getAttribute("color")) return node.getAttribute("color");
+    for(const name of (node.getAttribute("class") || "").split(/\s+/)){
+      if(classFonts[name]) return classFonts[name];
+    }
+  }
+  return "";
+}
+
 function cellText(cell){
   /* 칸 안 줄바꿈(<br>)을 띄어쓰기로 살려 둡니다. */
   const clone = cell.cloneNode(true);
@@ -1493,8 +1605,12 @@ function parseHtmlTable(html){
     return m ? m[1].trim() : "";
   });
   const classUnderlines = buildClassMap(doc, body => hasUnderlineStyle(body));
+  const classFonts = buildClassMap(doc, body => {
+    const m = body.match(/(?:^|[;\s{])color\s*:\s*([^;]+)/i);
+    return m ? m[1].trim() : "";
+  });
 
-  const values = [], colors = [], underlines = [];
+  const values = [], colors = [], underlines = [], fonts = [];
   const occupied = {};
 
   Array.from(table.querySelectorAll("tr")).forEach((tr, r)=>{
@@ -1507,6 +1623,7 @@ function parseHtmlTable(html){
       const value = cellText(cell);
       const color = cellBackground(cell, classColors);
       const under = cellUnderline(cell, classUnderlines);
+      const font = cellFontColor(cell, classFonts);
       const rs = parseInt(cell.getAttribute("rowspan") || "1", 10);
       const cs = parseInt(cell.getAttribute("colspan") || "1", 10);
       for(let rr = 0; rr < rs; rr++){
@@ -1518,6 +1635,8 @@ function parseHtmlTable(html){
           values[tr2][tc] = value;
           colors[tr2][tc] = color;
           underlines[tr2][tc] = under;
+          fonts[tr2] = fonts[tr2] || [];
+          fonts[tr2][tc] = font;
           occupied[tr2 + "," + tc] = true;
         }
       }
@@ -1525,7 +1644,7 @@ function parseHtmlTable(html){
     });
   });
 
-  return { values: fillRows(values), colors: fillRows(colors), underlines: fillRows(underlines, false) };
+  return { values: fillRows(values), colors: fillRows(colors), underlines: fillRows(underlines, false), fonts: fillRows(fonts) };
 }
 
 function fillRows(rows, empty){
@@ -1743,7 +1862,7 @@ function handlePaste(event){
 
   let grid = null;
   if(html && html.includes("<table")) grid = parseHtmlTable(html);
-  if(!grid && text) grid = { values: parseTsv(text), colors: [], underlines: null };
+  if(!grid && text) grid = { values: parseTsv(text), colors: [], underlines: null, fonts: null };
 
   const zone = document.getElementById("pasteZone");
   const status = document.getElementById("pasteStatus");
@@ -1754,7 +1873,7 @@ function handlePaste(event){
     return;
   }
 
-  const result = parseSheet(grid.values, grid.colors, grid.underlines);
+  const result = parseSheet(grid.values, grid.colors, grid.underlines, grid.fonts);
 
   if(result.layout.length === 0){
     parsed = null;
@@ -1831,7 +1950,7 @@ const ISSUE_INFO = {
   columnDup:  { title:"한 치료사 칸에 같은 환자 2번 이상", note:"같은 날 같은 치료사 칸에 두 번 이상 들어간 환자입니다. 1층(근골)은 2번까지 허용하고 3번부터 표시합니다." },
   continuity: { title:"치료 연속성 (빈 시간)", note:"치료 사이에 빈 시간이 있는 환자입니다. 오전 · 오후는 따로 보고, 점심시간은 빈 시간이 아닙니다. 침상재활 환자는 뺍니다." },
   routine:    { title:"루틴 개수", note:"" },
-  notes:      { title:"특이사항", note:"환자 이름 왼쪽 칸에 적은 메모를 읽어서 확인합니다. 기구X · 전기X · 로봇X · 아크X(특정 기구 제외) · 런닝,아크 고정 · 기구3개 · 14:40 이후 를 알아봅니다." }
+  notes:      { title:"특이사항", note:"환자 이름 왼쪽 칸 메모, 침상재활 메모, 시간표 칸의 (격리)를 읽어서 확인합니다. 기구X · 기구 HOLD · 격리 · 전기X · 로봇X · 아크X · 런닝,아크 고정 · 오토사이클만 · 워킹,슬라 · +PWB필수 · 기구 경사1개 · 기구3개 · 일9시만 · 14:40 이후 를 알아봅니다." }
 };
 
 function renderDay(a){

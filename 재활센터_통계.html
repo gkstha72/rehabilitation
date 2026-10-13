@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-14 b88</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-14 b89</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -5042,19 +5042,29 @@ function analyzeAbsentActLogic() {
         });
     });
     var LABEL = { neuro: "🧠 신경계", msk: "🦴 근골", none: "❔ 시간표에 없는 환자", all: "" };
+    // 한쪽 시간표만 넣으면 다른 쪽 근무자를 알 수 없다 — 근골 선생님이 신경계 환자를 봤을 수도 있으므로
+    // 오류로 올리지 않고 참고로만 보여 준다.
+    var partial = split && !(wl.neuro && wl.msk);
     var total = 0;
     ["neuro","msk","none","all"].forEach(function(wd) {
         gOrder[wd].forEach(function(w) {
             groups[wd][w].forEach(function(x) {
                 total++;
+                if (partial) return;
                 pushIssue("근무자 외 액팅", w, x.patient, x.time,
                           (LABEL[wd] ? LABEL[wd].replace(/^\S+\s/, "") + " · " : "") +
                           "시간표에 없는 " + w + " 이름으로 액팅 — " + x.slip);
             });
         });
     });
-    var html = "<h3 class='result-header' style='font-size:17px;border-color:" + (total ? "#c0392b" : "#16a085") +
-               ";'>⑩ 시간표에 없는 치료사 이름으로 넘어간 액팅 — " + total + "건</h3>";
+    if (partial && !total) { area.innerHTML = ""; return; }
+    var html = "<h3 class='result-header' style='font-size:17px;border-color:" + (total && !partial ? "#c0392b" : "#95a5a6") +
+               ";'" + (partial ? " data-keep='1'" : "") + ">⑩ 시간표에 없는 치료사 이름으로 넘어간 액팅 — " +
+               (partial ? "참고 " : "") + total + "건</h3>";
+    if (partial) {
+        html += "<p style='margin:0 0 8px;color:#a04000;font-size:12.5px;font-weight:700;'>⚠️ " + (wl.neuro ? "근골" : "신경계") +
+                " 시간표를 넣지 않아 그쪽 선생님은 근무자로 확인할 수 없습니다. 아래는 오류가 아니라 참고용이며 확인 요청 명단에 넣지 않았습니다.</p>";
+    }
     if (skipped) {
         html += "<p style='margin:0 0 8px;color:#7f8c8d;font-size:12.5px;'>" + (wl.neuro ? "근골" : "신경계") +
                 " 시간표를 넣지 않아 그쪽 환자로 보이는 " + skipped + "건은 점검에서 뺐습니다.</p>";
@@ -5068,7 +5078,8 @@ function analyzeAbsentActLogic() {
         html += "</tr></thead><tbody>";
         gOrder[wd].forEach(function(w) {
             var list = groups[wd][w];
-            html += "<tr class='error-cell'><td style='font-weight:700;white-space:nowrap;'>" + w + "</td><td>" + list.length +
+            html += "<tr" + (partial ? " style='background:#f7f9fa;color:#555;'" : " class='error-cell'") +
+                    "><td style='font-weight:700;white-space:nowrap;'>" + w + "</td><td>" + list.length +
                     "</td><td style='text-align:left;font-weight:400;color:#333;'>" +
                     list.map(function(x){ return x.patient + " " + (x.time||"") + " · " + x.slip; }).join("<br>") +
                     "</td></tr>";
@@ -5085,6 +5096,7 @@ function trimOrderArea(id, hasIssue) {
     var area = document.getElementById(id);
     if (!area) return;
     var hasErrRow = !!area.querySelector(".error-cell");
+    if (area.querySelector("[data-keep]")) return;      // 참고용 표는 그대로 둔다
     if (!hasIssue && !hasErrRow) {
         if (/먼저 EMR|찾지 못했습니다/.test(area.textContent)) return;
         area.innerHTML = "";

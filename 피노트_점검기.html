@@ -1546,8 +1546,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       return row;
     });
 
-    var titleH = heading ? 54 : 40;
-    var H = titleH + HDR + cells.reduce(function (a, r) { return a + r.__h; }, 0) + 30;
+    var titleH = 64;
+    var H = titleH + HDR + cells.reduce(function (a, r) { return a + r.__h; }, 0) + 16;
 
     cv.width = W * SC; cv.height = H * SC;
     cv.style.width = W + 'px';
@@ -1560,12 +1560,12 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     // 제목
     ctx.fillStyle = '#12161a';
     ctx.font = 'bold 16px ' + IMGF;
-    ctx.fillText(heading || '피노트 점검 결과', PX, 14);
+    ctx.fillText(heading || '피노트 점검 결과', PX, 16);
     ctx.font = '12px ' + IMGF;
     ctx.fillStyle = '#6b7682';
     var sub = list.length + '건';
     if (PERIOD) sub += ' · ' + PERIOD.replace('조회기간 :', '').trim();
-    ctx.fillText(sub, PX, heading ? 36 : 34);
+    ctx.fillText(sub, PX, 41);
 
     // 머리글
     var y = titleH;
@@ -1606,9 +1606,6 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     });
     ctx.strokeStyle = '#e4e8ec';
     ctx.beginPath(); ctx.moveTo(PX, y + 0.5); ctx.lineTo(W - PX, y + 0.5); ctx.stroke();
-
-    ctx.font = '11px ' + IMGF; ctx.fillStyle = '#9aa4b0';
-    ctx.fillText('피노트 점검기', PX, y + 9);
     return cv;
   }
   function roundRect(ctx, x, y, w, h, r) {

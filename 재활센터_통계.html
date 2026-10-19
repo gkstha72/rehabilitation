@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-19 b99</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-19 b100</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -2724,6 +2724,10 @@ function parseStaffAbsence(text) {
         if (!(name in byName)) { order.push(name); byName[name] = { name: name, kind: kind, w: w }; }
         else if (w > byName[name].w) { byName[name].kind = kind; byName[name].w = w; }
     }
+    // "강은서(7/19)" 처럼 이름 뒤에 날짜만 있으면 휴무 (대체 휴무일 표기)
+    var dre = /([가-힣]{2,4}\d?)\s*\(\s*\d{1,2}\s*[\/.]\s*\d{1,2}\s*\)/g, dm;
+    var raw = String(text || "");
+    while ((dm = dre.exec(raw)) !== null) put(dm[1], "휴무(" + dm[0].replace(/^[^(]*\(|\)\s*$/g, "").replace(/\s/g, "") + ")", 1);
     var t = String(text || "").replace(/\([^)]*\)/g, " ").replace(/["']/g, " ");
     var re = /([가-힣]{2,4}\d?)\s*((?:오전|오후)?\s*(?:반반차|반차|공가|연차|월차|휴무|휴가|병가|경조사|경조))/g, m;
     while ((m = re.exec(t)) !== null) {

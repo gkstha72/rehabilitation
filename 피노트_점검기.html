@@ -1089,24 +1089,24 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       var o6 = R[i], rk2 = 0, msg = '';
       switch (o6.stat) {
         case '기록없음':
-          rk2 = 1; msg = 'PN 기록이 없습니다. 작성해 주세요.';
-          if (C['PN'] >= 0 && !o6.pnFlag) msg = 'PN 기록이 없습니다. (EMR [PN] 표시도 비어 있습니다) 작성해 주세요.';
+          rk2 = 1; msg = 'PN 기록이 없습니다.';
+          if (C['PN'] >= 0 && !o6.pnFlag) msg = 'PN 기록이 없습니다. (EMR [PN] 표시도 비어 있습니다)';
           break;
-        case 'PN기록없음': rk2 = 1; msg = '이 날짜 PN이 비어 있습니다. 작성해 주세요.'; break;
-        case '시간불일치': rk2 = 2; msg = 'PN 기록 시간이 ' + timePart(o6.pnBy) + ' 입니다. 청구 시간에 맞춰 고쳐 주세요.'; break;
-        case 'PN시간미기재': rk2 = 2; msg = 'PN 기록에 치료시간 표기가 없습니다. 넣어 주세요.'; break;
-        case '시간·명칭불일치': rk2 = 3; msg = 'PN 기록이 [' + cut(o6.pnTitle, 30) + '] ' + timePart(o6.pnBy) + ' 로 되어 있습니다. 확인해 주세요.'; break;
-        case '치료사불일치': rk2 = 3; msg = '같은 시간 PN 기록 작성자가 ' + namePart(o6.pnBy) + ' 입니다. 확인해 주세요.'; break;
-        case '명칭확인필요': rk2 = 3; msg = 'PN 기록 제목이 [' + cut(o6.pnTitle, 30) + '] 입니다. 확인해 주세요.'; break;
-        case '회차표기누락': rk2 = 3; msg = 'PN 제목 앞에 ' + o6.hoe + ' 표기가 빠졌습니다. 넣어 주세요.'; break;
+        case 'PN기록없음': rk2 = 1; msg = '이 날짜 PN이 비어 있습니다.'; break;
+        case '시간불일치': rk2 = 2; msg = 'PN 기록 시간이 ' + timePart(o6.pnBy) + ' 입니다.'; break;
+        case 'PN시간미기재': rk2 = 2; msg = 'PN 기록에 치료시간 표기가 없습니다.'; break;
+        case '시간·명칭불일치': rk2 = 3; msg = 'PN 기록이 [' + cut(o6.pnTitle, 30) + '] ' + timePart(o6.pnBy) + ' 로 되어 있습니다.'; break;
+        case '치료사불일치': rk2 = 3; msg = '같은 시간 PN 기록 작성자가 ' + namePart(o6.pnBy) + ' 입니다.'; break;
+        case '명칭확인필요': rk2 = 3; msg = 'PN 기록 제목이 [' + cut(o6.pnTitle, 30) + '] 입니다.'; break;
+        case '회차표기누락': rk2 = 3; msg = 'PN 제목 앞에 ' + o6.hoe + ' 표기가 빠졌습니다.'; break;
         case '회차불일치':
           rk2 = 3;
-          msg = 'PN 제목은 ' + hoeOf(o6.pnTitle) + ' 표기인데 실제 청구는 ' + o6.hoe + ' 입니다. 표기를 고쳐 주세요.';
+          msg = 'PN 제목은 ' + hoeOf(o6.pnTitle) + ' 표기인데 실제 청구는 ' + o6.hoe + ' 입니다.';
           if (o6.hoeCode && o6.hoeLbl !== o6.hoeCode) {
             msg += ' (슬립명칭에는 ' + o6.hoeLbl + ' 로 떠 있으나 청구 코드는 ' + o6.hoeCode + ' 입니다)';
           }
           break;
-        case '슬립정보없음': rk2 = 6; msg = '슬립에 치료사 또는 치료시간이 비어 있습니다. 액팅을 확인해 주세요.'; break;
+        case '슬립정보없음': rk2 = 6; msg = '슬립에 치료사 또는 치료시간이 비어 있습니다.'; break;
       }
       if (rk2 > 0) {
         notice.push({
@@ -1129,10 +1129,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
           date: o6.date, name: o6.name, ther: o6.ther,
           billed: o6.slip + ' (' + o6.st + '-' + o6.et + ')',
           type: '가산체크확인',
-          msg: '슬립은 ' + o6.hoeLbl + ' 인데 ' + o6.hoeCode + ' 로 청구되어 있습니다. ' +
-            (hoeNum(o6.hoeLbl) > hoeNum(o6.hoeCode)
-              ? '액팅할 때 가산 체크가 빠지지 않았는지 확인해 주세요.'
-              : '액팅의 가산 체크를 확인해 주세요.'),
+          msg: '슬립은 ' + o6.hoeLbl + ' 인데 ' + o6.hoeCode + ' 로 청구되어 있습니다.',
           rank: 4
         });
       }
@@ -1141,7 +1138,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       notice.push({
         date: o7.date, name: o7.name, ther: o7.ther,
         billed: '(청구 없음) ' + cut(o7.title, 30) + ' (' + o7.st + '-' + o7.et + ')',
-        type: '청구없음', msg: 'PN 기록만 있고 청구가 없습니다. 액팅 누락인지 확인해 주세요.', rank: 5
+        type: '청구없음', msg: 'PN 기록만 있고 청구가 없습니다.', rank: 5
       });
     });
     notice.sort(function (a, b) {

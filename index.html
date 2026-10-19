@@ -723,6 +723,7 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
       <button class="nav-item" data-tool="mwd"><span class="icon">☀</span><span class="label">이동반 · 평일</span></button>
       <button class="nav-item" data-tool="mwe"><span class="icon">🌙</span><span class="label">이동반 · 주말</span></button>
       <button class="nav-item" data-tool="verify"><span class="icon">✅</span><span class="label">주말시간표 사전검증</span></button>
+      <button class="nav-item" data-tool="pnote"><span class="icon">🔎</span><span class="label">피노트 점검기</span></button>
       <button class="nav-item" data-tool="stat"><span class="icon">📊</span><span class="label">통계 프로그램</span></button>
     </div>
 
@@ -838,6 +839,7 @@ const TOOLS = {
   mwd: { title: '이동반 시간표 · 평일', url: '이동반_시간표_평일.html' },
   mwe: { title: '이동반 시간표 · 주말', url: '이동반_시간표_주말.html' },
   verify: { title: '주말시간표 사전검증', url: '주말시간표_사전검증.html' },
+  pnote: { title: '피노트 점검기', url: '피노트_점검기.html' },
   stat: { title: '통계 프로그램', url: '재활센터_통계.html' }
 };
 
@@ -999,6 +1001,7 @@ function renderUrlEditList() {
     mwd: {label: '간부용', color: 'var(--cat-mgmt)'},
     mwe: {label: '간부용', color: 'var(--cat-mgmt)'},
     verify: {label: '간부용', color: 'var(--cat-mgmt)'},
+    pnote: {label: '간부용', color: 'var(--cat-mgmt)'},
     stat: {label: '간부용', color: 'var(--cat-mgmt)'}
   };
 

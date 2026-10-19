@@ -1487,7 +1487,10 @@ else { initOnLoad(); }
                 if (/^열전기|^방문|^재택/.test(_ttl)) {
                     var _hr = matrix[fr - 1] || [];
                     for (var _c = sc + 1; _c <= ec; _c++) {
-                        var _n = cleanTherapistName(String(_hr[_c] || "").trim());
+                        var _hv = String(_hr[_c] || "").trim();
+                        // 옆 구역 제목(방문재활 · 재택교육 …)은 사람이 아니다
+                        if (/^(열전기|방문|재택)/.test(_hv)) continue;
+                        var _n = cleanTherapistName(_hv);
                         if (!_n) continue;
                         var _red = !!(fmtMatrix && (fmtMatrix[fr - 1] || [])[_c] && fmtMatrix[fr - 1][_c].r);
                         var _fill = [], _mins = [];
@@ -1670,7 +1673,7 @@ var NOT_A_NAME = ["근골격계","신경계","재활센터","치료실","담당"
                   "재택","연차","반차","공가","출장","교육","회의","외래","입원","병동","퇴원",
                   "점심시간","점심","휴게시간","오전근무","오후근무","기구","외진","평가",
                   // 로봇 · 기구 이름 — 로봇실 머리글에 적혀도 치료사로 세지 않는다
-                  "로봇","모닝","엔젤","엑소","알봇","워크봇","에리고","로코맷","클라","런닝","슬라","등속성"];
+                  "방문재활","재택교육","재택방문","방문","로봇","모닝","엔젤","엑소","알봇","워크봇","에리고","로코맷","클라","런닝","슬라","등속성"];
 function isTherapistNameOnly(raw) {
     var t = String(raw||"").trim().replace(TH_TITLE_SUFFIX, "").trim();
     if (!/^[가-힣]{2,4}\d?$/.test(t)) return false;   // 동명이인 표기(김수진1) 허용

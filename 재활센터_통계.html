@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-19 b96</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-19 b97</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -163,10 +163,7 @@ td.clickable:hover { opacity:0.75; }
     <input type="file" id="emrInput" accept=".xlsx, .xls" onclick="this.value='';" />
     <span id="emrStatus">엑셀 미등록</span>
     <button class="step-btn s12-reset" onclick="resetEmrFile()" title="EMR 초기화">초기화</button>
-    <button class="step-btn" onclick="showOutpatientList()" title="외래 환자 성함만 뽑기"
-            style="background:#2980b9;color:#fff;border-color:#2980b9;">&#128101; 외래 명단</button>
   </div>
-  <div id="outpatientArea" style="display:none;margin-top:7px;"></div>
   <div class="s12-head" style="margin-top:7px;">
     <span class="s12-title" style="color:#e67e22;">📋 STEP 2 · 시간표</span>
     <span class="s12-hint">신경계 · 근골 시트를 각 칸에 Ctrl+V (순서 상관없음)</span>
@@ -273,22 +270,39 @@ td.clickable:hover { opacity:0.75; }
 <button class="btn-calc" style="background:#8e44ad;font-size:14px;padding:10px 25px;margin-right:8px;" onclick="copyMismatchList()">&#128242; 액팅 틀린 치료사 명단 복사</button>
 <button class="btn-calc" style="background:#16a085;font-size:14px;padding:10px 25px;margin-right:8px;" onclick="copyTotalsSheet()" title="물리 · 작업 · 언어 · 평가 합계를 통계표 양식 그대로 복사 (A1 칸에 붙여넣기)">&#128203; 통계표 양식으로 합계 복사</button>
 <span id="errorCountBadge" style="display:none;"></span>
-<span id="budoSummary" style="display:none;"></span>
 </div>
-<div class="s3-box" style="border-color:#b9d3ea;background:#f5f9fd;margin:-4px 0 16px;">
+<div id="ptTripleArea"></div>
+<div id="otTripleArea"></div>
+<div id="stTripleArea"></div>
+<div id="painTripleArea"></div>
+<h2 class="result-header" style="border-color:#2471a3;">&#128101; 재활센터 인원현황</h2>
+<p>시간표와 EMR을 넣으면 출근 치료사 수 · 부도 환자 · 외래 명단을 통계표에 붙여넣을 수 있게 정리합니다.</p>
+<div class="s3-box" style="border-color:#b9d3ea;background:#f5f9fd;margin:8px 0 12px;">
   <div class="s12-head">
     <span class="s12-title" style="color:#2471a3;">👥 치료사 인원</span>
-    <span class="s12-hint">전체 인원은 한 번 적어 두면 기억합니다 · 근태 명단을 붙여넣으면 당일 인원에서 뺍니다 · 연차/휴무/공가 1 · 반차·오전/오후공가 0.5 · 반반차 0.25</span>
+    <span class="s12-hint">근태 명단을 붙여넣으면 당일(출근) 인원을 셉니다 · 전체 인원은 한 번 적어 두면 기억합니다 · 연차/휴무/공가 1 · 반차·오전/오후공가 0.5 · 반반차 0.25</span>
   </div>
   <textarea id="staffAbsence" oninput="renderStaffCount()" placeholder="예) 김한솜 오후공가(10/9)  이우진 오후반차  김영신 연차  강은서 휴무"
             style="width:100%;box-sizing:border-box;min-height:46px;margin-top:7px;padding:7px 9px;font-size:12.5px;
                    border:1px dashed #9cc3e4;border-radius:6px;background:#fff;resize:vertical;font-family:inherit;"></textarea>
   <div id="staffCountArea" style="margin-top:6px;font-size:13px;"></div>
 </div>
-<div id="ptTripleArea"></div>
-<div id="otTripleArea"></div>
-<div id="stTripleArea"></div>
-<div id="painTripleArea"></div>
+<div class="s3-box" style="border-color:#f0c040;background:#fffbea;margin:0 0 12px;">
+  <div class="s12-head">
+    <span class="s12-title" style="color:#a87400;">부도 환자</span>
+    <span class="s12-hint">시간표에서 주황색 칸 · 통계 · 오더 점검에서는 자동으로 빠집니다</span>
+  </div>
+  <div id="budoSummary" style="margin-top:6px;font-size:13px;"></div>
+</div>
+<div class="s3-box" style="border-color:#a9cce3;background:#f4f9fd;margin:0 0 12px;">
+  <div class="s12-head">
+    <span class="s12-title" style="color:#1f618d;">외래 명단</span>
+    <span class="s12-hint">EMR 외래/입원 열 기준</span>
+    <button class="step-btn" onclick="showOutpatientList()" title="외래 환자 성함만 뽑기"
+            style="background:#2980b9;color:#fff;border-color:#2980b9;">&#128101; 외래 명단 뽑기</button>
+  </div>
+  <div id="outpatientArea" style="display:none;margin-top:7px;"></div>
+</div>
 <h2 class="result-header" style="border-color:#8e44ad;">&#128203; [8] 평가 실적 집계</h2>
 <p>※ EMR 엑셀 파일이 연동된 상태에서 아래 버튼을 누르면 평가 실적이 자동 집계됩니다.</p>
 <div class="action-area">
@@ -1014,6 +1028,7 @@ function initOnLoad() {
     forceRenderAllInputGrids();
     if (typeof setWardMode === "function") setWardMode("neuro");
     if (typeof renderPainDurSetup === "function") renderPainDurSetup();
+    try { renderStaffCount(); renderBudoSummary(); } catch (e) {}
 }
 if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", initOnLoad); }
 else { initOnLoad(); }
@@ -1533,7 +1548,7 @@ else { initOnLoad(); }
             window._staffExtraPT[ward] = extraStaff;
             wardDates[ward] = wardDate;
             redistributeWards();
-            try { renderStaffCount(); } catch (eS) {}
+            try { renderStaffCount(); renderBudoSummary(); } catch (eS) {}
             area.value = "";
             var other = ward === "neuro" ? "msk" : "neuro";
             var msg = "";
@@ -2631,12 +2646,10 @@ function renderBudoSummary() {
     var el = document.getElementById("budoSummary");
     if (!el) return;
     var b = computeBudo();
-    el.style.cssText = "display:inline-block;background:#ffc000;color:#5a3d00;padding:8px 14px;border-radius:6px;" +
-                       "font-weight:bold;font-size:14px;margin-left:12px;vertical-align:middle;";
-    el.title = b.names.length ? "부도 환자: " + b.names.join(", ") : "";
-    el.innerHTML = "🟧 부도 " + b.total + "건" + (b.detail ? " — " + b.detail : "") +
-        (b.total ? " <button onclick='copyBudo()' style='margin-left:6px;padding:2px 8px;font-size:12px;" +
-                   "border:1px solid #a87400;border-radius:4px;background:#fff;cursor:pointer;'>복사</button>" : "");
+    el.innerHTML = "<span style='display:inline-block;background:#ffc000;color:#5a3d00;padding:6px 12px;border-radius:6px;font-weight:bold;'>" +
+        "부도 " + b.total + "건" + (b.detail ? " — " + b.detail : "") + "</span>" +
+        (b.total ? " <button class='step-btn' onclick='copyBudo()' style='margin-left:8px;background:#a87400;border-color:#a87400;color:#fff;'>📋 부도 복사</button>" : "") +
+        (b.names.length ? "<div style='margin-top:5px;color:#555;font-size:12px;'>환자: " + b.names.join(", ") + "</div>" : "");
 }
 function copyBudo() {
     var b = computeBudo();
@@ -2767,7 +2780,7 @@ function renderStaffCount(keepFocus) {
             "<tr style='background:#eaf2fa;font-weight:700;'>" + cell("") + cell("PT") + cell("OT") + cell("ST") + cell("코디") + cell("총 인원") + "</tr>" +
             "<tr>" + cell("<b>전체</b>") + inp("PT") + inp("OT") + inp("ST") + inp("CO") + cell(fmtNum(tFull)) + "</tr>" +
             "<tr>" + cell("<b>당일</b>") + cell(fmtNum(on.PT)) + cell(fmtNum(on.OT)) + cell(fmtNum(on.ST)) + cell(fmtNum(co)) + cell(fmtNum(tOn)) + "</tr></table>" +
-            " <button class='step-btn' onclick='copyStaffCount()' style='margin-left:8px;background:#2471a3;border-color:#2471a3;color:#fff;'>📋 인원 복사</button>";
+            " <button class='step-btn' onclick='copyStaffCount()' style='margin-left:8px;background:#2471a3;border-color:#2471a3;color:#fff;'>📋 당일 인원 복사</button>";
     if (used.length) h += "<div style='margin-top:5px;color:#555;font-size:12px;'>뺀 인원: " + used.join(" · ") + "</div>";
     if (miss.length) {
         h += "<div style='margin-top:4px;color:#c0392b;font-size:12px;font-weight:700;'>⚠️ 시간표에 없어 파트를 모르는 사람 — 한 번 골라 주면 기억합니다: ";
@@ -2799,12 +2812,11 @@ function copyStaffCount() {
     renderStaffCount();
     var c = _staffCnt;
     if (!c) return;
-    var tsv = [c.full.PT, c.full.OT, c.full.ST, fmtNum(c.co), fmtNum(c.tFull)].join("\t") + "\n" +
-              [fmtNum(c.on.PT), fmtNum(c.on.OT), fmtNum(c.on.ST), fmtNum(c.co), fmtNum(c.tOn)].join("\t");
+    var tsv = [fmtNum(c.on.PT), fmtNum(c.on.OT), fmtNum(c.on.ST), fmtNum(c.co), fmtNum(c.tOn)].join("\t");
     var ta = document.createElement("textarea");
     ta.value = tsv; ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); alert("✅ 인원 복사 완료" + (c.miss ? "\n⚠️ 파트를 모르는 사람 " + c.miss + "명은 빼지 않았습니다." : "") + "\n통계표 인원현황의 PT 첫 칸(전체 줄)에 붙여넣으세요."); }
+    try { document.execCommand("copy"); alert("✅ 인원 복사 완료" + (c.miss ? "\n⚠️ 파트를 모르는 사람 " + c.miss + "명은 빼지 않았습니다." : "") + "\n통계표 인원현황 당일 줄의 PT 칸에 붙여넣으세요."); }
     catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
     document.body.removeChild(ta);
 }

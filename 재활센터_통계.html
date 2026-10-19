@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-14 b90</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-19 b94</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -271,7 +271,21 @@ td.clickable:hover { opacity:0.75; }
 <h2 class="result-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">&#128202; [7] 최종 청구 실적 교차 대조 결과창<div style="display:flex;gap:6px;align-items:center;"><button class="btn-calc" style="background:#2c3e50;font-size:13px;padding:8px 20px;margin:0;" onclick="analyzeAllInOne()">&#9889; 전체 한 번에 집계</button><button class="btn-reset" style="font-size:13px;padding:8px 15px;margin:0;" onclick="resetAllGrids()">&#128465; 전체 그리드 지우기</button></div></h2>
 <div style="margin-bottom:15px;">
 <button class="btn-calc" style="background:#8e44ad;font-size:14px;padding:10px 25px;margin-right:8px;" onclick="copyMismatchList()">&#128242; 액팅 틀린 치료사 명단 복사</button>
+<button class="btn-calc" style="background:#16a085;font-size:14px;padding:10px 25px;margin-right:8px;" onclick="copyTotalsSheet()" title="물리 · 작업 · 언어 · 평가 합계를 통계표 양식 그대로 복사 (A1 칸에 붙여넣기)">&#128203; 통계표 양식으로 합계 복사</button>
 <span id="errorCountBadge" style="display:none;"></span>
+<span id="budoSummary" style="display:none;"></span>
+</div>
+<div class="s3-box" style="border-color:#b9d3ea;background:#f5f9fd;margin:-4px 0 16px;">
+  <div class="s12-head">
+    <span class="s12-title" style="color:#2471a3;">👥 치료사 인원</span>
+    <span class="s12-hint">근태 명단을 붙여넣으면 출근 인원에서 뺍니다 · 연차/휴무/공가 1 · 반차·오전/오후공가 0.5 · 반반차 0.25</span>
+    <label class="s12-hint" style="margin-left:auto;white-space:nowrap;">코디 <input type="number" id="staffCoordi" value="2" min="0" step="0.5"
+           oninput="renderStaffCount()" style="width:46px;padding:2px 4px;font-size:12.5px;"></label>
+  </div>
+  <textarea id="staffAbsence" oninput="renderStaffCount()" placeholder="예) 김한솜 오후공가(10/9)  이우진 오후반차  김영신 연차  강은서 휴무"
+            style="width:100%;box-sizing:border-box;min-height:46px;margin-top:7px;padding:7px 9px;font-size:12.5px;
+                   border:1px dashed #9cc3e4;border-radius:6px;background:#fff;resize:vertical;font-family:inherit;"></textarea>
+  <div id="staffCountArea" style="margin-top:6px;font-size:13px;"></div>
 </div>
 <div id="ptTripleArea"></div>
 <div id="otTripleArea"></div>
@@ -787,25 +801,56 @@ function buildClassDeco(doc) {
             var body = m[2];
             var u = /text-decoration[^;]*underline/i.test(body);
             var st = /text-decoration[^;]*line-through/i.test(body);
-            if (!u && !st) continue;
+            var bo = isBudoBg(body);
+            if (!u && !st && !bo) continue;
             m[1].split(",").forEach(function(sel) {
                 var cls = sel.trim().match(/\.([A-Za-z0-9_\-]+)/);
                 if (!cls) return;
-                var e = _clsDeco[cls[1]] || { u:false, s:false };
+                var e = _clsDeco[cls[1]] || { u:false, s:false, b:false };
                 if (u) e.u = true;
                 if (st) e.s = true;
+                if (bo) e.b = true;
                 _clsDeco[cls[1]] = e;
             });
         }
     }
 }
+// ── 부도 칸 (주황색 배경) ────────────────────────────────────────────
+//   시간표에서 부도 환자는 항상 칸을 주황색으로 칠한다.
+//   부도 칸은 치료를 안 한 것이므로 통계 · 오더 점검 · 퇴원 점검에서 모두 뺀다 (취소선과 같은 처리).
+//   엑셀 주황 계열(#FFC000 · #FF9900 · #ED7D31 · #F4B084 …)만 잡고,
+//   빨강 머리글 · 노랑 · 분홍 · 보라 칸은 잡지 않는다.
+function budoColorOk(r, g, b) {
+    return r >= 0xE0 && g >= 0x60 && g <= 0xD0 && b <= 0x90 && (r - b) >= 0x80;
+}
+function isBudoBg(css) {
+    var t = String(css||"");
+    var m = t.match(/background(?:-color)?\s*:\s*([^;]+)/i);
+    if (!m) return false;
+    var v = m[1].trim();
+    var hx = v.match(/#([0-9a-f]{6})\b/i);
+    if (hx) {
+        var n = parseInt(hx[1], 16);
+        return budoColorOk((n >> 16) & 255, (n >> 8) & 255, n & 255);
+    }
+    var rg = v.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (rg) return budoColorOk(+rg[1], +rg[2], +rg[3]);
+    return /^orange\b/i.test(v);
+}
+function tdIsBudo(td) {
+    if (!td || !td.getAttribute) return false;
+    var bg = td.getAttribute("bgcolor");
+    if (bg && isBudoBg("background:" + bg)) return true;
+    if (isBudoBg(td.getAttribute("style") || "")) return true;
+    return classDecoOf(td).b;
+}
 function classDecoOf(node) {
-    var out = { u:false, s:false };
+    var out = { u:false, s:false, b:false };
     var cn = (node.getAttribute && node.getAttribute("class")) || "";
     if (!cn) return out;
     cn.split(/\s+/).forEach(function(c) {
         var e = _clsDeco[c];
-        if (e) { if (e.u) out.u = true; if (e.s) out.s = true; }
+        if (e) { if (e.u) out.u = true; if (e.s) out.s = true; if (e.b) out.b = true; }
     });
     return out;
 }
@@ -847,6 +892,11 @@ function tdDecoration(td) {
     }
     walk(td, false, false);
     push();
+    // 부도 칸은 칸 전체를 취소선처럼 처리한다
+    if (tdIsBudo(td)) {
+        lines.forEach(function(x){ x.s = true; x.u = false; });
+        return { u:false, s:true, b:true, lines:lines };
+    }
     var anyU = lines.some(function(x){ return x.u; });
     var anyS = lines.some(function(x){ return x.s; });
     return { u:anyU, s:anyS, lines:lines };
@@ -925,9 +975,11 @@ function distributeMatrix(matrix, tableId, targetElement, fmt) {
                 var f = (fmt && fmt[i] && fmt[i][j]) ? fmt[i][j] : { u:false, s:false };
                 setCellFmt(tableId, tr, tc, f);
                 if (inp) {
-                    inp.style.textDecoration = f.s ? "line-through" : (f.u ? "underline" : "");
-                    inp.title = f.s ? "취소선 — 시행만 하고 액팅 안 넘김"
-                                    : (f.u ? "밑줄 — 이 시간에 액팅을 넘김" : "");
+                    inp.style.textDecoration = f.b ? "" : (f.s ? "line-through" : (f.u ? "underline" : ""));
+                    inp.style.backgroundColor = f.b ? "#ffc000" : "";
+                    inp.title = f.b ? "부도 — 통계 · 오더 점검에서 제외"
+                              : (f.s ? "취소선 — 시행만 하고 액팅 안 넘김"
+                                    : (f.u ? "밑줄 — 이 시간에 액팅을 넘김" : ""));
                 }
             }
         }
@@ -1471,6 +1523,7 @@ else { initOnLoad(); }
             wardBuffers[ward] = gridBuffers;
             wardDates[ward] = wardDate;
             redistributeWards();
+            try { renderStaffCount(); } catch (eS) {}
             area.value = "";
             var other = ward === "neuro" ? "msk" : "neuro";
             var msg = "";
@@ -1558,7 +1611,9 @@ var TH_TITLE_SUFFIX = /\s*(계장|과장|팀장|실장|주임|선생님|선생|�
 var NOT_A_NAME = ["근골격계","신경계","재활센터","치료실","담당","치료사","환자","시간","합계","소계",
                   "비고","통증","물리","작업","언어","전기","메디","페인","기타","오전","오후","휴진",
                   "재택","연차","반차","공가","출장","교육","회의","외래","입원","병동","퇴원",
-                  "점심시간","점심","휴게시간","오전근무","오후근무","기구","외진","평가"];
+                  "점심시간","점심","휴게시간","오전근무","오후근무","기구","외진","평가",
+                  // 로봇 · 기구 이름 — 로봇실 머리글에 적혀도 치료사로 세지 않는다
+                  "로봇","모닝","엔젤","엑소","알봇","워크봇","에리고","로코맷","클라","런닝","슬라","등속성"];
 function isTherapistNameOnly(raw) {
     var t = String(raw||"").trim().replace(TH_TITLE_SUFFIX, "").trim();
     if (!/^[가-힣]{2,4}\d?$/.test(t)) return false;   // 동명이인 표기(김수진1) 허용
@@ -2493,6 +2548,210 @@ function copyResultTable(id) {
     window.getSelection().addRange(range);
     try { document.execCommand("copy"); alert("표 데이터가 복사되었습니다! 대장에 붙여넣으세요."); }
     catch (err) { alert("복사 실패! 마우스 드래그를 이용해 주세요."); }
+}
+
+// ── 통계표 양식으로 합계 복사 ──────────────────────────────────────────
+//   A·B 물리 | C·D 작업 (한 칸 띄우고 머리글 + 언어) | E·F 평가
+//   치료는 시간표 합계, 평가는 EMR 건수. 통계표 A1 칸에 붙여넣으면 그대로 맞는다.
+function summaryTotalsOf(areaId) {
+    var out = {};
+    var t = document.getElementById(areaId + "-integrated");
+    if (!t) return null;
+    t.querySelectorAll("tbody tr").forEach(function(tr) {
+        var td = tr.querySelectorAll("td");
+        if (td.length < 3) return;
+        var lb = td[0].dataset.label || td[0].innerText.trim();
+        out[lb] = parseInt(td[2].innerText, 10) || 0;
+    });
+    return out;
+}
+function evalTotalsFromEmr() {
+    var out = {};
+    evalOrder.forEach(function(e){ out[e] = 0; });
+    if (!globalEmrRows || globalEmrCodeIdx === -1) return null;
+    globalEmrRows.forEach(function(row) {
+        if (!row) return;
+        var rc = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
+        var nm = String(row[globalEmrNameIdx]||"").trim();
+        if (!rc || !nm) return;
+        var lb = evalCodeMap[rc];
+        if (lb) out[lb] += 1;
+    });
+    return out;
+}
+// 부도 집계 — 주황 칸마다 기구(GR · 모닝 · 엔젤 …)를 하나씩 센다
+//   "H김선자 GR김선자+모닝" → GR 1 · 모닝 1
+//   "H이정희+엔젤"          → 엔젤 1
+//   기구 표기가 없는 칸은 "기타" 로 센다
+function computeBudo() {
+    var cnt = {}, order = [], names = [];
+    function add(k) { if (!(k in cnt)) { cnt[k] = 0; order.push(k); } cnt[k]++; }
+    ["ptGridTable","otGridTable","stGridTable","etGridTable","mtGridTable","painGridTable"].forEach(function(gid) {
+        var fm = gridCellFmt[gid] || {};
+        Object.keys(fm).forEach(function(k) {
+            if (!fm[k] || !fm[k].b) return;
+            var el = document.getElementById(gid + "-cell-" + k);
+            var txt = el ? el.value.trim() : "";
+            if (!txt) return;
+            var hit = 0;
+            // 줄바꿈이 빠져 글자가 붙어 와도 읽히도록 칸 전체에서 찾는다
+            var flat = txt.replace(/\([^)]*\)/g, " ");
+            (flat.match(/GR(?=[가-힣])/gi) || []).forEach(function(){ add("GR"); hit++; });
+            (flat.match(/\+\s*[가-힣A-Za-z]+/g) || []).forEach(function(p) {
+                var w = p.replace(/[^가-힣A-Za-z]/g, "");
+                if (w) { add(w); hit++; }
+            });
+            (flat.match(/(?:^|[\s\d])[A-Za-z]{0,2}([가-힣]{2,4})(?=[\s+\d]|GR|$)/g) || []).forEach(function(x) {
+                var nm = x.replace(/[^가-힣]/g, "");
+                if (nm && names.indexOf(nm) === -1) names.push(nm);
+            });
+            if (!hit) add("기타");
+        });
+    });
+    // 기구 이름을 먼저, GR · 기타 는 뒤로
+    order.sort(function(a, b) {
+        function w(x){ return x === "기타" ? 2 : (x === "GR" ? 1 : 0); }
+        return w(a) - w(b);
+    });
+    var total = 0;
+    order.forEach(function(k){ total += cnt[k]; });
+    return { total: total, detail: order.map(function(k){ return k + "(" + cnt[k] + ")"; }).join(", "), names: names };
+}
+function renderBudoSummary() {
+    var el = document.getElementById("budoSummary");
+    if (!el) return;
+    var b = computeBudo();
+    el.style.cssText = "display:inline-block;background:#ffc000;color:#5a3d00;padding:8px 14px;border-radius:6px;" +
+                       "font-weight:bold;font-size:14px;margin-left:12px;vertical-align:middle;";
+    el.title = b.names.length ? "부도 환자: " + b.names.join(", ") : "";
+    el.innerHTML = "🟧 부도 " + b.total + "건" + (b.detail ? " — " + b.detail : "") +
+        (b.total ? " <button onclick='copyBudo()' style='margin-left:6px;padding:2px 8px;font-size:12px;" +
+                   "border:1px solid #a87400;border-radius:4px;background:#fff;cursor:pointer;'>복사</button>" : "");
+}
+function copyBudo() {
+    var b = computeBudo();
+    var ta = document.createElement("textarea");
+    ta.value = b.total + "\t" + b.detail;
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); alert("✅ 부도 " + b.total + "건 · " + b.detail + "\n통계표 부도환자 숫자 칸에 붙여넣으세요."); }
+    catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
+    document.body.removeChild(ta);
+}
+
+// ── 치료사 인원 (PT · OT · ST) ───────────────────────────────────────
+//   전체 = 붙여넣은 시간표에 이름이 있는 치료사 수
+//     PT = 물리 + 전기 + 메디페인 + 통증 담당 / OT = 작업 / ST = 언어
+//   출근 = 전체 − 근태 명단 (연차·휴무·휴가·공가·병가 1, 반차·오전/오후 0.5, 반반차 0.25)
+function staffDeptSets() {
+    var pt = {}, ot = {}, st = {};
+    extractMembers("ptGridTable").members.forEach(function(n){ pt[n] = 1; });
+    var ec = etTherapistCol();
+    for (var r = 1; r < ROW_COUNT; r++) {
+        var el = document.getElementById("etGridTable-cell-" + r + "-" + ec);
+        var n = cleanTherapistName(el ? el.value.trim() : "");
+        if (n && isNaN(n)) pt[n] = 1;
+    }
+    var pr = buildPainRowTherapists() || {};
+    Object.keys(pr).forEach(function(r){ if (pr[r]) pt[pr[r]] = 1; });
+    var rc = window._painRowThByCol || {};
+    Object.keys(rc).forEach(function(r){ Object.keys(rc[r]).forEach(function(c){ if (rc[r][c]) pt[rc[r][c]] = 1; }); });
+    extractMembers("otGridTable").members.forEach(function(n){ ot[n] = 1; });
+    extractMembers("stGridTable").members.forEach(function(n){ st[n] = 1; });
+    // 한 사람이 두 파트에 잡히면 작업 · 언어 쪽을 우선한다 (중복 집계 방지)
+    Object.keys(ot).forEach(function(n){ delete pt[n]; });
+    Object.keys(st).forEach(function(n){ delete pt[n]; delete ot[n]; });
+    return { PT: pt, OT: ot, ST: st };
+}
+function parseStaffAbsence(text) {
+    var out = [];
+    var re = /([가-힣]{2,4}\d?)\s*((?:오전|오후)?\s*(?:반반차|반차|공가|연차|월차|휴무|휴가|병가|경조사|경조))/g, m;
+    var t = String(text || "").replace(/\([^)]*\)/g, " ");
+    while ((m = re.exec(t)) !== null) {
+        var kind = m[2].replace(/\s/g, "");
+        var w = /반반차/.test(kind) ? 0.25 : ((/반차/.test(kind) || /^(오전|오후)/.test(kind)) ? 0.5 : 1);
+        out.push({ name: m[1], kind: kind, w: w });
+    }
+    return out;
+}
+function fmtNum(x) { return String(Math.round(x * 100) / 100); }
+var _staffCnt = null;
+function renderStaffCount() {
+    var area = document.getElementById("staffCountArea");
+    if (!area) return;
+    var sets = staffDeptSets();
+    var full = { PT: Object.keys(sets.PT).length, OT: Object.keys(sets.OT).length, ST: Object.keys(sets.ST).length };
+    if (!full.PT && !full.OT && !full.ST) { area.innerHTML = "<span style='color:#999;'>시간표를 붙여넣으면 인원이 계산됩니다.</span>"; _staffCnt = null; return; }
+    var on = { PT: full.PT, OT: full.OT, ST: full.ST }, miss = [], used = [];
+    var absTxt = (document.getElementById("staffAbsence") || {}).value || "";
+    parseStaffAbsence(absTxt).forEach(function(a) {
+        var cands = [a.name, cleanTherapistName(a.name), a.name.replace(/\d+$/, "")];
+        var dep = null, who = "";
+        ["PT","OT","ST"].some(function(d) {
+            for (var i = 0; i < cands.length; i++) if (cands[i] && sets[d][cands[i]]) { dep = d; who = cands[i]; return true; }
+            return false;
+        });
+        if (!dep) { miss.push(a.name + " " + a.kind); return; }
+        on[dep] -= a.w;
+        used.push(dep + " " + who + " " + a.kind + " −" + fmtNum(a.w));
+    });
+    var co = parseFloat((document.getElementById("staffCoordi") || {}).value) || 0;
+    var tFull = full.PT + full.OT + full.ST + co, tOn = on.PT + on.OT + on.ST + co;
+    _staffCnt = { full: full, on: on, co: co, tFull: tFull, tOn: tOn };
+    function cell(v){ return "<td style='padding:3px 10px;text-align:center;border:1px solid #cfdbe6;'>" + v + "</td>"; }
+    var h = "<table style='border-collapse:collapse;background:#fff;font-size:13px;display:inline-table;vertical-align:middle;'>" +
+            "<tr style='background:#eaf2fa;font-weight:700;'>" + cell("") + cell("PT") + cell("OT") + cell("ST") + cell("코디") + cell("총 인원") + "</tr>" +
+            "<tr>" + cell("<b>전체</b>") + cell(full.PT) + cell(full.OT) + cell(full.ST) + cell(fmtNum(co)) + cell(fmtNum(tFull)) + "</tr>" +
+            "<tr>" + cell("<b>출근</b>") + cell(fmtNum(on.PT)) + cell(fmtNum(on.OT)) + cell(fmtNum(on.ST)) + cell(fmtNum(co)) + cell(fmtNum(tOn)) + "</tr></table>" +
+            " <button class='step-btn' onclick='copyStaffCount()' style='margin-left:8px;background:#2471a3;border-color:#2471a3;color:#fff;'>📋 인원 복사</button>";
+    if (used.length) h += "<div style='margin-top:5px;color:#555;font-size:12px;'>뺀 인원: " + used.join(" · ") + "</div>";
+    if (miss.length) h += "<div style='margin-top:3px;color:#c0392b;font-size:12px;font-weight:700;'>⚠️ 시간표에 없는 이름이라 빼지 않음: " + miss.join(" · ") + "</div>";
+    area.innerHTML = h;
+}
+function copyStaffCount() {
+    renderStaffCount();
+    var c = _staffCnt;
+    if (!c) { alert("시간표를 먼저 붙여넣어 주세요."); return; }
+    var tsv = [c.full.PT, c.full.OT, c.full.ST, fmtNum(c.co), fmtNum(c.tFull)].join("\t") + "\n" +
+              [fmtNum(c.on.PT), fmtNum(c.on.OT), fmtNum(c.on.ST), fmtNum(c.co), fmtNum(c.tOn)].join("\t");
+    var ta = document.createElement("textarea");
+    ta.value = tsv; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); alert("✅ 인원 복사 완료\n통계표 인원현황의 PT 첫 칸(전체 줄)에 붙여넣으세요."); }
+    catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
+    document.body.removeChild(ta);
+}
+
+function copyTotalsSheet() {
+    var pt = summaryTotalsOf("ptTripleArea"), ot = summaryTotalsOf("otTripleArea"),
+        st = summaryTotalsOf("stTripleArea"), ev = evalTotalsFromEmr();
+    var miss = [];
+    if (!pt) miss.push("물리"); if (!ot) miss.push("작업");
+    if (!st && isSectionActive("stGridTable")) miss.push("언어");
+    if (!ev) miss.push("평가(EMR 미연동)");
+    if (miss.length && !confirm("아직 집계되지 않은 파트가 있습니다: " + miss.join(" · ") +
+            "\n빈 파트는 0으로 채워 복사할까요?")) return;
+    function v(map, k) { return map && map[k] !== undefined ? map[k] : 0; }
+    var stLabels = ["비회","H2","H3"];
+    var rows = [["처방명","건수","처방명","건수","처방명","건수"]];
+    var n = Math.max(ptOrder.length, evalOrder.length);
+    for (var i = 0; i < n; i++) {
+        var r = ["","","","","",""];
+        if (i < ptOrder.length) { r[0] = ptOrder[i]; r[1] = v(pt, ptOrder[i]); }
+        var j = i - otOrder.length;          // 작업 끝 → 한 칸 비움 → 머리글 → 언어
+        if (i < otOrder.length) { r[2] = otOrder[i]; r[3] = v(ot, otOrder[i]); }
+        else if (j === 1) { r[2] = "처방명"; r[3] = "건수"; }
+        else if (j >= 2 && j - 2 < stLabels.length) { r[2] = stLabels[j-2]; r[3] = v(st, stLabels[j-2]); }
+        if (i < evalOrder.length) { r[4] = evalOrder[i]; r[5] = v(ev, evalOrder[i]); }
+        rows.push(r);
+    }
+    var tsv = rows.map(function(r){ return r.join("\t"); }).join("\n");
+    var ta = document.createElement("textarea");
+    ta.value = tsv; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); alert("✅ 통계표 양식으로 복사했습니다.\n통계표 A1 칸(처방명)을 누르고 붙여넣으세요."); }
+    catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
+    document.body.removeChild(ta);
 }
 
 function copySummaryOnly(tableId) {
@@ -6248,6 +6507,8 @@ function countMismatches() {
 }
 
 function updateErrorCount() {
+    renderBudoSummary();
+    try { renderStaffCount(); } catch (e) {}
     var result = countMismatches();
     var badge = document.getElementById('errorCountBadge');
     if (!badge) return;

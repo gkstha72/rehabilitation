@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-19 b103</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-19 b104</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -2739,6 +2739,8 @@ function staffFraction(filled, mins) {
 }
 // 시간제 근무자 — 출근해도 이 값으로 센다 (사람이 바뀌면 여기만 고치면 된다)
 var STAFF_PART_TIME = { "심원빈": 0.5 };
+// 열전기 · 방문재활 · 재택 구역 담당은 기본 PT. OT 인 사람만 여기 적는다.
+var STAFF_VISIT_DEPT = { "임건우": "OT", "노을": "OT" };
 function staffDeptSets() {
     var dep = { PT: {}, OT: {}, ST: {} };       // 이름 → 출근 값 (1 · 0.75 · 0.5 · 0.25 · 0)
     var red = {};                               // 빨간 이름으로 표시된 사람
@@ -2794,7 +2796,8 @@ function staffDeptSets() {
     var ex = window._staffExtraPT || {};
     Object.keys(ex).forEach(function(w){ Object.keys(ex[w] || {}).forEach(function(n) {
         var o = ex[w][n], v = (typeof o === "object") ? o.v : 1;
-        if (!(n in dep.PT)) { dep.PT[n] = v; if (o && o.red) red[n] = v; }
+        var d = STAFF_VISIT_DEPT[n] || "PT";
+        if (!(n in dep.PT) && !(n in dep.OT) && !(n in dep.ST)) { dep[d][n] = v; if (o && o.red) red[n] = v; }
     }); });
     ["PT","OT","ST"].forEach(function(d) {
         Object.keys(dep[d]).forEach(function(n) {

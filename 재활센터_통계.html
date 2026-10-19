@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-19 b104</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-20 b105</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -2640,9 +2640,18 @@ function evalTotalsFromEmr() {
 //   "H김선자 GR김선자+모닝" → GR 1 · 모닝 1
 //   "H이정희+엔젤"          → 엔젤 1
 //   기구 표기가 없는 칸은 "기타" 로 센다
+// 부도 집계 — 통계표 부도환자 칸 양식 그대로
+//   1줄: 로봇  모닝(1), 엔젤(2), GR(2)   (+ 로봇 이름은 칸에 적힌 대로)
+//   다음 줄부터 오더:  H3() · N() · G() · M() · S() · A() · D()
+//   H 는 한 칸에 H 가 혼자면 H3, 둘 이상이거나 M · G · F 와 같이 있으면 H2 (통계 집계와 같은 규칙)
+//   건수가 0 이면 괄호를 비워 둔다
+var BUDO_ROBOTS = ["모닝","엔젤","GR"];
+var BUDO_ROBOT_WORDS = /^(모닝|엔젤|엑소|알봇|워크봇|에리고|로코맷|RBOT|ROBOT|AR|MW|MR)$/i;
+var BUDO_ORDERS = ["H3","N","G","M","S","A","D"];
 function computeBudo() {
-    var cnt = {}, order = [], names = [];
-    function add(k) { if (!(k in cnt)) { cnt[k] = 0; order.push(k); } cnt[k]++; }
+    var robot = {}, ord = {}, names = [], extraRobot = [], extraOrd = [];
+    function addR(k) { if (BUDO_ROBOTS.indexOf(k) === -1 && extraRobot.indexOf(k) === -1) extraRobot.push(k); robot[k] = (robot[k] || 0) + 1; }
+    function addO(k) { if (BUDO_ORDERS.indexOf(k) === -1 && extraOrd.indexOf(k) === -1) extraOrd.push(k); ord[k] = (ord[k] || 0) + 1; }
     ["ptGridTable","otGridTable","stGridTable","etGridTable","mtGridTable","painGridTable"].forEach(function(gid) {
         var fm = gridCellFmt[gid] || {};
         Object.keys(fm).forEach(function(k) {
@@ -2650,46 +2659,62 @@ function computeBudo() {
             var el = document.getElementById(gid + "-cell-" + k);
             var txt = el ? el.value.trim() : "";
             if (!txt) return;
-            var hit = 0;
-            // 줄바꿈이 빠져 글자가 붙어 와도 읽히도록 칸 전체에서 찾는다
-            var flat = txt.replace(/\([^)]*\)/g, " ");
-            (flat.match(/GR(?=[가-힣])/gi) || []).forEach(function(){ add("GR"); hit++; });
-            (flat.match(/\+\s*[가-힣A-Za-z]+/g) || []).forEach(function(p) {
-                var w = p.replace(/[^가-힣A-Za-z]/g, "");
-                if (w) { add(w); hit++; }
+            var flat = txt.replace(/\([^)]*\)/g, " ").replace(/["']/g, " ");
+            // 줄바꿈이 빠져 붙어 와도 "GR김선자" 앞에서 끊어 읽는다
+            flat = flat.replace(/([가-힣])(?=GR[가-힣])/g, "$1 ");
+            var toks = flat.split(/[\s,]+/).filter(Boolean);
+            var hCnt = 0, mgf = false;
+            toks.forEach(function(t) {
+                var head = t.split("+")[0].toUpperCase();
+                if (/^GR[가-힣]/.test(head)) return;
+                if (/^H[23]?[가-힣]/.test(head)) hCnt++;
+                else if (/^[MGF][가-힣]/.test(head)) mgf = true;
             });
-            (flat.match(/(?:^|[\s\d])[A-Za-z]{0,2}([가-힣]{2,4})(?=[\s+\d]|GR|$)/g) || []).forEach(function(x) {
-                var nm = x.replace(/[^가-힣]/g, "");
-                if (nm && names.indexOf(nm) === -1) names.push(nm);
+            toks.forEach(function(t) {
+                var parts = t.split("+"), head = parts[0];
+                var HU = head.toUpperCase();
+                if (/^GR[가-힣]/.test(HU)) addR("GR");
+                else if (/^H2[가-힣]/.test(HU)) addO("H2");
+                else if (/^H3[가-힣]/.test(HU)) addO("H3");
+                else if (/^H[가-힣]/.test(HU)) addO(hCnt > 1 || mgf ? "H2" : "H3");
+                else { var m = HU.match(/^([A-Z])[가-힣]/); if (m) addO(m[1]); }
+                parts.slice(1).forEach(function(p) {
+                    var w = p.replace(/[^가-힣A-Za-z]/g, "");
+                    if (w && BUDO_ROBOT_WORDS.test(w)) addR(w);
+                });
+                var nm = head.replace(/^[A-Za-z0-9]+/, "").match(/^[가-힣]{2,4}/);
+                if (nm && names.indexOf(nm[0]) === -1) names.push(nm[0]);
             });
-            if (!hit) add("기타");
         });
     });
-    // 기구 이름을 먼저, GR · 기타 는 뒤로
-    order.sort(function(a, b) {
-        function w(x){ return x === "기타" ? 2 : (x === "GR" ? 1 : 0); }
-        return w(a) - w(b);
-    });
+    function n(map, k){ return map[k] ? String(map[k]) : ""; }
+    var rLine = BUDO_ROBOTS.concat(extraRobot).map(function(k){ return k + "(" + n(robot, k) + ")"; }).join(", ");
+    var oLines = BUDO_ORDERS.concat(extraOrd).map(function(k){ return k + "(" + n(ord, k) + ")"; });
     var total = 0;
-    order.forEach(function(k){ total += cnt[k]; });
-    return { total: total, detail: order.map(function(k){ return k + "(" + cnt[k] + ")"; }).join(", "), names: names };
+    Object.keys(robot).forEach(function(k){ total += robot[k]; });
+    var detail = [rLine].concat(oLines).join("\n");
+    return { total: total, detail: detail, names: names, empty: !Object.keys(robot).length && !Object.keys(ord).length };
 }
 function renderBudoSummary() {
     var el = document.getElementById("budoSummary");
     if (!el) return;
     var b = computeBudo();
-    el.innerHTML = "<span style='display:inline-block;background:#ffc000;color:#5a3d00;padding:6px 12px;border-radius:6px;font-weight:bold;'>" +
-        "부도 " + b.total + "건" + (b.detail ? " — " + b.detail : "") + "</span>" +
-        (b.total ? " <button class='step-btn' onclick='copyBudo()' style='margin-left:8px;background:#a87400;border-color:#a87400;color:#fff;'>📋 부도 복사</button>" : "") +
+    el.innerHTML = "<div style='display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;'>" +
+        "<span style='display:inline-block;background:#ffc000;color:#5a3d00;padding:6px 12px;border-radius:6px;font-weight:bold;'>부도 " + b.total + "</span>" +
+        "<pre style='margin:0;padding:6px 10px;background:#fff;border:1px solid #f0d27a;border-radius:6px;font-family:inherit;font-size:13px;line-height:1.55;'>" +
+        b.detail + "</pre>" +
+        (b.empty ? "" : "<button class='step-btn' onclick='copyBudo()' style='background:#a87400;border-color:#a87400;color:#fff;'>📋 부도 복사</button>") +
+        "</div>" +
         (b.names.length ? "<div style='margin-top:5px;color:#555;font-size:12px;'>환자: " + b.names.join(", ") + "</div>" : "");
 }
 function copyBudo() {
     var b = computeBudo();
     var ta = document.createElement("textarea");
-    ta.value = b.total + "\t" + b.detail;
+    // 여러 줄을 한 칸에 넣으려면 큰따옴표로 감싼다 (엑셀 · 구글 시트 공통)
+    ta.value = b.total + "\t\"" + b.detail.replace(/"/g, '""') + "\"";
     ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); alert("✅ 부도 " + b.total + "건 · " + b.detail + "\n통계표 부도환자 숫자 칸에 붙여넣으세요."); }
+    try { document.execCommand("copy"); alert("✅ 부도 복사 완료\n통계표 부도환자 숫자 칸에 붙여넣으면 옆 칸에 오더 내역이 들어갑니다.\n\n" + b.detail); }
     catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
     document.body.removeChild(ta);
 }

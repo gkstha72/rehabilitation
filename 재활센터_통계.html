@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-19 b94</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-19 b95</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -2643,9 +2643,30 @@ function copyBudo() {
 //   전체 = 붙여넣은 시간표에 이름이 있는 치료사 수
 //     PT = 물리 + 전기 + 메디페인 + 통증 담당 / OT = 작업 / ST = 언어
 //   출근 = 전체 − 근태 명단 (연차·휴무·휴가·공가·병가 1, 반차·오전/오후 0.5, 반반차 0.25)
+// 머리글 칸에서 치료사 이름을 넉넉하게 읽는다 (인원 계산 전용)
+//   "김나연연차" · "김나연(9:30출근)" · "김나연 오후반차" 처럼
+//   근태 메모가 붙은 머리글도 사람으로 센다.
+var STAFF_HDR_NOISE = /(오전|오후)?\s*(반반차|반차|공가|연차|월차|휴무|휴가|병가|경조사|경조|출근|퇴근|교육|출장|근무)|\d{1,2}\s*:\s*\d{2}|~/g;
+function staffHeaderNames(gid) {
+    var out = {};
+    headerRowsOf(gid).forEach(function(hr) {
+        for (var c = 1; c < COL_COUNT; c++) {
+            var el = document.getElementById(gid + "-cell-" + hr + "-" + c);
+            var v = el ? el.value.trim() : "";
+            if (!v || ignoreHeaders.indexOf(v) !== -1) continue;
+            v = v.replace(/\([^)]*\)/g, " ").replace(STAFF_HDR_NOISE, " ");
+            v.split(/[\s\/,\-]+/).forEach(function(p) {
+                var n = cleanTherapistName(p);
+                if (n && n.length >= 2) out[n] = 1;
+            });
+        }
+    });
+    return out;
+}
 function staffDeptSets() {
     var pt = {}, ot = {}, st = {};
     extractMembers("ptGridTable").members.forEach(function(n){ pt[n] = 1; });
+    Object.keys(staffHeaderNames("ptGridTable")).forEach(function(n){ pt[n] = 1; });
     var ec = etTherapistCol();
     for (var r = 1; r < ROW_COUNT; r++) {
         var el = document.getElementById("etGridTable-cell-" + r + "-" + ec);
@@ -2658,6 +2679,8 @@ function staffDeptSets() {
     Object.keys(rc).forEach(function(r){ Object.keys(rc[r]).forEach(function(c){ if (rc[r][c]) pt[rc[r][c]] = 1; }); });
     extractMembers("otGridTable").members.forEach(function(n){ ot[n] = 1; });
     extractMembers("stGridTable").members.forEach(function(n){ st[n] = 1; });
+    Object.keys(staffHeaderNames("otGridTable")).forEach(function(n){ ot[n] = 1; });
+    Object.keys(staffHeaderNames("stGridTable")).forEach(function(n){ st[n] = 1; });
     // 한 사람이 두 파트에 잡히면 작업 · 언어 쪽을 우선한다 (중복 집계 방지)
     Object.keys(ot).forEach(function(n){ delete pt[n]; });
     Object.keys(st).forEach(function(n){ delete pt[n]; delete ot[n]; });

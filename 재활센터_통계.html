@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-19 b101</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-19 b102</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -280,7 +280,7 @@ td.clickable:hover { opacity:0.75; }
 <div class="s3-box" style="border-color:#b9d3ea;background:#f5f9fd;margin:8px 0 12px;">
   <div class="s12-head">
     <span class="s12-title" style="color:#2471a3;">👥 치료사 인원</span>
-    <span class="s12-hint">시간표에 이름이 있는 치료사를 셉니다 · 빨간 이름은 빈 시간만큼 빠짐 (전부 비면 0 · 반쯤 비면 0.5) · 전체 인원은 한 번 적어 두면 기억합니다</span>
+    <span class="s12-hint">시간표에 이름이 있는 치료사를 셉니다 · 빨간 이름은 전부 비면 0 · 오전이나 오후만 있으면 0.5 · 둘 다 있으면 0.75 (부도 칸은 빈 칸으로 봄) · 전체 인원은 한 번 적어 두면 기억합니다</span>
   </div>
   <div id="staffCountArea" style="margin-top:6px;font-size:13px;"></div>
 </div>
@@ -1490,12 +1490,16 @@ else { initOnLoad(); }
                         var _n = cleanTherapistName(String(_hr[_c] || "").trim());
                         if (!_n) continue;
                         var _red = !!(fmtMatrix && (fmtMatrix[fr - 1] || [])[_c] && fmtMatrix[fr - 1][_c].r);
-                        var _fill = [];
+                        var _fill = [], _mins = [];
                         for (var _r = fr; _r <= seg.endRow; _r++) {
-                            if (!/^\d{1,2}:\d{2}/.test(String((matrix[_r] || [])[sc] || "").trim())) continue;
-                            _fill.push(!cellValIsBlankOrInvalid(String((matrix[_r] || [])[_c] || "").trim()));
+                            var _tm = String((matrix[_r] || [])[sc] || "").trim().match(/^(\d{1,2}):(\d{2})/);
+                            if (!_tm) continue;
+                            var _h = +_tm[1]; if (_h < 8) _h += 12;
+                            var _f = fmtMatrix && (fmtMatrix[_r] || [])[_c];
+                            _fill.push(!cellValIsBlankOrInvalid(String((matrix[_r] || [])[_c] || "").trim()) && !(_f && _f.b));
+                            _mins.push(_h * 60 + (+_tm[2]));
                         }
-                        extraStaff[_n] = { v: _red ? staffFraction(_fill) : 1, red: _red };
+                        extraStaff[_n] = { v: _red ? staffFraction(_fill, _mins) : 1, red: _red };
                     }
                 }
                 var room = identifyRoom(matrix, sc, fr);
@@ -2718,15 +2722,20 @@ function staffHeaderNames(gid) {
 //   아침부터 비어 있으면 오전 휴무, 끝까지 비어 있으면 오후 휴무로 보고
 //   일한 비율을 0.25 단위로 반올림한다 (전부 비면 0 · 반쯤 비면 0.5 · 조금 비면 0.75)
 //   중간에 빈 칸(치료 없는 시간)은 빠진 것으로 보지 않는다.
-function staffFraction(filled) {
-    var n = filled.length;
-    if (!n) return 1;
-    if (!filled.some(Boolean)) return 0;
-    var lead = 0, trail = 0;
-    while (lead < n && !filled[lead]) lead++;
-    while (trail < n && !filled[n - 1 - trail]) trail++;
-    var worked = 1 - (lead + trail) / n;
-    return Math.max(0, Math.min(1, Math.round(worked * 4) / 4));
+function staffFraction(filled, mins) {
+    // filled[i] = 그 시간에 치료가 있는지, mins[i] = 그 시간(분)
+    // 오전(12:00 전) · 오후(13:00 이후)로 나눠 본다. 점심 칸은 보지 않는다.
+    var am = false, pm = false;
+    for (var i = 0; i < filled.length; i++) {
+        if (!filled[i]) continue;
+        var m = mins ? mins[i] : null;
+        if (m === null || m === undefined) { am = true; pm = true; continue; }
+        if (m < 12 * 60) am = true;
+        else if (m >= 13 * 60) pm = true;
+    }
+    if (!am && !pm) return 0;        // 하루 전부 비움 — 연차 · 휴무
+    if (am !== pm) return 0.5;       // 반나절 비움 — 반차
+    return 0.75;                     // 둘 다 있는데 빨간 이름 — 반반차
 }
 function staffDeptSets() {
     var dep = { PT: {}, OT: {}, ST: {} };       // 이름 → 출근 값 (1 · 0.75 · 0.5 · 0.25 · 0)
@@ -2763,7 +2772,8 @@ function staffDeptSets() {
         Object.keys(per).forEach(function(n) {
             var p = per[n];
             var rows = Object.keys(p.rows).map(Number).sort(function(a, b){ return a - b; });
-            dep[g[1]][n] = p.red ? staffFraction(rows.map(function(r){ return p.rows[r]; })) : 1;
+            dep[g[1]][n] = p.red ? staffFraction(rows.map(function(r){ return p.rows[r]; }),
+                                                 rows.map(function(r){ return toMinutes(slot[r]); })) : 1;
             if (p.red) red[n] = dep[g[1]][n];
         });
     });

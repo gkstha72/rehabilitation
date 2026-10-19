@@ -1284,7 +1284,8 @@ function loadTool(key, isInitial){
     document.getElementById('newTabTitle').textContent = tool.title;
     newTabNotice.style.display = 'flex';
   } else {
-    frame.src = tool.url;
+    // 도구를 고쳐 올려도 예전 파일이 캐시에서 열리지 않도록 매번 새로 받는다
+    frame.src = tool.url + (tool.url.indexOf('?') === -1 ? '?' : '&') + 'v=' + Date.now();
     frame.style.display = 'block';
     newTabNotice.style.display = 'none';
   }

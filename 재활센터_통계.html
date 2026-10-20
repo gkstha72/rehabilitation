@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-20 b107</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-20 b108</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -476,16 +476,16 @@ var mtPartMembers = [];  // 메디페인 치료사 목록 (전기치료와 동�
 
 var masterTherapists = ["황보슬","김윤량","박세인","서슬기","김진환","서준호","정수경","서수경","곽주영","신승영","김연화","조수빈","정민석","우지수","장보균","이예인","곽나영","박해미","이심명","곽도율","민정","김유강","이영호","천미연","안아민","김준표","최영아","최아인","박진희","정우림","김수연","김혜민2","이선영","전소희","박지윤","최수인","지영헌","최은성","이우진","허민규","서충환","정호진","김연완","김하늘","이효정","김윤호","우광식","원종혁","조연우","최윤서"];
 
-var ptOrder  = ["NDT","MAT","GAIT","COMPLEX","기립경사","FES","호흡","SSP","ESWT3","ESWT6","ESWT9","ESWT15","3.5","R","AR+MW+RBOT","보행로봇F","신장분사치료[단순]","신장분사치료[special]","비침습적무통증신호요법[10.0][special]","8","10","12","16","14","20","도수치료[관리급여]","메디페인CR4","메디페인CR6","메디페인CR7","메디페인(기타)","H2","H3"];
+var ptOrder  = ["NDT","MAT","GAIT","COMPLEX","CPM","기립경사","FES","호흡","SSP","ESWT3","ESWT6","ESWT9","ESWT15","3.5","R","AR+MW+RBOT","보행로봇F","신장분사치료[단순]","신장분사치료[special]","비침습적무통증신호요법[10.0][special]","8","10","12","16","14","20","도수치료[관리급여]","메디페인CR4","메디페인CR6","메디페인CR7","메디페인(기타)","H2","H3"];
 var otOrder  = ["COMPLEX","SPECIAL","ADL","DYSPHAGIA","VITAL STIM","경두개직류","CR6(비)","CR7(비)","CR6(F),CR7(F)","RS","H2","H3"];
 var stOrder  = ["비회","H2","H3","평가"];
-var painOrder = ["표층열치료(HP)","표층열치료(IR)","표층열치료(심층열동시-HP)","표층열치료(심층열동시-IR)","심층열치료(microwave)","심층열치료(ultra sound)","심층열치료(sonor)","심층열치료[1일당]","한냉치료(ICE)","경피적전기신경자극치료[TENS]","전기자극치료[EST]","간섭파전류치료[ICT]","저주파자극치료[SSP]","레이저치료[1일당]","한냉치료(콜드팩)","비침습적 무통증 신호요법(2ch/30분)","압박치료[1일당]","H1","이온도입기(ION)","운동치료-단순운동치료[간단]"];
+var painOrder = ["표층열치료(HP)","표층열치료(IR)","표층열치료(심층열동시-HP)","표층열치료(심층열동시-IR)","심층열치료(microwave)","심층열치료(ultra sound)","심층열치료(sonor)","심층열치료[1일당]","한냉치료(ICE)","경피적전기신경자극치료[TENS]","전기자극치료[EST]","간섭파전류치료[ICT]","저주파자극치료[SSP]","레이저치료[1일당]","한냉치료(콜드팩)","비침습적 무통증 신호요법(2ch/30분)","압박치료[1일당]","CPM(복합운동치료)","H1","이온도입기(ION)","운동치료-단순운동치료[간단]"];
 var evalOrder = ["후글-마이어-평가","수지기능검사(MFT)","수지기능검사(젭슨)","일상생활동작검사","간이정신진단검사","[F]간이정신진단검사","MMSE&GDS","치매척도검사","신경인지기능검사(전체)","신경인지기능검사 유형1,2","신경인지기능검사-무시증후군 총집","신경행동학적 인지기능검사","섭식장애평가","MMT&ROM","버그균형검사","[F]버그 균형검사","경직진자검사","동적족저압측정[단순]","동적족저압측정[복잡]","동적체평형검사[단순]","동적체평형검사[복잡]","동작분석 역동적 근전도[단순]","동작분석 역동적 근전도[복잡]","동작분석(생역학검사)[단순]","동작분석(생역학검사)[복잡]","기립성혈압검사[단순]","기립성혈압검사[복잡]","[비]언어평가","웨스턴실어증검사"];
 var ignoreHeaders = ["NDT","MAT","로봇PT","전기","통증","ST","OT","로봇OT","TIME","시간",""];
 
 var ptDataCodes = {
     "NDT":["MM105","MM1051"],"MAT":["MM3011","MM3012"],"GAIT":["MM3021","MM3022"],
-    "COMPLEX":["MM102","MM102A"],"기립경사":["MM460"],"FES":["MM1511","MM1512"],
+    "COMPLEX":["MM102"],"CPM":["MM102A"],"기립경사":["MM460"],"FES":["MM1511","MM1512"],
     "호흡":["MM290"],"SSP":["MM080A"],"ESWT3":["ESWT3"],"ESWT6":["ESWT6"],"ESWT9":["ESWT9"],"ESWT15":["ESWT15"],
     "3.5":["EX006"],"R":["EX005"],"AR+MW+RBOT":["MM304"],"보행로봇F":["MM999"],"신장분사치료[단순]":["MZ007A"],"신장분사치료[special]":["MZ007B"],"비침습적무통증신호요법[10.0][special]":["MZ012D"],
     "8":["EX002"],"10":["EX003"],"12":["EX014"],"16":["EX008"],"14":["EX004"],"20":["EX017"],"도수치료[관리급여]":["KR001"],
@@ -523,6 +523,7 @@ var painDataCodes = {
     "저주파자극치료[SSP]":["MM080A"],"레이저치료[1일당]":["MM085","MM085B"],
     "한냉치료(콜드팩)":["MM011"],"비침습적 무통증 신호요법(2ch/30분)":["MZ012"],
     "압박치료[1일당]":["MM190"],
+    "CPM(복합운동치료)":["MM102A"],
     "H1":["IM010","IM011","IM012","IM015","IM020","IM042","IM0051","IM052","IM060","IM061","IM080","IM085","IM102","IM102A","IM190","IM200"],
     "이온도입기(ION)":["MX121"],
     "운동치료-단순운동치료[간단]":["MM101"]
@@ -1779,12 +1780,18 @@ function countComplexFromCpmBlock(members, stats, dbg) {
     globalCpmBlock.forEach(function(item) {
         var th = slotToTh[item.slot];
         if (!th || members.indexOf(th) === -1 || !stats[th]) return;
-        stats[th]["COMPLEX"] += item.count;
-        if (dbg) { var k = th + "||COMPLEX"; if (!dbg[k]) dbg[k] = []; for (var i=0;i<item.count;i++) dbg[k].push("CPM 시간표 " + item.slot); }
+        stats[th]["CPM"] += item.count;
+        if (dbg) { var k = th + "||CPM"; if (!dbg[k]) dbg[k] = []; for (var i=0;i<item.count;i++) dbg[k].push("CPM 시간표 " + item.slot); }
     });
 }
 
-// 통증 시간표에 적힌 복합운동치료(C○○○ · CPM)를 물리 COMPLEX 실적으로 합산
+// 통증 시간표 CPM 칸(어깨 · 다리) — 머리글로 판별
+function painIsCpmCol(c) {
+    var el = document.getElementById("painGridTable-cell-0-" + c);
+    var h = el ? el.value.replace(/\s/g, "") : "";
+    return /^(CPM|어깨|다리)/i.test(h);
+}
+// 통증 시간표에 적힌 C.P.M(C○○○)을 물리 CPM(MM102A) 실적으로 합산
 function countComplexFromPainGrid(members, stats, dbg) {
     if (!stats) return;
     var painRowTh = buildPainRowTherapists();
@@ -1793,7 +1800,7 @@ function countComplexFromPainGrid(members, stats, dbg) {
         if (!th || members.indexOf(th) === -1 || !stats[th]) continue;
         for (var c = 2; c < COL_COUNT; c++) {
             var el = document.getElementById("painGridTable-cell-"+r+"-"+c);
-            var ct = el ? el.value.trim() : "";
+            var ct = el ? liveCellText("painGridTable", r, c, el.value.trim()) : "";
             if (!ct || cellValIsBlankOrInvalid(ct)) continue;
             var n = 0;
             ct.replace(/\r?\n|\r/g," ").split(/[\s,]+/).forEach(function(tok) {
@@ -1802,8 +1809,8 @@ function countComplexFromPainGrid(members, stats, dbg) {
                 if (/^C[가-힣]/.test(tok)) n++;
             });
             if (n > 0) {
-                stats[th]["COMPLEX"] += n;
-                if (dbg) { var k = th + "||COMPLEX"; if (!dbg[k]) dbg[k] = []; for (var i2=0;i2<n;i2++) dbg[k].push(ct); }
+                stats[th]["CPM"] += n;
+                if (dbg) { var k = th + "||CPM"; if (!dbg[k]) dbg[k] = []; for (var i2=0;i2<n;i2++) dbg[k].push(ct); }
             }
         }
     }
@@ -2465,6 +2472,12 @@ function analyzePainMasterLogic() {
             var painHits = detectPainCodes(searchText);
             // 머리글이 처방 이름인 칸(SSP 등) — 칸 안에는 환자 성함만 적히므로
             // 성함 하나를 그 처방 1건으로 센다.
+            // CPM 칸(어깨 · 다리) — C○○○ 한 명 = C.P.M 1건 (C 접두가 있어야 CPM)
+            if (painIsCpmCol(c)) {
+                var cpmN = (cellText.replace(/\([^)]*\)/g, " ").match(/(^|[\s,\/])C[가-힣]{2,}/g) || []).length;
+                for (var ci = 0; ci < cpmN; ci++) { timeStats[currentTherapist]["CPM(복합운동치료)"] += 1; logPain("CPM(복합운동치료)"); }
+                continue;
+            }
             var headLabel = painColTreatLabel(c);
             if (headLabel && painHits.length === 0 && !upperCell.includes("H1")) {
                 if (timeStats[currentTherapist][headLabel] !== undefined) {
@@ -3207,7 +3220,8 @@ var prescriptionDesc = {
     "NDT":        { emr: "슬립코드: MM105, MM1051", sched: "시간표에서 NDT 또는 N으로 시작하는 토큰" },
     "MAT":        { emr: "슬립코드: MM3011, MM3012", sched: "시간표에서 MAT, M으로 시작하는 토큰\n예) M안정자+기립, MAT홍길동" },
     "GAIT":       { emr: "슬립코드: MM3021, MM3022", sched: "시간표에서 GAIT, G으로 시작하는 토큰\n예) G박선희+런닝, G이은영+슬라" },
-    "COMPLEX":    { emr: "슬립코드: MM102, MM102A", sched: "시간표에서 COMPLEX, C으로 시작하는 토큰" },
+    "COMPLEX":    { emr: "슬립코드: MM102", sched: "물리 시간표에서 COMPLEX, C으로 시작하는 토큰" },
+    "CPM":        { emr: "슬립코드: MM102A (C.P.M 복합운동치료)", sched: "통증 시간표 CPM 칸(어깨 · 다리)과 통증 칸에 C○○○ 로 적힌 건\n예) C송포자" },
     "기립경사":   { emr: "슬립코드: MM460", sched: "시간표에서 T로 시작하는 토큰" },
     "FES":        { emr: "슬립코드: MM1511, MM1512", sched: "시간표에서 F환자이름 형태 (단독 F 또는 FES는 전기치료실 배치 표시이므로 제외)\n전기치료 시간표에서 H/H2 아닌 셀은 FES로 집계" },
     "호흡":       { emr: "슬립코드: MM290", sched: "시간표에서 B로 시작하는 토큰" },
@@ -3264,7 +3278,7 @@ var prescriptionDesc = {
     "한냉치료(콜드팩)":        { emr: "슬립코드: MM011", sched: "시간표 셀에서 CP 코드 포함" },
     "비침습적 무통증 신호요법(2ch/30분)": { emr: "슬립코드: MZ012", sched: "시간표 셀에서 MP 코드 포함" },
     "압박치료[1일당]":         { emr: "슬립코드: MM190", sched: "시간표 셀에서 PC 코드 포함" },
-    "CPM(복합운동치료)":       { emr: "슬립코드: MM102A", sched: "시간표 셀에서 C 코드 포함 (단독)" },
+    "CPM(복합운동치료)":       { emr: "슬립코드: MM102A", sched: "통증 시간표 CPM 칸(어깨 · 다리)에 C○○○ 로 적힌 건, 또는 통증 칸의 C 코드" },
     "복합운동치료":            { emr: "슬립코드: MM102", sched: "시간표 셀에서 CE 코드 포함" },
     "이온도입기(ION)":         { emr: "슬립코드: MX121", sched: "시간표 셀에서 ION 포함" },
     "운동치료-단순운동치료[간단]": { emr: "슬립코드: MM101", sched: "시간표 셀에서 간단 포함" },
@@ -4781,7 +4795,7 @@ function classifyOtTokenForDischarge(token) {
 // 집계 라벨 → 실제 처방명 (퇴원 점검에서 "넘길 오더" 로 보여줄 이름)
 var ORDER_NAMES = {
     "NDT":"중추신경계발달재활치료", "MAT":"매트및이동치료", "GAIT":"보행치료",
-    "COMPLEX":"복합운동치료", "기립경사":"기립경사테이블", "FES":"기능적전기자극치료",
+    "COMPLEX":"복합운동치료", "CPM":"C.P.M(복합운동치료)", "기립경사":"기립경사테이블", "FES":"기능적전기자극치료",
     "호흡":"호흡재활치료", "SSP":"저주파자극치료[SSP]",
     "AR+MW+RBOT":"보행치료(로봇 사용)", "보행로봇F":"[F]보행로봇치료",
     "도수치료[관리급여]":"도수치료[관리급여]",

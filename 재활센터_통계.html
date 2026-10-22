@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-20 b114</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-22 b115</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -733,8 +733,9 @@ function classifyPtToken(token) {
         if (isDosuPatientToken(base)) return "도수치료[관리급여]";
     }
     if (base.startsWith("COMPLEX")) return "COMPLEX";
-    // C홍길동+CPM · C홍길동+패시브 — 복합운동이 아니라 C.P.M(MM102A)
-    if (/^C[가-힣]/.test(base) && CPM_MARK.test(token)) return "CPM";
+    // 비회복기 C○○○(+기구) — C.P.M(MM102A) 으로 액팅 (메디페인 + 신장분사 · 외래 환자)
+    //   (F)C○○○ 는 위에서 프리로 빠진다
+    if (/^C[가-힣]/.test(base)) return "CPM";
     if (base === "FES") return null;
     if (base.startsWith("FES")) return "FES";
     if (base.startsWith("SSP")) return "SSP";
@@ -1798,6 +1799,9 @@ function painIsCpmCol(c) {
 }
 // 통증 시간표에 적힌 C.P.M(C○○○)을 물리 CPM(MM102A) 실적으로 합산
 function countComplexFromPainGrid(members, stats, dbg) {
+    // 2026-10 규칙: CPM 액팅은 선생님 개인 시간표(C○○○+기구)로 센다.
+    // 통증 시간표 CPM 칸은 시행선(취소선)으로 표시만 하므로 물리 집계에 더하지 않는다 (두 번 세지 않게).
+    return;
     if (!stats) return;
     var painRowTh = buildPainRowTherapists();
     for (var r = 1; r < ROW_COUNT; r++) {
@@ -2002,8 +2006,10 @@ function analyzePtEtMtCombinedMasterLogic() {
                 else if (type === "COMPLEX") complexCount++;
                 else if (directCounts[type] !== undefined) directCounts[type]++;
             });
-            // 같은 칸에 다른 환자(M · G · F · C · CPM)가 있으면 회Ⅱ
-            var hasMGF = matCount > 0 || gaitCount > 0 || fesCount > 0 || complexCount > 0 || directCounts["CPM"] > 0 || directCounts["H1"] > 0;
+            // 같은 칸에 다른 환자(M · G · F · C · CPM · H1)가 있으면 회Ⅱ
+            // 회복기 CPM(H○○○+패시브)은 혼자여도 회Ⅱ
+            var hCpm = hItems.some(function(x){ return CPM_MARK.test(x.token); });
+            var hasMGF = matCount > 0 || gaitCount > 0 || fesCount > 0 || complexCount > 0 || directCounts["CPM"] > 0 || directCounts["H1"] > 0 || hCpm;
             var hAsH2 = 0, hAsH3 = 0;
             if (unmatchedHCount > 0) {
                 if (hasMGF || unmatchedHCount > 1) { hAsH2 = unmatchedHCount; }
@@ -3101,8 +3107,10 @@ function analyzePtOnlyLogic() {
                 else if (type === "COMPLEX") complexCount++;
                 else if (directCounts[type] !== undefined) directCounts[type]++;
             });
-            // 같은 칸에 다른 환자(M · G · F · C · CPM)가 있으면 회Ⅱ
-            var hasMGF = matCount > 0 || gaitCount > 0 || fesCount > 0 || complexCount > 0 || directCounts["CPM"] > 0 || directCounts["H1"] > 0;
+            // 같은 칸에 다른 환자(M · G · F · C · CPM · H1)가 있으면 회Ⅱ
+            // 회복기 CPM(H○○○+패시브)은 혼자여도 회Ⅱ
+            var hCpm = hItems.some(function(x){ return CPM_MARK.test(x.token); });
+            var hasMGF = matCount > 0 || gaitCount > 0 || fesCount > 0 || complexCount > 0 || directCounts["CPM"] > 0 || directCounts["H1"] > 0 || hCpm;
             var hAsH2 = 0, hAsH3 = 0;
             if (unmatchedHCount > 0) {
                 if (hasMGF || unmatchedHCount > 1) { hAsH2 = unmatchedHCount; }
@@ -3230,8 +3238,8 @@ var prescriptionDesc = {
     "NDT":        { emr: "슬립코드: MM105, MM1051", sched: "시간표에서 NDT 또는 N으로 시작하는 토큰" },
     "MAT":        { emr: "슬립코드: MM3011, MM3012", sched: "시간표에서 MAT, M으로 시작하는 토큰\n예) M안정자+기립, MAT홍길동" },
     "GAIT":       { emr: "슬립코드: MM3021, MM3022", sched: "시간표에서 GAIT, G으로 시작하는 토큰\n예) G박선희+런닝, G이은영+슬라" },
-    "COMPLEX":    { emr: "슬립코드: MM102", sched: "물리 시간표에서 COMPLEX, C으로 시작하는 토큰" },
-    "CPM":        { emr: "슬립코드: MM102A (C.P.M 복합운동치료)", sched: "개인 시간표에 C○○○+CPM · C○○○+패시브 로 적힌 건 (그 칸 담당 치료사)\n예) C홍길동+CPM · C송포자+패시브\n※ H○○○+CPM 은 CPM 이 아님 (H 규칙대로 회Ⅱ/회Ⅲ) · (F)C○○○+CPM 은 프리라 제외\n+ 통증 시간표 CPM 칸에 C○○○ 로 적힌 건" },
+    "COMPLEX":    { emr: "슬립코드: MM102", sched: "물리 시간표에 COMPLEX 로 적힌 건\n※ C○○○ 는 이제 C.P.M(MM102A) 으로 집계 (도수치료 종료 후 메디페인 + 신장분사 환자)" },
+    "CPM":        { emr: "슬립코드: MM102A (C.P.M 복합운동치료)", sched: "비회복기 — 개인 시간표에 C○○○ + 기구 로 적힌 건 (그 칸 담당 치료사)\n예) C송포자+패시브\n※ (F)C○○○ 는 프리라 제외\n※ 회복기 H○○○+패시브 는 CPM 이 아니라 회Ⅱ\n※ 통증 시간표 CPM 칸은 시행선(취소선)이라 물리 집계에 넣지 않음" },
     "기립경사":   { emr: "슬립코드: MM460", sched: "시간표에서 T로 시작하는 토큰" },
     "FES":        { emr: "슬립코드: MM1511, MM1512", sched: "시간표에서 F환자이름 형태 (단독 F 또는 FES는 전기치료실 배치 표시이므로 제외)\n전기치료 시간표에서 H/H2 아닌 셀은 FES로 집계" },
     "호흡":       { emr: "슬립코드: MM290", sched: "시간표에서 B로 시작하는 토큰" },
@@ -3452,7 +3460,7 @@ function computeDetailDiff(therapist, label, room) {
         if (isDosuPatientToken(base)) return "도수치료[관리급여]";
     }
         if (base.startsWith("COMPLEX")) return "COMPLEX";
-        if (/^C[가-힣]/.test(base) && CPM_MARK.test(token)) return "CPM";
+        if (/^C[가-힣]/.test(base)) return "CPM";
         if (base === "FES") return null;
         if (base.startsWith("FES")) return "FES";
         if (base.startsWith("SSP"))  return "SSP";
@@ -3526,7 +3534,7 @@ function computeDetailDiff(therapist, label, room) {
             return grTokens.length > 0 ? grTokens : [cellText];
         }
         if (label === "CPM") {
-            var cpmT = tokens.filter(function(t){ return /^C[가-힣]/i.test(t) && CPM_MARK.test(t) && !/\(F\)/i.test(t); });
+            var cpmT = tokens.filter(function(t){ return /^C[가-힣]/i.test(t) && !/\(F\)/i.test(t); });
             return cpmT.length > 0 ? cpmT : [cellText];
         }
         var matched = tokens.filter(function(t) { return getTokenLabel(t) === label; });

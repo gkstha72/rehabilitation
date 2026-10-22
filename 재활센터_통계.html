@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-22 b115</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-22 b116</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -3374,7 +3374,10 @@ function computeDetailDiff(therapist, label, room) {
     // EMR 데이터 추출
     var emrItems = [];
     if (globalEmrRows && globalEmrCodeIdx !== -1) {
-        var allCodeMaps = [ptMap, otMap, stMap, painMap];
+        // 표의 숫자와 같은 기준으로 — 그 치료실 코드만 본다
+        //  (물리 H2 칸에 작업치료 [회Ⅱ]특수작업치료가 섞여 표는 1건 · 상세는 2건으로 보이던 문제)
+        var roomMap = { pt: ptMap, ot: otMap, st: stMap, pain: painMap }[room];
+        var allCodeMaps = roomMap ? [roomMap] : [ptMap, otMap, stMap, painMap];
         var matchCodes = [];
         allCodeMaps.forEach(function(cmap) {
             Object.keys(cmap).forEach(function(code) {

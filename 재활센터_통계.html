@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-23 b118</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-23 b119</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -2148,7 +2148,6 @@ function analyzeOtMasterLogic() {
                 if (u.includes("경두개")) { therapists.forEach(function(th){ timeStats[th]["경두개직류"] += 1; logCell(th,"경두개직류"); }); return; }
                 if (u.includes("RS"))   { therapists.forEach(function(th){ timeStats[th]["RS"] += 1; logCell(th,"RS"); }); return; }
                 if (/^H1[가-힣]/.test(u)) return;      // H1 은 회Ⅲ 이 아니다 (통증 H1)
-                if (/^H[23]?[가-힣]/.test(u) && /\+\s*V(?![A-Z])/.test(u)) return;   // H○○○+V (바이탈) 은 액팅을 넘기지 않는다
                 if (u.startsWith("H"))  { localHCount += 1; }
             });
             therapists.forEach(function(therapist) {
@@ -4798,7 +4797,6 @@ function dischargeWhoOf(gid, r, c, cols) {
 function classifyOtTokenForDischarge(token) {
     var u = String(token||"").trim().toUpperCase();
     if (!u) return "";
-    if (/^H[23]?[가-힣]/.test(u) && /\+\s*V(?![A-Z])/.test(u)) return "";   // 바이탈은 넘기지 않는다
     if (u.includes("(F)") || u.includes("(필")) {
         var af = u.replace(/^\(F\)|^\(필[^)]*\)/, "").replace(/\(F\)|\(필[^)]*\)/g, "").trim();
         if (!/^[CSADVH]/.test(af)) return "CR6(F),CR7(F)";

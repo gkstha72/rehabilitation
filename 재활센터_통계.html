@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-23 b119</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-23 b120</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -2105,9 +2105,9 @@ function analyzeOtMasterLogic() {
                 var u = item.toUpperCase();
                 var fc = item[0]; var isKorean = fc >= "가" && fc <= "힣";
                 if (u === "V") return;
-                if (isKorean && u.endsWith("V") && !item.includes("+")) { therapists.forEach(function(th){ timeStats[th]["VITAL STIM"] += 1; logCell(th,"VITAL STIM"); }); return; }
                 if (u.startsWith("D"))  { therapists.forEach(function(th){ timeStats[th]["DYSPHAGIA"] += 1; logCell(th,"DYSPHAGIA"); }); return; }
-                if (u.startsWith("V") && u.length >= 2) { therapists.forEach(function(th){ timeStats[th]["VITAL STIM"] += 1; logCell(th,"VITAL STIM"); }); return; }
+                // 바이탈은 비회복기 V○○○ 만 센다 (H○○○+V · ○○○V 는 바이탈로 세지 않음)
+                if (/^V[가-힣]/.test(u)) { therapists.forEach(function(th){ timeStats[th]["VITAL STIM"] += 1; logCell(th,"VITAL STIM"); }); return; }
                 // CR6/CR7은 C로 시작하므로 COMPLEX보다 반드시 먼저 체크
                 // 한 토큰 안에 여러 CR이 붙어 있어도(예: 박종기+CR6(비)+TDCS+CR6(F)) 모두 집계한다
                 var crHit = false;
@@ -3266,7 +3266,7 @@ var prescriptionDesc = {
     "SPECIAL":    { emr: "슬립코드: MM113, MM1131", sched: "시간표에서 S로 시작하는 토큰" },
     "ADL":        { emr: "슬립코드: MM114", sched: "시간표에서 A로 시작하는 토큰" },
     "DYSPHAGIA":  { emr: "슬립코드: MX141, MX142", sched: "시간표에서 D로 시작하는 토큰" },
-    "VITAL STIM": { emr: "슬립코드: MZ0081, MZ0082", sched: "시간표에서 한글이름V 형태 토큰 (첫 글자가 한글, V로 끝, + 없음)\n예) 임희재V, 정부자V\n※ H이름V, +V 형태는 제외" },
+    "VITAL STIM": { emr: "슬립코드: MZ0081, MZ0082", sched: "비회복기 V○○○ 만 집계\n예) V이다혜\n※ H○○○+V · ○○○V 는 바이탈로 세지 않음 (H○○○+V 는 회Ⅲ/회Ⅱ)" },
     "경두개직류": { emr: "슬립코드: DF003B", sched: "시간표에서 경두개 포함 토큰" },
     "CR6(비)":    { emr: "슬립코드: 51020, 51020^, EX022", sched: "시간표에서 CR6(비) 또는 CR6 포함 토큰\n※ CR6(F) 보다 나중에 체크 (우선순위: CR6(F) > CR6(비))" },
     "CR7(비)":    { emr: "슬립코드: EX022A", sched: "시간표에서 CR7(비) 또는 CR7 포함 토큰\n※ CR7(F) 보다 나중에 체크" },
@@ -3478,7 +3478,7 @@ function computeDetailDiff(therapist, label, room) {
         if (u.startsWith("A"))   return "ADL";
         var fc = token[0];
         var isKorean = fc >= "가" && fc <= "힣";
-        if (isKorean && u.endsWith("V") && !token.includes("+")) return "VITAL STIM";
+        if (/^V[가-힣]/.test(u)) return "VITAL STIM";
         if (base.length >= 1) {
             var ch = base[0];
             if (ch === "M") return "MAT";

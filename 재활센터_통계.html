@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-24 b122</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-24 b123</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -479,7 +479,7 @@ var masterTherapists = ["황보슬","김윤량","박세인","서슬기","김진�
 var ptOrder  = ["NDT","MAT","GAIT","COMPLEX","CPM","기립경사","FES","호흡","SSP","ESWT3","ESWT6","ESWT9","ESWT15","3.5","R","AR+MW+RBOT","보행로봇F","신장분사치료[단순]","신장분사치료[special]","비침습적무통증신호요법[10.0][special]","8","10","12","16","14","20","도수치료[관리급여]","메디페인CR4","메디페인CR6","메디페인CR7","메디페인(기타)","H1","H2","H3"];
 var otOrder  = ["COMPLEX","SPECIAL","ADL","DYSPHAGIA","VITAL STIM","경두개직류","CR6(비)","CR7(비)","CR6(F),CR7(F)","RS","H2","H3"];
 var stOrder  = ["비회","H2","H3","평가"];
-var painOrder = ["표층열치료(HP)","표층열치료(IR)","표층열치료(심층열동시-HP)","표층열치료(심층열동시-IR)","심층열치료(microwave)","심층열치료(ultra sound)","심층열치료(sonor)","심층열치료[1일당]","한냉치료(ICE)","경피적전기신경자극치료[TENS]","전기자극치료[EST]","간섭파전류치료[ICT]","저주파자극치료[SSP]","레이저치료[1일당]","한냉치료(콜드팩)","비침습적 무통증 신호요법(2ch/30분)","압박치료[1일당]","CPM(복합운동치료)","H1","이온도입기(ION)","운동치료-단순운동치료[간단]"];
+var painOrder = ["표층열치료(HP)","표층열치료(IR)","표층열치료(심층열동시-HP)","표층열치료(심층열동시-IR)","심층열치료(microwave)","심층열치료(ultra sound)","심층열치료(sonor)","심층열치료[1일당]","한냉치료(ICE)","경피적전기신경자극치료[TENS]","전기자극치료[EST]","간섭파전류치료[ICT]","저주파자극치료[SSP]","레이저치료[1일당]","한냉치료(콜드팩)","비침습적 무통증 신호요법(2ch/30분)","압박치료[1일당]","H1","이온도입기(ION)","운동치료-단순운동치료[간단]"];
 var evalOrder = ["후글-마이어-평가","수지기능검사(MFT)","수지기능검사(젭슨)","일상생활동작검사","간이정신진단검사","[F]간이정신진단검사","MMSE&GDS","치매척도검사","신경인지기능검사(전체)","신경인지기능검사 유형1,2","신경인지기능검사-무시증후군 총집","신경행동학적 인지기능검사","섭식장애평가","MMT&ROM","버그균형검사","[F]버그 균형검사","경직진자검사","동적족저압측정[단순]","동적족저압측정[복잡]","동적체평형검사[단순]","동적체평형검사[복잡]","동작분석 역동적 근전도[단순]","동작분석 역동적 근전도[복잡]","동작분석(생역학검사)[단순]","동작분석(생역학검사)[복잡]","기립성혈압검사[단순]","기립성혈압검사[복잡]","[비]언어평가","웨스턴실어증검사"];
 var ignoreHeaders = ["NDT","MAT","로봇PT","전기","통증","ST","OT","로봇OT","TIME","시간",""];
 
@@ -524,7 +524,6 @@ var painDataCodes = {
     "저주파자극치료[SSP]":["MM080A"],"레이저치료[1일당]":["MM085","MM085B"],
     "한냉치료(콜드팩)":["MM011"],"비침습적 무통증 신호요법(2ch/30분)":["MZ012"],
     "압박치료[1일당]":["MM190"],
-    "CPM(복합운동치료)":["MM102A"],
     "H1":["IM010","IM011","IM012","IM015","IM020","IM042","IM0051","IM052","IM060","IM061","IM080","IM085","IM102","IM102A","IM190","IM200"],
     "이온도입기(ION)":["MX121"],
     "운동치료-단순운동치료[간단]":["MM101"]
@@ -2488,7 +2487,7 @@ function analyzePainMasterLogic() {
             // CPM 칸(어깨 · 다리) — C○○○ 한 명 = C.P.M 1건 (C 접두가 있어야 CPM)
             if (painIsCpmCol(c)) {
                 var cpmN = (cellText.replace(/\([^)]*\)/g, " ").match(/(^|[\s,\/])C[가-힣]{2,}/g) || []).length;
-                for (var ci = 0; ci < cpmN; ci++) { timeStats[currentTherapist]["CPM(복합운동치료)"] += 1; logPain("CPM(복합운동치료)"); }
+                // CPM 칸은 시행선으로 표시만 한다 — CPM(MM102A)은 물리 표에서 개인 시간표로 대조
                 continue;
             }
             var headLabel = painColTreatLabel(c);
@@ -2506,6 +2505,7 @@ function analyzePainMasterLogic() {
                 continue;
             }
             painHits.forEach(function(label) {
+                if (timeStats[currentTherapist][label] === undefined) return;   // 통증 표에 없는 처방 (CPM 등)
                 timeStats[currentTherapist][label] += 1;
                 logPain(label);
             });

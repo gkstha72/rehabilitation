@@ -149,7 +149,7 @@ td.clickable:hover { opacity:0.75; }
 <body>
 <div class="container">
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
-<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-23 b120</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
+<div style="text-align:center;font-size:12px;color:#95a5a6;margin:-6px 0 8px;">버전 <b id="buildStamp">2026-10-24 b121</b> &middot; 이전 파일과 헷갈릴 때 이 번호를 확인하세요</div>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
   <span style="font-size:19px;font-weight:800;color:#1b5e8a;" id="dateBannerText"></span>
@@ -836,10 +836,11 @@ function buildClassDeco(doc) {
 // ── 부도 칸 (주황색 배경) ────────────────────────────────────────────
 //   시간표에서 부도 환자는 항상 칸을 주황색으로 칠한다.
 //   부도 칸은 치료를 안 한 것이므로 통계 · 오더 점검 · 퇴원 점검에서 모두 뺀다 (취소선과 같은 처리).
-//   엑셀 주황 계열(#FFC000 · #FF9900 · #ED7D31 · #F4B084 …)만 잡고,
+//   진한 주황(#FF9000 · #FF9900 · #ED7D31 …)만 잡고, 로봇 칸 금색(#FFC000)은 잡지 않는다.
 //   빨강 머리글 · 노랑 · 분홍 · 보라 칸은 잡지 않는다.
 function budoColorOk(r, g, b) {
-    return r >= 0xE0 && g >= 0x60 && g <= 0xD0 && b <= 0x90 && (r - b) >= 0x80;
+    // 부도 주황(#FF9000 · #FF9900 · #ED7D31)만. 로봇 칸에 쓰는 금색(#FFC000)·노랑은 부도가 아니다.
+    return r >= 0xE0 && g >= 0x60 && g <= 0xAF && b <= 0x60 && (r - b) >= 0x80;
 }
 function isBudoBg(css) {
     var t = String(css||"");

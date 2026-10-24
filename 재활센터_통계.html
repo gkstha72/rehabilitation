@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-24 b124</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-24 b125</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3588,7 +3588,7 @@ function computeDetailDiff(therapist, label, room) {
                 var txt = liveCellText(gid, r, c, raw);
                 if (!txt) continue;
                 var toks = txt.replace(/\r?\n|\r/g," ").split(/[\s,]+/).map(function(t){ return t.trim(); }).filter(Boolean);
-                thSlots.push({ slot: rowSlot[r], text: txt, toks: toks, used: {} });
+                thSlots.push({ slot: cellMovedSlot(txt, rowSlot[r]), text: txt, toks: toks, used: {} });
             }
         });
     });
@@ -6134,6 +6134,19 @@ function isEvalContentCell(text, gid) {
     return false;
 }
 
+// 시간 변경 메모 — "A차광철 11:20->09:00" 이면 그 칸은 09:00 에 치료한 것이다.
+// 화살표 뒤 시간을 정규 슬롯으로 바꿔 돌려준다 (없으면 원래 행 시간).
+function cellMovedSlot(txt, rowSlotVal) {
+    var m = String(txt||"").match(/\d{1,2}\s*:\s*\d{2}\s*(?:-\s*>|→|=>|>)\s*(\d{1,2})\s*:\s*(\d{2})/);
+    if (!m) return rowSlotVal;
+    var h = parseInt(m[1], 10), mi = parseInt(m[2], 10);
+    if (h < 8) h += 12;
+    var mins = h * 60 + mi;
+    for (var i = 0; i < SLOT_TIMES.length; i++) {
+        if (Math.abs(toMinutes(SLOT_TIMES[i]) - mins) <= 2) return SLOT_TIMES[i];
+    }
+    return rowSlotVal;
+}
 function buildScheduleMap() {
     var sched = {};
     ["ptGridTable","otGridTable","stGridTable"].forEach(function(gid) {
@@ -6155,7 +6168,7 @@ function buildScheduleMap() {
                     if (!sched[th]) sched[th] = [];
                     lines.forEach(function(ln) {
                         if (!ln.text) return;
-                        sched[th].push({ slot: rowSlot[r], text: ln.text, u: ln.u, s: ln.s });
+                        sched[th].push({ slot: cellMovedSlot(txt, rowSlot[r]), text: ln.text, u: ln.u, s: ln.s });
                     });
                 });
             }

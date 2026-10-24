@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-24 b123</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-24 b124</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -1216,11 +1216,9 @@ else { initOnLoad(); }
             // 제목행에 환자 스케줄이 적혀 있으면 다른 시간표가 시작된 것 → 여기서 끊는다
             if (looksLikeScheduleCell(v)) break;
 
-            // 통증치료는 "다리(앉아서)" 열 뒤의 2개 열까지 함께 가져온다.
-            if (isPainSection && v.replace(/\s/g, "").indexOf("다리(앉아서)") !== -1) {
-                end = Math.min(c + 2, totalCols - 1);
-                break;
-            }
+            // 통증치료는 오른쪽 CPM(어깨 · 다리) · complex 칸 앞에서 끊는다.
+            // 그 칸은 시행선 표시용이라 통증 통계에 넣지 않는다 (CPM 은 개인 시간표로 센다).
+            if (isPainSection && /^(어깨|다리|CPM|COMPLEX)/i.test(v.replace(/\s/g, ""))) break;
 
             if (v === "") {
                 if ((allowFirstBlank || isPainSection) && c === seg.col + 1) {

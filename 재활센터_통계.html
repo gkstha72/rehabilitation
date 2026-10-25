@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b143</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b144</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -1513,6 +1513,14 @@ else { initOnLoad(); }
             var extraStaff = {};   // 열전기 · 방문 등 시간표 집계에서 빠지는 구역의 PT 치료사 (인원 계산용)
             var unmatchedTitles = [];
 
+            // 치료사 머리글 행 — PT · OT · ST(NDT · 근골격계 · PT(일) · OT …) 제목이 있는 행.
+            // 열전기 · 방문 · 재택 담당은 이 행에 이름이 있을 때만 출근 인원으로 센다.
+            var therapistHdrRows = {};
+            sections.forEach(function(sg) {
+                var rm = identifyRoom(matrix, sg.col, sg.firstRow);
+                if (rm && /^(pt|ot|st)GridTable$/.test(rm.id || "")) therapistHdrRows[sg.firstRow - 1] = true;
+            });
+
             // ② 각 섹션 처리
             sections.forEach(function(seg, idx) {
                 var sc = seg.col;
@@ -1524,7 +1532,7 @@ else { initOnLoad(); }
 
                 // 열전기(방문/재택) 구역은 집계에서 빼지만, 담당은 PT 인원으로 센다
                 var _ttl = String((matrix[fr - 1] || [])[sc] || "").split(/[\n\r]/)[0].trim();
-                if (/^열전기|^방문|^재택/.test(_ttl)) {
+                if (/^열전기|^방문|^재택/.test(_ttl) && therapistHdrRows[fr - 1]) {
                     var _hr = matrix[fr - 1] || [];
                     var _subTtl = _ttl;   // 지금 칸이 속한 구역 제목 (열전기 → 방문재활 → 재택/방문 …)
                     for (var _c = sc + 1; _c <= ec; _c++) {

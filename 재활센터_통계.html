@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b128</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b129</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2851,7 +2851,8 @@ function staffFraction(filled, mins) {
 var STAFF_PART_TIME = { "심원빈": 0 };
 // 열전기 · 방문재활 · 재택 구역 담당은 기본 PT. OT 인 사람만 여기 적는다.
 var STAFF_VISIT_DEPT = { "임건우": "OT", "노을": "OT" };
-function staffDeptSets() {
+function staffDeptSets(wardFilter) {
+    function inWard(gid, c) { return !wardFilter || wardOfCol(gid, c) === wardFilter; }
     var dep = { PT: {}, OT: {}, ST: {} };       // 이름 → 출근 값 (1 · 0.75 · 0.5 · 0.25 · 0)
     var red = {};                               // 빨간 이름으로 표시된 사람
     // ① 물리 · 작업 · 언어 — 열 머리글이 담당
@@ -2864,6 +2865,7 @@ function staffDeptSets() {
                 var el = document.getElementById(gid + "-cell-" + hr + "-" + c);
                 var v = el ? el.value.trim() : "";
                 if (!v || ignoreHeaders.indexOf(v) !== -1) continue;
+                if (!inWard(gid, c)) continue;
                 var isRed = !!cellFmt(gid, hr, c).r;
                 var names = {};
                 v.replace(/\([^)]*\)/g, " ").replace(STAFF_HDR_NOISE, " ").split(/[\s\/,\-]+/).forEach(function(p) {
@@ -2894,17 +2896,17 @@ function staffDeptSets() {
     // ② 전기 · 통증 · 열전기 담당 — PT (개인 시간표에 이미 있으면 그 값을 쓴다)
     function addPT(n, v) { if (n && !(n in dep.PT)) dep.PT[n] = v; }
     var ec = etTherapistCol();
-    for (var r = 1; r < ROW_COUNT; r++) {
+    if (inWard("etGridTable", ec)) for (var r = 1; r < ROW_COUNT; r++) {
         var el = document.getElementById("etGridTable-cell-" + r + "-" + ec);
         var n = cleanTherapistName(el ? el.value.trim() : "");
         if (n && isNaN(n)) addPT(n, 1);
     }
     var pr = buildPainRowTherapists() || {};
-    Object.keys(pr).forEach(function(r){ addPT(pr[r], 1); });
+    if (!wardFilter) Object.keys(pr).forEach(function(r){ addPT(pr[r], 1); });
     var rc = window._painRowThByCol || {};
-    Object.keys(rc).forEach(function(r){ Object.keys(rc[r]).forEach(function(c){ addPT(rc[r][c], 1); }); });
+    Object.keys(rc).forEach(function(r){ Object.keys(rc[r]).forEach(function(c){ if (inWard("painGridTable", +c)) addPT(rc[r][c], 1); }); });
     var ex = window._staffExtraPT || {};
-    Object.keys(ex).forEach(function(w){ Object.keys(ex[w] || {}).forEach(function(n) {
+    Object.keys(ex).forEach(function(w){ if (wardFilter && w !== wardFilter) return; Object.keys(ex[w] || {}).forEach(function(n) {
         var o = ex[w][n], v = (typeof o === "object") ? o.v : 1;
         var d = STAFF_VISIT_DEPT[n] || "PT";
         if (!(n in dep.PT) && !(n in dep.OT) && !(n in dep.ST)) { dep[d][n] = v; if (o && o.red) red[n] = v; }
@@ -2948,12 +2950,17 @@ function renderStaffCount(keepFocus) {
     var full = staffFull();
     function sum(m){ var t = 0; Object.keys(m).forEach(function(k){ t += m[k]; }); return t; }
     var on = { PT: sum(sets.PT), OT: sum(sets.OT), ST: sum(sets.ST) };
+    // 근골(os) 출근 인원 — 통계표 당일 줄 아래 줄
+    var osSets = window._wardCols && Object.keys(window._wardCols).some(function(g){ return window._wardCols[g].some(function(x){ return x.ward === "msk"; }); })
+                 ? staffDeptSets("msk") : { PT:{}, OT:{}, ST:{} };
+    var os = { PT: sum(osSets.PT), OT: sum(osSets.OT), ST: sum(osSets.ST) };
+    os.T = os.PT + os.OT + os.ST;
     var co = full.CO;
     var coDayEl = document.getElementById("staffCoDay");
     var coDay = (coDayEl && coDayEl.value !== "") ? (parseFloat(coDayEl.value) || 0) : (window._staffCoDay !== undefined ? window._staffCoDay : full.CO);
     var tFull = full.PT + full.OT + full.ST + co, tOn = on.PT + on.OT + on.ST + coDay;
     var nOn = Object.keys(sets.PT).length + Object.keys(sets.OT).length + Object.keys(sets.ST).length;
-    _staffCnt = nOn ? { full: full, on: on, co: coDay, tFull: tFull, tOn: tOn } : null;
+    _staffCnt = nOn ? { full: full, on: on, co: coDay, tFull: tFull, tOn: tOn, os: os } : null;
     function cell(v){ return "<td style='padding:3px 10px;text-align:center;border:1px solid #cfdbe6;'>" + v + "</td>"; }
     function inp(k){ return "<td style='padding:2px 4px;border:1px solid #cfdbe6;'><input type='number' step='0.5' min='0' value='" + fmtNum(full[k]) +
                             "' onchange='setStaffFull(\"" + k + "\", this.value)' title='전체 인원 — 바뀌면 고쳐 두세요 (이 PC에 기억됩니다)'" +
@@ -2966,7 +2973,9 @@ function renderStaffCount(keepFocus) {
                      "<td style='padding:2px 4px;border:1px solid #cfdbe6;'><input type='number' id='staffCoDay' step='0.5' min='0' value='" + fmtNum(coDay) +
                      "' oninput='window._staffCoDay = parseFloat(this.value) || 0; renderStaffCount(true);' title='당일 코디 — 주말처럼 코디가 없는 날은 0 으로'" +
                      " style='width:48px;text-align:center;font-size:13px;border:1px solid #b9d3ea;border-radius:4px;padding:2px;'></td>" +
-                     cell(nOn ? fmtNum(tOn) : dash) + "</tr></table>" +
+                     cell(nOn ? fmtNum(tOn) : dash) + "</tr>" +
+            "<tr style='color:#7d3c98;'>" + cell("<b>os</b>") + cell(fmtNum(os.PT)) + cell(fmtNum(os.OT)) + cell(os.ST ? fmtNum(os.ST) : "") +
+                     cell("") + cell(fmtNum(os.T)) + "</tr></table>" +
             " <button class='step-btn' onclick='copyStaffCount()' style='margin-left:8px;background:#2471a3;border-color:#2471a3;color:#fff;'>📋 당일 인원 복사</button>";
     if (!nOn) h += "<div style='margin-top:5px;color:#999;font-size:12px;'>시간표를 붙여넣으면 출근 인원이 계산됩니다.</div>";
     var rk = Object.keys(sets.red);
@@ -2974,7 +2983,7 @@ function renderStaffCount(keepFocus) {
         rk.map(function(n){ return n + " " + fmtNum(sets.red[n]); }).join(" · ") + "</div>";
     if (keepFocus === true) {
         var tds = area.querySelectorAll("table tr");
-        if (tds.length === 3) { tds[1].lastChild.innerHTML = fmtNum(tFull); tds[2].lastChild.innerHTML = nOn ? fmtNum(tOn) : dash; return; }
+        if (tds.length >= 3) { tds[1].lastChild.innerHTML = fmtNum(tFull); tds[2].lastChild.innerHTML = nOn ? fmtNum(tOn) : dash; return; }
     }
     area.innerHTML = h;
 }
@@ -2982,11 +2991,13 @@ function copyStaffCount() {
     renderStaffCount();
     var c = _staffCnt;
     if (!c) { alert("시간표를 먼저 붙여넣어 주세요."); return; }
-    var tsv = [fmtNum(c.on.PT), fmtNum(c.on.OT), fmtNum(c.on.ST), fmtNum(c.co), fmtNum(c.tOn)].join("\t");
+    // 두 줄 — 당일 전체 / 근골(os) 출근 (통계표 당일 줄 PT 칸에 붙이면 아래 줄까지 채워진다)
+    var tsv = [fmtNum(c.on.PT), fmtNum(c.on.OT), fmtNum(c.on.ST), fmtNum(c.co), fmtNum(c.tOn)].join("\t") + "\n" +
+              [fmtNum(c.os.PT), fmtNum(c.os.OT), c.os.ST ? fmtNum(c.os.ST) : "", "", fmtNum(c.os.T)].join("\t");
     var ta = document.createElement("textarea");
     ta.value = tsv; ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); alert("✅ 당일 인원 복사 완료\n통계표 인원현황 당일 줄의 PT 칸에 붙여넣으세요."); }
+    try { document.execCommand("copy"); alert("✅ 당일 인원 복사 완료\n통계표 인원현황 당일 줄의 PT 칸에 붙여넣으세요.\n(아래 줄에 근골 os 출근 인원까지 들어갑니다)"); }
     catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
     document.body.removeChild(ta);
 }

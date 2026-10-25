@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b135</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b137</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2915,6 +2915,13 @@ var STAFF_PART_TIME = { "심원빈": 0 };
 var STAFF_VISIT_DEPT = { "임건우": "OT", "노을": "OT" };
 // 다른 파트 칸(주말 관리자 칸 등)에 이름이 있어도 실제 파트로 센다
 var STAFF_DEPT_FIX = { "홍은기": "OT" };
+// 재활센터 인원현황 PT 명단 (2026-10) — 여기 있는 사람은 어느 칸에 있든 PT 로 센다
+// (방문 · 재택 칸의 공찬우 · 장민주 · 지영헌 포함). 사람이 바뀌면 이 목록만 고치면 된다.
+var STAFF_ROSTER_PT = ["장일용","김윤량","김영신","황보슬","박세인","서슬기","김진환","공찬우","장민주","최은성","박지윤","김수연","이예인","서수경","신승영","김혜민2","서준호","김나연","지영헌","박수희","곽주영","정우림","이심명","최수인","백규광","정민석","정호진","구혜진","강준호","김하늘","백진우","이기범","이우진","이호승","이효정","허민규","전소희","김연완","한국화","정철현","최연우","곽도율","김유강","김준표","민정","박진희","서충환","안이삭","원종혁","윤지수","이도경","이영호","천미연","최아인","최영아","강동희","박다현","서세연","오다연","윤다영","윤소은","이슬현","이재화","정시온","정파란","조연우","최윤서","정형우","김경혜","지영현"];
+// 재활센터 인원현황 OT 명단 (2026-10) — 여기 있는 사람은 어느 칸에 있든 OT 로 센다 (주말 PT 관리자 칸의 홍은기 등)
+var STAFF_ROSTER_OT = ["우광식","이진광","김한솜","정승희","홍은기","김수현","강은서","모정민","김민지","김태규","조시연","이다혜","임건우","정다경","노을","양영모","한혜수","양가영","임서윤","임정현","황은비","문원혁","박준오","김수진","이수진","윤희지","김지수","윤수연","엄주영","김남준","정희성","오서율","김다은","임희정","송가은","윤혜미","박채원","박철민","김용훈","서지원","진하민","박민희","김혜민","김수현2","김나현","구하빈","박상규","이병주","이원석","정영빈","정찬웅","손다은","이어진","김영우","오유진","박윤지","강민혁","김가은","김선중","박은영","이명이","조수현","황수아","강채린","이지현","황다정"];
+// 재활센터 인원현황 ST 명단 (2026-10)
+var STAFF_ROSTER_ST = ["김민정","양세미","양소희","우주연","조수진"];
 function staffDeptSets(wardFilter) {
     function inWard(gid, c) { return !wardFilter || wardOfCol(gid, c) === wardFilter; }
     var dep = { PT: {}, OT: {}, ST: {} };       // 이름 → 출근 값 (1 · 0.75 · 0.5 · 0.25 · 0)
@@ -2981,6 +2988,21 @@ function staffDeptSets(wardFilter) {
     ["PT","OT","ST"].forEach(function(d) {
         Object.keys(dep[d]).forEach(function(n) {
             if (n in STAFF_PART_TIME) dep[d][n] = Math.min(dep[d][n], STAFF_PART_TIME[n]);
+        });
+    });
+    STAFF_ROSTER_PT.forEach(function(n) {
+        ["OT","ST"].forEach(function(d) {
+            if (n in dep[d]) { if (!(n in dep.PT)) dep.PT[n] = dep[d][n]; delete dep[d][n]; }
+        });
+    });
+    STAFF_ROSTER_ST.forEach(function(n) {
+        ["PT","OT"].forEach(function(d) {
+            if (n in dep[d]) { if (!(n in dep.ST)) dep.ST[n] = dep[d][n]; delete dep[d][n]; }
+        });
+    });
+    STAFF_ROSTER_OT.forEach(function(n) {
+        ["PT","ST"].forEach(function(d) {
+            if (n in dep[d]) { if (!(n in dep.OT)) dep.OT[n] = dep[d][n]; delete dep[d][n]; }
         });
     });
     Object.keys(STAFF_DEPT_FIX).forEach(function(n) {

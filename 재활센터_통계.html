@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b139</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b140</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3068,9 +3068,6 @@ function renderStaffCount(keepFocus) {
     var vis = { PT: sum(visitSets.PT), OT: sum(visitSets.OT), ST: sum(visitSets.ST) };
     vis.T = vis.PT + vis.OT + vis.ST;
     var ns = { PT: on.PT - os.PT - vis.PT, OT: on.OT - os.OT - vis.OT, ST: on.ST - os.ST - vis.ST };
-    // 주말은 os · 방문을 나누지 않고 출근 인원 전부를 ns 줄에 적는다 (os · 방문 줄은 비움)
-    var _wkEnd = /토요일|일요일|주말/.test(typeof schedDateText === "string" ? schedDateText : "");
-    if (_wkEnd) { ns = { PT: on.PT, OT: on.OT, ST: on.ST }; }
     var co = full.CO;
     // 당일 코디 — 주말(토 · 일)은 코디가 없어 0, 평일은 전체 코디 수. 칸에서 고치면 그 값을 쓴다.
     var isWeekendDay = /토요일|일요일|주말/.test(typeof schedDateText === "string" ? schedDateText : "");
@@ -3078,7 +3075,7 @@ function renderStaffCount(keepFocus) {
     var tFull = full.PT + full.OT + full.ST + co, tOn = on.PT + on.OT + on.ST + coDay;
     ns.T = ns.PT + ns.OT + ns.ST + coDay;
     var nOn = Object.keys(sets.PT).length + Object.keys(sets.OT).length + Object.keys(sets.ST).length;
-    _staffCnt = nOn ? { full: full, on: on, co: coDay, tFull: tFull, tOn: tOn, os: os, ns: ns, vis: vis, weekend: _wkEnd } : null;
+    _staffCnt = nOn ? { full: full, on: on, co: coDay, tFull: tFull, tOn: tOn, os: os, ns: ns, vis: vis } : null;
     function cell(v){ return "<td style='padding:3px 10px;text-align:center;border:1px solid #cfdbe6;'>" + v + "</td>"; }
     function inp(k){ return "<td style='padding:2px 4px;border:1px solid #cfdbe6;'><input type='number' step='0.5' min='0' value='" + fmtNum(full[k]) +
                             "' onchange='setStaffFull(\"" + k + "\", this.value)' title='전체 인원 — 바뀌면 고쳐 두세요 (이 PC에 기억됩니다)'" +
@@ -3092,13 +3089,10 @@ function renderStaffCount(keepFocus) {
                      "' oninput='window._staffCoDay = parseFloat(this.value) || 0; renderStaffCount(true);' title='당일 코디 — 주말처럼 코디가 없는 날은 0 으로'" +
                      " style='width:48px;text-align:center;font-size:13px;border:1px solid #b9d3ea;border-radius:4px;padding:2px;'></td>" +
                      cell(nOn ? fmtNum(ns.T) : dash) + "</tr>" +
-            (_wkEnd
-              ? "<tr style='color:#999;'>" + cell("<b>os</b>") + "<td colspan='5' style='padding:3px 10px;border:1px solid #cfdbe6;font-size:12px;'>주말은 ns 줄에 전부</td></tr>" +
-                "<tr style='color:#999;'>" + cell("<b>방문</b>") + "<td colspan='5' style='padding:3px 10px;border:1px solid #cfdbe6;font-size:12px;'>주말은 ns 줄에 전부</td></tr>"
-              : "<tr style='color:#7d3c98;'>" + cell("<b>os</b>") + cell(fmtNum(os.PT)) + cell(fmtNum(os.OT)) + cell(os.ST ? fmtNum(os.ST) : "") +
+            "<tr style='color:#7d3c98;'>" + cell("<b>os</b>") + cell(fmtNum(os.PT)) + cell(fmtNum(os.OT)) + cell(os.ST ? fmtNum(os.ST) : "") +
                      cell("") + cell(fmtNum(os.T)) + "</tr>" +
-                "<tr style='color:#1e8449;'>" + cell("<b>방문</b>") + cell(fmtNum(vis.PT)) + cell(fmtNum(vis.OT)) + cell(vis.ST ? fmtNum(vis.ST) : "") +
-                     cell("") + cell(fmtNum(vis.T)) + "</tr>") +
+            "<tr style='color:#1e8449;'>" + cell("<b>방문</b>") + cell(fmtNum(vis.PT)) + cell(fmtNum(vis.OT)) + cell(vis.ST ? fmtNum(vis.ST) : "") +
+                     cell("") + cell(fmtNum(vis.T)) + "</tr>" +
             "<tr style='background:#f4f6f7;'>" + cell("당일 계") + cell(nOn ? fmtNum(on.PT) : dash) + cell(nOn ? fmtNum(on.OT) : dash) + cell(nOn ? fmtNum(on.ST) : dash) +
                      cell(fmtNum(coDay)) + cell(nOn ? fmtNum(tOn) : dash) + "</tr></table>" +
             " <button class='step-btn' onclick='copyStaffCount()' style='margin-left:8px;background:#2471a3;border-color:#2471a3;color:#fff;'>📋 당일 인원 복사</button>";
@@ -3124,8 +3118,7 @@ function copyStaffCount() {
     if (!c) { alert("시간표를 먼저 붙여넣어 주세요."); return; }
     // 세 줄 — ns / os / 방문 (통계표 ns 줄 PT 칸에 붙이면 os · 방문 줄까지 채워진다)
     function rowOf(o, coV) { return [fmtNum(o.PT), fmtNum(o.OT), o.ST ? fmtNum(o.ST) : "0", coV, fmtNum(o.T)].join("\t"); }
-    var tsv = rowOf(c.ns, c.co ? fmtNum(c.co) : "0");
-    if (!c.weekend) tsv += "\n" + rowOf(c.os, "") + "\n" + rowOf(c.vis, "");   // 주말은 ns 한 줄만
+    var tsv = rowOf(c.ns, c.co ? fmtNum(c.co) : "0") + "\n" + rowOf(c.os, "") + "\n" + rowOf(c.vis, "");
     var ta = document.createElement("textarea");
     ta.value = tsv; ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();

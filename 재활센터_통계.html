@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b127</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b128</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -1348,6 +1348,7 @@ else { initOnLoad(); }
         resetEmrTherapistAlias();
         if (typeof resetHeaderRowCache === "function") resetHeaderRowCache();
         var report = { neuro: [], msk: [] };
+        window._wardCols = {};   // 그리드별 신경계 · 근골 열 범위 (부도 ns / os 구분용)
         ["neuro","msk"].forEach(function(ward) {
             var gb = wardBuffers[ward];
             if (!gb) return;
@@ -1362,6 +1363,8 @@ else { initOnLoad(); }
                     distributeMatrix(subRows, gid, fakeTarget, (buf.fmts || [])[bi] || null);
                     colOffset += (subRows[0]||[]).length;
                 });
+                if (!window._wardCols[gid]) window._wardCols[gid] = [];
+                window._wardCols[gid].push({ ward: ward, s: start, e: colOffset - 1 });
                 var over = colOffset > COL_COUNT;
                 report[ward].push(buf.name + "(×" + buf.cols.length + ")" + (over ? " ⚠️칸 부족" : ""));
             });
@@ -2696,7 +2699,12 @@ function evalTotalsFromEmr() {
 var BUDO_ROBOTS = ["모닝","엔젤","GR"];
 var BUDO_ROBOT_WORDS = /^(모닝|엔젤|엑소|알봇|워크봇|에리고|로코맷|RBOT|ROBOT|AR|MW|MR)$/i;
 var BUDO_ORDERS = ["H3","N","G","M","S","A","D"];
-function computeBudo() {
+function wardOfCol(gid, c) {
+    var rs = (window._wardCols || {})[gid] || [];
+    for (var i = 0; i < rs.length; i++) if (c >= rs[i].s && c <= rs[i].e) return rs[i].ward;
+    return "neuro";
+}
+function computeBudo(wardFilter) {
     var robot = {}, ord = {}, names = [], extraRobot = [], extraOrd = [];
     function addR(k) { if (BUDO_ROBOTS.indexOf(k) === -1 && extraRobot.indexOf(k) === -1) extraRobot.push(k); robot[k] = (robot[k] || 0) + 1; }
     function addO(k) { if (BUDO_ORDERS.indexOf(k) === -1 && extraOrd.indexOf(k) === -1) extraOrd.push(k); ord[k] = (ord[k] || 0) + 1; }
@@ -2704,6 +2712,7 @@ function computeBudo() {
         var fm = gridCellFmt[gid] || {};
         Object.keys(fm).forEach(function(k) {
             if (!fm[k] || !fm[k].b) return;
+            if (wardFilter && wardOfCol(gid, +k.split("-")[1]) !== wardFilter) return;
             var el = document.getElementById(gid + "-cell-" + k);
             var txt = el ? el.value.trim() : "";
             if (!txt) return;
@@ -2770,23 +2779,27 @@ function computeBudo() {
 function renderBudoSummary() {
     var el = document.getElementById("budoSummary");
     if (!el) return;
-    var b = computeBudo();
-    el.innerHTML = "<div style='display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;'>" +
-        "<span style='display:inline-block;background:#ffc000;color:#5a3d00;padding:6px 12px;border-radius:6px;font-weight:bold;'>부도 " + b.total + "</span>" +
-        "<pre style='margin:0;padding:6px 10px;background:#fff;border:1px solid #f0d27a;border-radius:6px;font-family:inherit;font-size:13px;line-height:1.55;'>" +
-        b.detail + "</pre>" +
-        (b.empty ? "" : "<button class='step-btn' onclick='copyBudo()' style='background:#a87400;border-color:#a87400;color:#fff;'>📋 부도 복사</button>") +
-        "</div>" +
-        (b.names.length ? "<div style='margin-top:5px;color:#555;font-size:12px;'>환자: " + b.names.join(", ") + "</div>" : "");
+    function block(title, ward, color) {
+        var b = computeBudo(ward);
+        return "<div style='flex:1;min-width:220px;'>" +
+            "<div style='font-weight:800;color:" + color + ";margin-bottom:4px;'>" + title + " · " + b.total + "건" +
+            (b.empty ? "" : " <button class='step-btn' onclick='copyBudo(\"" + ward + "\")' style='margin-left:6px;padding:2px 9px;font-size:12px;background:#a87400;border-color:#a87400;color:#fff;'>📋 복사</button>") +
+            "</div><pre style='margin:0;padding:6px 10px;min-height:20px;background:#fff;border:1px solid #f0d27a;border-radius:6px;font-family:inherit;font-size:13px;line-height:1.55;'>" +
+            (b.detail || "<span style='color:#bbb;'>없음</span>") + "</pre>" +
+            (b.names.length ? "<div style='margin-top:3px;color:#555;font-size:12px;'>환자: " + b.names.join(", ") + "</div>" : "") + "</div>";
+    }
+    el.innerHTML = "<div style='display:flex;gap:14px;flex-wrap:wrap;'>" +
+        block("ns (신경계)", "neuro", "#1f618d") + block("os (근골)", "msk", "#7d3c98") + "</div>" +
+        "<div style='margin-top:5px;color:#7f8c8d;font-size:12px;'>복사 → 통계표 부도환자의 ns / os 옆 칸에 붙여넣기 (내역이 한 칸에 여러 줄로 들어갑니다)</div>";
 }
-function copyBudo() {
-    var b = computeBudo();
+function copyBudo(ward) {
+    var b = computeBudo(ward);
     var ta = document.createElement("textarea");
     // 여러 줄을 한 칸에 넣으려면 큰따옴표로 감싼다 (엑셀 · 구글 시트 공통)
-    ta.value = b.total + "\t\"" + b.detail.replace(/"/g, '""') + "\"";
+    ta.value = "\"" + b.detail.replace(/"/g, '""') + "\"";
     ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); alert("✅ 부도 복사 완료\n통계표 부도환자 숫자 칸에 붙여넣으면 옆 칸에 오더 내역이 들어갑니다.\n\n" + b.detail); }
+    try { document.execCommand("copy"); alert("✅ 부도 " + (ward === "msk" ? "os" : "ns") + " 복사 완료\n\n" + b.detail); }
     catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
     document.body.removeChild(ta);
 }
@@ -2936,9 +2949,11 @@ function renderStaffCount(keepFocus) {
     function sum(m){ var t = 0; Object.keys(m).forEach(function(k){ t += m[k]; }); return t; }
     var on = { PT: sum(sets.PT), OT: sum(sets.OT), ST: sum(sets.ST) };
     var co = full.CO;
-    var tFull = full.PT + full.OT + full.ST + co, tOn = on.PT + on.OT + on.ST + co;
+    var coDayEl = document.getElementById("staffCoDay");
+    var coDay = (coDayEl && coDayEl.value !== "") ? (parseFloat(coDayEl.value) || 0) : (window._staffCoDay !== undefined ? window._staffCoDay : full.CO);
+    var tFull = full.PT + full.OT + full.ST + co, tOn = on.PT + on.OT + on.ST + coDay;
     var nOn = Object.keys(sets.PT).length + Object.keys(sets.OT).length + Object.keys(sets.ST).length;
-    _staffCnt = nOn ? { full: full, on: on, co: co, tFull: tFull, tOn: tOn } : null;
+    _staffCnt = nOn ? { full: full, on: on, co: coDay, tFull: tFull, tOn: tOn } : null;
     function cell(v){ return "<td style='padding:3px 10px;text-align:center;border:1px solid #cfdbe6;'>" + v + "</td>"; }
     function inp(k){ return "<td style='padding:2px 4px;border:1px solid #cfdbe6;'><input type='number' step='0.5' min='0' value='" + fmtNum(full[k]) +
                             "' onchange='setStaffFull(\"" + k + "\", this.value)' title='전체 인원 — 바뀌면 고쳐 두세요 (이 PC에 기억됩니다)'" +
@@ -2948,7 +2963,10 @@ function renderStaffCount(keepFocus) {
             "<tr style='background:#eaf2fa;font-weight:700;'>" + cell("") + cell("PT") + cell("OT") + cell("ST") + cell("코디") + cell("총 인원") + "</tr>" +
             "<tr>" + cell("<b>전체</b>") + inp("PT") + inp("OT") + inp("ST") + inp("CO") + cell(fmtNum(tFull)) + "</tr>" +
             "<tr>" + cell("<b>당일</b>") + cell(nOn ? fmtNum(on.PT) : dash) + cell(nOn ? fmtNum(on.OT) : dash) + cell(nOn ? fmtNum(on.ST) : dash) +
-                     cell(fmtNum(co)) + cell(nOn ? fmtNum(tOn) : dash) + "</tr></table>" +
+                     "<td style='padding:2px 4px;border:1px solid #cfdbe6;'><input type='number' id='staffCoDay' step='0.5' min='0' value='" + fmtNum(coDay) +
+                     "' oninput='window._staffCoDay = parseFloat(this.value) || 0; renderStaffCount(true);' title='당일 코디 — 주말처럼 코디가 없는 날은 0 으로'" +
+                     " style='width:48px;text-align:center;font-size:13px;border:1px solid #b9d3ea;border-radius:4px;padding:2px;'></td>" +
+                     cell(nOn ? fmtNum(tOn) : dash) + "</tr></table>" +
             " <button class='step-btn' onclick='copyStaffCount()' style='margin-left:8px;background:#2471a3;border-color:#2471a3;color:#fff;'>📋 당일 인원 복사</button>";
     if (!nOn) h += "<div style='margin-top:5px;color:#999;font-size:12px;'>시간표를 붙여넣으면 출근 인원이 계산됩니다.</div>";
     var rk = Object.keys(sets.red);
@@ -5209,15 +5227,28 @@ function showOutpatientList() {
     var lines = [];
     for (var i = 0; i < names.length; i += 5) lines.push(names.slice(i, i + 5).join(" "));
     outpatientText = lines.join("\n");
+    outpatientFormText = names.length + "\t\"" + names.join(" ") + "\"";
 
     area.style.display = "block";
     area.innerHTML =
         "<div style='border:1px solid #2980b9;border-radius:6px;padding:9px 11px;background:#eaf2f8;'>" +
         "<div style='font-weight:700;color:#1f618d;margin-bottom:6px;'>외래 " + names.length + "명" +
         " <button class='btn-copy' style='margin-left:8px;padding:3px 10px;font-size:12px;' " +
-        "onclick='copyOutpatientList()'>&#128203; 복사</button></div>" +
+        "onclick='copyOutpatientList()'>&#128203; 명단만 복사</button>" +
+        " <button class='btn-copy' style='margin-left:4px;padding:3px 10px;font-size:12px;background:#2980b9;' " +
+        "onclick='copyOutpatientForm()'>&#128203; 양식 복사 (인원 + 명단)</button></div>" +
         "<pre style='margin:0;font-family:\"Malgun Gothic\",sans-serif;font-size:13.5px;line-height:1.7;" +
         "white-space:pre-wrap;color:#222;'>" + (outpatientText || "(없음)") + "</pre></div>";
+}
+var outpatientFormText = "";
+function copyOutpatientForm() {
+    if (!outpatientFormText) return alert("외래 명단을 먼저 뽑아 주세요.");
+    var ta = document.createElement("textarea");
+    ta.value = outpatientFormText; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); alert("✅ 외래 양식 복사 완료\n통계표 외래 인원 칸에 붙여넣으면 옆 칸에 명단이 들어갑니다."); }
+    catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
+    document.body.removeChild(ta);
 }
 function copyOutpatientList() {
     if (!outpatientText) return alert("복사할 명단이 없습니다.");

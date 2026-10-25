@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b145</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b146</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -284,14 +284,16 @@ td.clickable:hover { opacity:0.75; }
   </div>
   <div id="staffCountArea" style="margin-top:6px;font-size:13px;"></div>
 </div>
-<div class="s3-box" style="border-color:#f0c040;background:#fffbea;margin:0 0 12px;">
+<!-- 부도 ns · 부도 os · 외래 명단을 한 줄에 3칸으로 -->
+<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;margin:0 0 12px;">
+<div class="s3-box" style="border-color:#f0c040;background:#fffbea;margin:0;flex:2 1 460px;min-width:0;">
   <div class="s12-head">
     <span class="s12-title" style="color:#a87400;">부도 환자</span>
     <span class="s12-hint">시간표에서 주황색 칸 · 통계 · 오더 점검에서는 자동으로 빠집니다</span>
   </div>
   <div id="budoSummary" style="margin-top:6px;font-size:13px;"></div>
 </div>
-<div class="s3-box" style="border-color:#a9cce3;background:#f4f9fd;margin:0 0 12px;">
+<div class="s3-box" style="border-color:#a9cce3;background:#f4f9fd;margin:0;flex:1 1 230px;min-width:0;">
   <div class="s12-head">
     <span class="s12-title" style="color:#1f618d;">외래 명단</span>
     <span class="s12-hint">EMR 외래/입원 열 기준</span>
@@ -299,6 +301,7 @@ td.clickable:hover { opacity:0.75; }
             style="background:#2980b9;color:#fff;border-color:#2980b9;">&#128101; 외래 명단 뽑기</button>
   </div>
   <div id="outpatientArea" style="display:none;margin-top:7px;"></div>
+</div>
 </div>
 <h2 class="result-header" style="border-color:#8e44ad;">&#128203; [8] 평가 실적 집계</h2>
 <p>※ EMR 엑셀 파일이 연동된 상태에서 아래 버튼을 누르면 평가 실적이 자동 집계됩니다.</p>
@@ -2862,7 +2865,7 @@ function renderBudoSummary() {
     if (!el) return;
     function block(title, ward, color) {
         var b = computeBudo(ward);
-        return "<div style='flex:1;min-width:220px;'>" +
+        return "<div style='flex:1 1 200px;min-width:0;'>" +
             "<div style='font-weight:800;color:" + color + ";margin-bottom:4px;'>" + title + " · " + b.total + "건" +
             (b.empty ? "" : " <button class='step-btn' onclick='copyBudo(\"" + ward + "\")' style='margin-left:6px;padding:2px 9px;font-size:12px;background:#a87400;border-color:#a87400;color:#fff;'>📋 복사</button>") +
             "</div><pre style='margin:0;padding:6px 10px;min-height:20px;background:#fff;border:1px solid #f0d27a;border-radius:6px;font-family:inherit;font-size:13px;line-height:1.55;'>" +

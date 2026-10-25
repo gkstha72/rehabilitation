@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b137</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b138</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -1526,10 +1526,11 @@ else { initOnLoad(); }
                 var _ttl = String((matrix[fr - 1] || [])[sc] || "").split(/[\n\r]/)[0].trim();
                 if (/^열전기|^방문|^재택/.test(_ttl)) {
                     var _hr = matrix[fr - 1] || [];
+                    var _subTtl = _ttl;   // 지금 칸이 속한 구역 제목 (열전기 → 방문재활 → 재택/방문 …)
                     for (var _c = sc + 1; _c <= ec; _c++) {
                         var _hv = String(_hr[_c] || "").trim();
-                        // 옆 구역 제목(방문재활 · 재택교육 …)은 사람이 아니다
-                        if (/^(열전기|방문|재택)/.test(_hv)) continue;
+                        // 옆 구역 제목(방문재활 · 재택교육 …)은 사람이 아니다 — 그 뒤 사람은 그 구역 소속
+                        if (/^(열전기|방문|재택)/.test(_hv)) { _subTtl = _hv; continue; }
                         var _n = cleanTherapistName(_hv);
                         if (!_n) continue;
                         var _red = !!(fmtMatrix && (fmtMatrix[fr - 1] || [])[_c] && fmtMatrix[fr - 1][_c].r);
@@ -1542,7 +1543,7 @@ else { initOnLoad(); }
                             _fill.push(!cellValIsBlankOrInvalid(String((matrix[_r] || [])[_c] || "").trim()) && !(_f && _f.b));
                             _mins.push(_h * 60 + (+_tm[2]));
                         }
-                        extraStaff[_n] = { v: _red ? staffFraction(_fill, _mins) : 1, red: _red };
+                        extraStaff[_n] = { v: _red ? staffFraction(_fill, _mins) : 1, red: _red, visit: /^(방문|재택)/.test(_subTtl) };
                     }
                 }
                 var room = identifyRoom(matrix, sc, fr);
@@ -2926,6 +2927,7 @@ function staffDeptSets(wardFilter) {
     function inWard(gid, c) { return !wardFilter || wardOfCol(gid, c) === wardFilter; }
     var dep = { PT: {}, OT: {}, ST: {} };       // 이름 → 출근 값 (1 · 0.75 · 0.5 · 0.25 · 0)
     var red = {};                               // 빨간 이름으로 표시된 사람
+    var visit = {};                             // 방문 · 재택 칸 담당 (인원현황 방문 줄)
     var osName = {};                            // 근골(os) 머리글(연하늘색)로 표시된 사람
     // ① 물리 · 작업 · 언어 — 열 머리글이 담당
     [["ptGridTable","PT"],["otGridTable","OT"],["stGridTable","ST"]].forEach(function(g) {
@@ -2982,6 +2984,7 @@ function staffDeptSets(wardFilter) {
     var ex = window._staffExtraPT || {};
     Object.keys(ex).forEach(function(w){ if (wardFilter && w !== wardFilter) return; Object.keys(ex[w] || {}).forEach(function(n) {
         var o = ex[w][n], v = (typeof o === "object") ? o.v : 1;
+        if (o && o.visit) visit[n] = 1;
         var d = STAFF_VISIT_DEPT[n] || "PT";
         if (!(n in dep.PT) && !(n in dep.OT) && !(n in dep.ST)) { dep[d][n] = v; if (o && o.red) red[n] = v; }
     }); });
@@ -3014,7 +3017,7 @@ function staffDeptSets(wardFilter) {
     // 한 사람이 두 파트에 잡히면 작업 · 언어 쪽을 우선한다
     Object.keys(dep.OT).forEach(function(n){ delete dep.PT[n]; });
     Object.keys(dep.ST).forEach(function(n){ delete dep.PT[n]; delete dep.OT[n]; });
-    return { PT: dep.PT, OT: dep.OT, ST: dep.ST, red: red, os: osName };
+    return { PT: dep.PT, OT: dep.OT, ST: dep.ST, red: red, os: osName, visit: visit };
 }
 function fmtNum(x) { return String(Math.round(x * 100) / 100); }
 var _staffCnt = null;
@@ -3055,15 +3058,24 @@ function renderStaffCount(keepFocus) {
         osSets = { PT:{}, OT:{}, ST:{} };
         ["PT","OT","ST"].forEach(function(d){ Object.keys(sets[d]).forEach(function(n){ if (sets.os[n]) osSets[d][n] = sets[d][n]; }); });
     }
+    // 방문 · 재택 담당은 방문 줄로 따로 센다 (ns · os 에서 뺀다)
+    var visitSets = { PT:{}, OT:{}, ST:{} };
+    ["PT","OT","ST"].forEach(function(d){ Object.keys(sets[d]).forEach(function(n){
+        if (sets.visit[n]) { visitSets[d][n] = sets[d][n]; delete osSets[d][n]; }
+    }); });
     var os = { PT: sum(osSets.PT), OT: sum(osSets.OT), ST: sum(osSets.ST) };
     os.T = os.PT + os.OT + os.ST;
+    var vis = { PT: sum(visitSets.PT), OT: sum(visitSets.OT), ST: sum(visitSets.ST) };
+    vis.T = vis.PT + vis.OT + vis.ST;
+    var ns = { PT: on.PT - os.PT - vis.PT, OT: on.OT - os.OT - vis.OT, ST: on.ST - os.ST - vis.ST };
     var co = full.CO;
     // 당일 코디 — 주말(토 · 일)은 코디가 없어 0, 평일은 전체 코디 수. 칸에서 고치면 그 값을 쓴다.
     var isWeekendDay = /토요일|일요일|주말/.test(typeof schedDateText === "string" ? schedDateText : "");
     var coDay = (window._staffCoDay !== undefined) ? window._staffCoDay : (isWeekendDay ? 0 : full.CO);
     var tFull = full.PT + full.OT + full.ST + co, tOn = on.PT + on.OT + on.ST + coDay;
+    ns.T = ns.PT + ns.OT + ns.ST + coDay;
     var nOn = Object.keys(sets.PT).length + Object.keys(sets.OT).length + Object.keys(sets.ST).length;
-    _staffCnt = nOn ? { full: full, on: on, co: coDay, tFull: tFull, tOn: tOn, os: os } : null;
+    _staffCnt = nOn ? { full: full, on: on, co: coDay, tFull: tFull, tOn: tOn, os: os, ns: ns, vis: vis } : null;
     function cell(v){ return "<td style='padding:3px 10px;text-align:center;border:1px solid #cfdbe6;'>" + v + "</td>"; }
     function inp(k){ return "<td style='padding:2px 4px;border:1px solid #cfdbe6;'><input type='number' step='0.5' min='0' value='" + fmtNum(full[k]) +
                             "' onchange='setStaffFull(\"" + k + "\", this.value)' title='전체 인원 — 바뀌면 고쳐 두세요 (이 PC에 기억됩니다)'" +
@@ -3072,24 +3084,31 @@ function renderStaffCount(keepFocus) {
     var h = "<table style='border-collapse:collapse;background:#fff;font-size:13px;display:inline-table;vertical-align:middle;'>" +
             "<tr style='background:#eaf2fa;font-weight:700;'>" + cell("") + cell("PT") + cell("OT") + cell("ST") + cell("코디") + cell("총 인원") + "</tr>" +
             "<tr>" + cell("<b>전체</b>") + inp("PT") + inp("OT") + inp("ST") + inp("CO") + cell(fmtNum(tFull)) + "</tr>" +
-            "<tr>" + cell("<b>당일</b>") + cell(nOn ? fmtNum(on.PT) : dash) + cell(nOn ? fmtNum(on.OT) : dash) + cell(nOn ? fmtNum(on.ST) : dash) +
+            "<tr>" + cell("<b>ns</b>") + cell(nOn ? fmtNum(ns.PT) : dash) + cell(nOn ? fmtNum(ns.OT) : dash) + cell(nOn ? fmtNum(ns.ST) : dash) +
                      "<td style='padding:2px 4px;border:1px solid #cfdbe6;'><input type='number' id='staffCoDay' step='0.5' min='0' value='" + fmtNum(coDay) +
                      "' oninput='window._staffCoDay = parseFloat(this.value) || 0; renderStaffCount(true);' title='당일 코디 — 주말처럼 코디가 없는 날은 0 으로'" +
                      " style='width:48px;text-align:center;font-size:13px;border:1px solid #b9d3ea;border-radius:4px;padding:2px;'></td>" +
-                     cell(nOn ? fmtNum(tOn) : dash) + "</tr>" +
+                     cell(nOn ? fmtNum(ns.T) : dash) + "</tr>" +
             "<tr style='color:#7d3c98;'>" + cell("<b>os</b>") + cell(fmtNum(os.PT)) + cell(fmtNum(os.OT)) + cell(os.ST ? fmtNum(os.ST) : "") +
-                     cell("") + cell(fmtNum(os.T)) + "</tr></table>" +
+                     cell("") + cell(fmtNum(os.T)) + "</tr>" +
+            "<tr style='color:#1e8449;'>" + cell("<b>방문</b>") + cell(fmtNum(vis.PT)) + cell(fmtNum(vis.OT)) + cell(vis.ST ? fmtNum(vis.ST) : "") +
+                     cell("") + cell(fmtNum(vis.T)) + "</tr>" +
+            "<tr style='background:#f4f6f7;'>" + cell("당일 계") + cell(nOn ? fmtNum(on.PT) : dash) + cell(nOn ? fmtNum(on.OT) : dash) + cell(nOn ? fmtNum(on.ST) : dash) +
+                     cell(fmtNum(coDay)) + cell(nOn ? fmtNum(tOn) : dash) + "</tr></table>" +
             " <button class='step-btn' onclick='copyStaffCount()' style='margin-left:8px;background:#2471a3;border-color:#2471a3;color:#fff;'>📋 당일 인원 복사</button>";
     if (!nOn) h += "<div style='margin-top:5px;color:#999;font-size:12px;'>시간표를 붙여넣으면 출근 인원이 계산됩니다.</div>";
     var osNames = []; ["PT","OT","ST"].forEach(function(d){ Object.keys(osSets[d]).forEach(function(n){ osNames.push(n); }); });
     if (nOn) h += "<div style='margin-top:4px;color:#7d3c98;font-size:12px;'>os: " + (osNames.length ? osNames.join(" · ") : "없음") +
                   (hasMsk ? " (근골 칸 시간표)" : " (머리글 연하늘색)") + "</div>";
+    var visNames = []; ["PT","OT","ST"].forEach(function(d){ Object.keys(visitSets[d]).forEach(function(n){ visNames.push(n + "(" + d + ")"); }); });
+    if (nOn && visNames.length) h += "<div style='margin-top:2px;color:#1e8449;font-size:12px;'>방문: " + visNames.join(" · ") + "</div>";
     var rk = Object.keys(sets.red);
     if (rk.length) h += "<div style='margin-top:5px;color:#c0392b;font-size:12px;'>빨간 이름: " +
         rk.map(function(n){ return n + " " + fmtNum(sets.red[n]); }).join(" · ") + "</div>";
     if (keepFocus === true) {
         var tds = area.querySelectorAll("table tr");
-        if (tds.length >= 3) { tds[1].lastChild.innerHTML = fmtNum(tFull); tds[2].lastChild.innerHTML = nOn ? fmtNum(tOn) : dash; return; }
+        if (tds.length >= 6) { tds[1].lastChild.innerHTML = fmtNum(tFull); tds[2].lastChild.innerHTML = nOn ? fmtNum(ns.T) : dash;
+            tds[5].lastChild.innerHTML = nOn ? fmtNum(tOn) : dash; tds[5].children[4].innerHTML = fmtNum(coDay); return; }
     }
     area.innerHTML = h;
 }
@@ -3097,13 +3116,13 @@ function copyStaffCount() {
     renderStaffCount();
     var c = _staffCnt;
     if (!c) { alert("시간표를 먼저 붙여넣어 주세요."); return; }
-    // 두 줄 — 당일 전체 / 근골(os) 출근 (통계표 당일 줄 PT 칸에 붙이면 아래 줄까지 채워진다)
-    var tsv = [fmtNum(c.on.PT), fmtNum(c.on.OT), fmtNum(c.on.ST), c.co ? fmtNum(c.co) : "", fmtNum(c.tOn)].join("\t") + "\n" +
-              [fmtNum(c.os.PT), fmtNum(c.os.OT), c.os.ST ? fmtNum(c.os.ST) : "", "", fmtNum(c.os.T)].join("\t");
+    // 세 줄 — ns / os / 방문 (통계표 ns 줄 PT 칸에 붙이면 os · 방문 줄까지 채워진다)
+    function rowOf(o, coV) { return [fmtNum(o.PT), fmtNum(o.OT), o.ST ? fmtNum(o.ST) : "0", coV, fmtNum(o.T)].join("\t"); }
+    var tsv = rowOf(c.ns, c.co ? fmtNum(c.co) : "0") + "\n" + rowOf(c.os, "") + "\n" + rowOf(c.vis, "");
     var ta = document.createElement("textarea");
     ta.value = tsv; ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); alert("✅ 당일 인원 복사 완료\n통계표 인원현황 당일 줄의 PT 칸에 붙여넣으세요.\n(아래 줄에 근골 os 출근 인원까지 들어갑니다)"); }
+    try { document.execCommand("copy"); alert("✅ 당일 인원 복사 완료\n통계표 인원현황 ns 줄의 PT 칸에 붙여넣으세요.\n(아래로 os · 방문 줄까지 들어갑니다)"); }
     catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
     document.body.removeChild(ta);
 }

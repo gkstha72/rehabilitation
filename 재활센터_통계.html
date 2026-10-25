@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b140</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b141</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3117,7 +3117,8 @@ function copyStaffCount() {
     var c = _staffCnt;
     if (!c) { alert("시간표를 먼저 붙여넣어 주세요."); return; }
     // 세 줄 — ns / os / 방문 (통계표 ns 줄 PT 칸에 붙이면 os · 방문 줄까지 채워진다)
-    function rowOf(o, coV) { return [fmtNum(o.PT), fmtNum(o.OT), o.ST ? fmtNum(o.ST) : "0", coV, fmtNum(o.T)].join("\t"); }
+    // 총 인원 칸은 셀 병합 + 합계 수식이라 붙이지 않는다 (붙이면 병합이 풀린다) — PT · OT · ST · 코디 네 칸만
+    function rowOf(o, coV) { return [fmtNum(o.PT), fmtNum(o.OT), o.ST ? fmtNum(o.ST) : "0", coV].join("\t"); }
     var tsv = rowOf(c.ns, c.co ? fmtNum(c.co) : "0") + "\n" + rowOf(c.os, "") + "\n" + rowOf(c.vis, "");
     var ta = document.createElement("textarea");
     ta.value = tsv; ta.style.position = "fixed"; ta.style.opacity = "0";

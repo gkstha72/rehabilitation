@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b133</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b134</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -1622,6 +1622,7 @@ else { initOnLoad(); }
             if (!window._staffExtraPT) window._staffExtraPT = {};
             window._staffExtraPT[ward] = extraStaff;
             wardDates[ward] = wardDate;
+            window._staffCoDay = undefined;   // 새 시간표 — 당일 코디는 날짜(평일 · 주말) 기준으로 다시 잡는다
             redistributeWards();
             try { renderStaffCount(); renderBudoSummary(); } catch (eS) {}
             area.value = "";
@@ -3027,8 +3028,9 @@ function renderStaffCount(keepFocus) {
     var os = { PT: sum(osSets.PT), OT: sum(osSets.OT), ST: sum(osSets.ST) };
     os.T = os.PT + os.OT + os.ST;
     var co = full.CO;
-    var coDayEl = document.getElementById("staffCoDay");
-    var coDay = (coDayEl && coDayEl.value !== "") ? (parseFloat(coDayEl.value) || 0) : (window._staffCoDay !== undefined ? window._staffCoDay : full.CO);
+    // 당일 코디 — 주말(토 · 일)은 코디가 없어 0, 평일은 전체 코디 수. 칸에서 고치면 그 값을 쓴다.
+    var isWeekendDay = /토요일|일요일|주말/.test(typeof schedDateText === "string" ? schedDateText : "");
+    var coDay = (window._staffCoDay !== undefined) ? window._staffCoDay : (isWeekendDay ? 0 : full.CO);
     var tFull = full.PT + full.OT + full.ST + co, tOn = on.PT + on.OT + on.ST + coDay;
     var nOn = Object.keys(sets.PT).length + Object.keys(sets.OT).length + Object.keys(sets.ST).length;
     _staffCnt = nOn ? { full: full, on: on, co: coDay, tFull: tFull, tOn: tOn, os: os } : null;
@@ -3066,7 +3068,7 @@ function copyStaffCount() {
     var c = _staffCnt;
     if (!c) { alert("시간표를 먼저 붙여넣어 주세요."); return; }
     // 두 줄 — 당일 전체 / 근골(os) 출근 (통계표 당일 줄 PT 칸에 붙이면 아래 줄까지 채워진다)
-    var tsv = [fmtNum(c.on.PT), fmtNum(c.on.OT), fmtNum(c.on.ST), fmtNum(c.co), fmtNum(c.tOn)].join("\t") + "\n" +
+    var tsv = [fmtNum(c.on.PT), fmtNum(c.on.OT), fmtNum(c.on.ST), c.co ? fmtNum(c.co) : "", fmtNum(c.tOn)].join("\t") + "\n" +
               [fmtNum(c.os.PT), fmtNum(c.os.OT), c.os.ST ? fmtNum(c.os.ST) : "", "", fmtNum(c.os.T)].join("\t");
     var ta = document.createElement("textarea");
     ta.value = tsv; ta.style.position = "fixed"; ta.style.opacity = "0";

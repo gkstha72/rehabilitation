@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b126</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b127</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2221,11 +2221,15 @@ function analyzeStMasterLogic() {
     var emrStats = calculateEmrStatsLogic(members, stOrder, stMap);
     // EMR 쪽 평가 건수 — 평가 코드는 stMap 에 없으므로 따로 더한다
     if (globalEmrRows && globalEmrCodeIdx !== -1) {
+        var stEvalSeen = {};
         globalEmrRows.forEach(function(row) {
             if (!row) return;
             if (globalEmrDcIdx !== -1 && String(row[globalEmrDcIdx]||"").trim() !== "") return;
             var rc = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
             if (!evalCodeMap[rc]) return;
+            var stk = emrChartOf(row) + "||" + rc;
+            if (stEvalSeen[stk]) return;          // 세부 줄은 1건으로
+            stEvalSeen[stk] = 1;
             var nm = globalEmrTherapistIdx !== -1 ? String(row[globalEmrTherapistIdx]||"").trim()
                                                   : String(row[globalEmrNameIdx]||"").trim();
             if (members.includes(nm)) emrStats[nm]["평가"] = (emrStats[nm]["평가"]||0) + 1;
@@ -2521,6 +2525,7 @@ function analyzeEvalLogic() {
         return alert("EMR 엑셀 파일을 먼저 연동해 주세요.");
     }
     evalStats = {};
+    var seenEval = {};
     evalOrder.forEach(function(e){ evalStats[e] = { total:0, therapists:[] }; });
     globalEmrRows.forEach(function(row) {
         if (!row) return;
@@ -2529,6 +2534,9 @@ function analyzeEvalLogic() {
         if (!rawCode || !rawName) return;
         var label = evalCodeMap[rawCode];
         if (!label) return;
+        var ek = evalEmrSeenKey(row, rawCode);
+        if (!ek || seenEval[ek]) return;      // 같은 환자 · 같은 평가의 세부 줄은 1건
+        seenEval[ek] = 1;
         evalStats[label].total += 1;
         // 치료사별 건수 추적
         if (!evalStats[label].therapistCounts) evalStats[label].therapistCounts = {};
@@ -2651,17 +2659,28 @@ function summaryTotalsOf(areaId) {
     });
     return out;
 }
+// 평가 EMR 1건 판정 — 한 슬립에 세부 줄이 여러 개(MMSE · GDS 등) 붙어 나오므로
+// 같은 환자(차트번호) · 같은 평가 코드는 1건으로 센다. D/C 줄은 뺀다.
+function evalEmrSeenKey(row, rc) {
+    if (globalEmrDcIdx !== -1 && String(row[globalEmrDcIdx]||"").trim() !== "") return null;
+    return emrChartOf(row) + "||" + rc;
+}
 function evalTotalsFromEmr() {
     var out = {};
     evalOrder.forEach(function(e){ out[e] = 0; });
     if (!globalEmrRows || globalEmrCodeIdx === -1) return null;
+    var seenE = {};
     globalEmrRows.forEach(function(row) {
         if (!row) return;
         var rc = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
         var nm = String(row[globalEmrNameIdx]||"").trim();
         if (!rc || !nm) return;
         var lb = evalCodeMap[rc];
-        if (lb) out[lb] += 1;
+        if (!lb) return;
+        var k = evalEmrSeenKey(row, rc);
+        if (!k || seenE[k]) return;
+        seenE[k] = 1;
+        out[lb] += 1;
     });
     return out;
 }

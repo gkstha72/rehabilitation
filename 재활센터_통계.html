@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-24 b125</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b126</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -694,6 +694,8 @@ function classifyPtToken(token) {
         //   (F)H김철수     → H → 회복기 규칙
         // 접두 문자 없이 환자명만 남으면 프리 보행로봇([F]보행로봇치료 MM999)
         //   김필순(F)+모닝 · 홍길동(F)+엑소 → 보행로봇F
+        // (F)○○○+CPM · (F)○○○+패시브 — 프리 CPM 이라 액팅 없음 (보행로봇F 아님)
+        if (CPM_MARK.test(token)) return null;
         var afterF = token.replace(/\(F\)/gi, "").trim();
         var fBase = afterF.split("+")[0].toUpperCase().trim();
         // 프리 복합운동치료((F)C○○○+CPM)는 청구하지 않으므로 집계에서 제외
@@ -3421,6 +3423,8 @@ function computeDetailDiff(therapist, label, room) {
         //   (F)H김철수     → H → 회복기 규칙
         // 접두 문자 없이 환자명만 남으면 프리 보행로봇([F]보행로봇치료 MM999)
         //   김필순(F)+모닝 · 홍길동(F)+엑소 → 보행로봇F
+        // (F)○○○+CPM · (F)○○○+패시브 — 프리 CPM 이라 액팅 없음 (보행로봇F 아님)
+        if (CPM_MARK.test(token)) return null;
         var afterF = token.replace(/\(F\)/gi, "").trim();
         var fBase = afterF.split("+")[0].toUpperCase().trim();
         // 프리 복합운동치료((F)C○○○+CPM)는 청구하지 않으므로 집계에서 제외

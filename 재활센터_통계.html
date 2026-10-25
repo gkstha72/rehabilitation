@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b144</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b145</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2769,7 +2769,7 @@ function evalTotalsFromEmr() {
 //   로봇이 걸린 환자는 로봇으로만 센다 · 건수가 0 인 항목은 보내지 않는다
 var BUDO_ROBOTS = ["모닝","엔젤","GR"];
 var BUDO_ROBOT_WORDS = /^(모닝|엔젤|엑소|알봇|워크봇|에리고|로코맷|RBOT|ROBOT|AR|MW|MR)$/i;
-var BUDO_ORDERS = ["H3","N","G","M","S","A","D"];
+var BUDO_ORDERS = ["H3","N","G","M","S","A","D","언어"];
 function wardOfCol(gid, c) {
     var rs = (window._wardCols || {})[gid] || [];
     for (var i = 0; i < rs.length; i++) if (c >= rs[i].s && c <= rs[i].e) return rs[i].ward;
@@ -2791,6 +2791,16 @@ function computeBudo(wardFilter) {
             // 줄바꿈이 빠져 붙어 와도 "GR김선자" 앞에서 끊어 읽는다
             flat = flat.replace(/([가-힣])(?=GR[가-힣])/g, "$1 ");
             var toks = flat.split(/[\s,]+/).filter(Boolean);
+            // 언어치료는 오더 구분 없이 환자 한 명 = 언어(1) (H · 비회 모두)
+            if (gid === "stGridTable") {
+                toks.forEach(function(t) {
+                    var nm = t.split("+")[0].replace(/^[A-Za-z0-9]+/, "").match(/^[가-힣]{2,4}/);
+                    if (!nm) return;
+                    addO("언어");
+                    if (names.indexOf(nm[0]) === -1) names.push(nm[0]);
+                });
+                return;
+            }
             var hCnt = 0, mgf = false;
             toks.forEach(function(t) {
                 var head = t.split("+")[0].toUpperCase();

@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b130</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b131</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -777,7 +777,7 @@ function handlePainPaste(e) { handleGridPaste(e, "painGridTable"); }
 var gridCellFmt = {};
 function setCellFmt(gid, r, c, f) {
     if (!gridCellFmt[gid]) gridCellFmt[gid] = {};
-    if (f && (f.u || f.s || f.b || f.r)) gridCellFmt[gid][r+"-"+c] = f;
+    if (f && (f.u || f.s || f.b || f.r || f.o)) gridCellFmt[gid][r+"-"+c] = f;
     else delete gridCellFmt[gid][r+"-"+c];
 }
 function cellFmt(gid, r, c) {
@@ -820,12 +820,14 @@ function buildClassDeco(doc) {
             var st = /text-decoration[^;]*line-through/i.test(body);
             var bo = isBudoBg(body);
             var rd = isRedBg(body);
-            if (!u && !st && !bo && !rd) continue;
+            var oc = isOsBg(body);
+            if (!u && !st && !bo && !rd && !oc) continue;
             m[1].split(",").forEach(function(sel) {
                 var cls = sel.trim().match(/\.([A-Za-z0-9_\-]+)/);
                 if (!cls) return;
                 var e = _clsDeco[cls[1]] || { u:false, s:false, b:false, r:false };
                 if (rd) e.r = true;
+                if (oc) e.o = true;
                 if (u) e.u = true;
                 if (st) e.s = true;
                 if (bo) e.b = true;
@@ -872,6 +874,26 @@ function isRedBg(css) {
     }
     return r >= 0xC0 && g <= 0x50 && b <= 0x50;
 }
+// 근골(os) 담당 머리글 — 주말 시트에서 근골 선생님 이름 칸은 연하늘색(#CCE6FF)으로 칠한다
+function isOsBg(css) {
+    var t = String(css||"");
+    var m = t.match(/background(?:-color)?\s*:\s*([^;]+)/i);
+    if (!m) return false;
+    var hx = m[1].trim().match(/#([0-9a-f]{6})\b/i), r, g, b;
+    if (hx) { var n = parseInt(hx[1], 16); r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255; }
+    else {
+        var rg = m[1].match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+        if (!rg) return false; r = +rg[1]; g = +rg[2]; b = +rg[3];
+    }
+    return b >= 0xF0 && r >= 0xB0 && r <= 0xE0 && g >= 0xD8 && g <= 0xF2;
+}
+function tdIsOs(td) {
+    if (!td || !td.getAttribute) return false;
+    var bg = td.getAttribute("bgcolor");
+    if (bg && isOsBg("background:" + bg)) return true;
+    if (isOsBg(td.getAttribute("style") || "")) return true;
+    return classDecoOf(td).o;
+}
 function tdIsRed(td) {
     if (!td || !td.getAttribute) return false;
     var bg = td.getAttribute("bgcolor");
@@ -892,7 +914,7 @@ function classDecoOf(node) {
     if (!cn) return out;
     cn.split(/\s+/).forEach(function(c) {
         var e = _clsDeco[c];
-        if (e) { if (e.u) out.u = true; if (e.s) out.s = true; if (e.b) out.b = true; if (e.r) out.r = true; }
+        if (e) { if (e.u) out.u = true; if (e.s) out.s = true; if (e.b) out.b = true; if (e.r) out.r = true; if (e.o) out.o = true; }
     });
     return out;
 }
@@ -941,7 +963,7 @@ function tdDecoration(td) {
     }
     var anyU = lines.some(function(x){ return x.u; });
     var anyS = lines.some(function(x){ return x.s; });
-    return { u:anyU, s:anyS, r:tdIsRed(td), lines:lines };
+    return { u:anyU, s:anyS, r:tdIsRed(td), o:tdIsOs(td), lines:lines };
 }
 
 // 클립보드 HTML → { matrix, fmt }. 표가 없으면 null 을 돌려 글자 붙여넣기로 넘긴다.
@@ -2855,6 +2877,7 @@ function staffDeptSets(wardFilter) {
     function inWard(gid, c) { return !wardFilter || wardOfCol(gid, c) === wardFilter; }
     var dep = { PT: {}, OT: {}, ST: {} };       // 이름 → 출근 값 (1 · 0.75 · 0.5 · 0.25 · 0)
     var red = {};                               // 빨간 이름으로 표시된 사람
+    var osName = {};                            // 근골(os) 머리글(연하늘색)로 표시된 사람
     // ① 물리 · 작업 · 언어 — 열 머리글이 담당
     [["ptGridTable","PT"],["otGridTable","OT"],["stGridTable","ST"]].forEach(function(g) {
         var gid = g[0], slot = buildRowSlotMap(gid), hdrs = headerRowsOf(gid);
@@ -2867,6 +2890,7 @@ function staffDeptSets(wardFilter) {
                 if (!v || ignoreHeaders.indexOf(v) !== -1) continue;
                 if (!inWard(gid, c)) continue;
                 var isRed = !!cellFmt(gid, hr, c).r;
+                var isOs = !!cellFmt(gid, hr, c).o;
                 var names = {};
                 v.replace(/\([^)]*\)/g, " ").replace(STAFF_HDR_NOISE, " ").split(/[\s\/,\-]+/).forEach(function(p) {
                     var n = cleanTherapistName(p);
@@ -2875,6 +2899,7 @@ function staffDeptSets(wardFilter) {
                 Object.keys(names).forEach(function(n) {
                     if (!per[n]) per[n] = { red: false, rows: {} };
                     if (isRed) per[n].red = true;
+                    if (isOs) osName[n] = 1;
                     for (var r = hr + 1; r < hrEnd; r++) {
                         if (!slot[r]) continue;
                         var ce = document.getElementById(gid + "-cell-" + r + "-" + c);
@@ -2919,7 +2944,7 @@ function staffDeptSets(wardFilter) {
     // 한 사람이 두 파트에 잡히면 작업 · 언어 쪽을 우선한다
     Object.keys(dep.OT).forEach(function(n){ delete dep.PT[n]; });
     Object.keys(dep.ST).forEach(function(n){ delete dep.PT[n]; delete dep.OT[n]; });
-    return { PT: dep.PT, OT: dep.OT, ST: dep.ST, red: red };
+    return { PT: dep.PT, OT: dep.OT, ST: dep.ST, red: red, os: osName };
 }
 function fmtNum(x) { return String(Math.round(x * 100) / 100); }
 var _staffCnt = null;
@@ -2943,16 +2968,6 @@ function setStaffFull(k, v) {
     staffSave("staffFull", f);
     renderStaffCount(true);
 }
-function osRosterLoad() { return staffLoad("osRoster", {}) || {}; }
-function osRosterEdit(txt) {
-    var cur = osRosterLoad(), out = {};
-    String(txt||"").split(/[\s,·]+/).forEach(function(n) {
-        n = n.trim(); if (!/^[가-힣]{2,4}\d?$/.test(n)) return;
-        out[n] = cur[n] || "PT";
-    });
-    staffSave("osRoster", out);
-    renderStaffCount();
-}
 function renderStaffCount(keepFocus) {
     var area = document.getElementById("staffCountArea");
     if (!area) return;
@@ -2961,19 +2976,14 @@ function renderStaffCount(keepFocus) {
     function sum(m){ var t = 0; Object.keys(m).forEach(function(k){ t += m[k]; }); return t; }
     var on = { PT: sum(sets.PT), OT: sum(sets.OT), ST: sum(sets.ST) };
     // 근골(os) 출근 인원 — 통계표 당일 줄 아래 줄
-    // 근골(os) — 평일은 근골 칸에 붙여넣은 시간표로 세고, 그 명단을 기억해 둔다.
-    //   주말처럼 한 시트에 섞여 오면 기억해 둔 근골 명단으로 가른다.
+    // 근골(os) — 평일은 근골 칸에 따로 붙여넣으니 그 칸 기준,
+    //   주말처럼 한 시트로 오면 머리글 색(근골 = 연하늘색 #CCE6FF)으로 가른다.
     var hasMsk = window._wardCols && Object.keys(window._wardCols).some(function(g){ return window._wardCols[g].some(function(x){ return x.ward === "msk"; }); });
-    var roster = osRosterLoad();
     var osSets;
-    if (hasMsk) {
-        osSets = staffDeptSets("msk");
-        var changed = false;
-        ["PT","OT","ST"].forEach(function(d){ Object.keys(osSets[d]).forEach(function(n){ if (!roster[n]) { roster[n] = d; changed = true; } }); });
-        if (changed) staffSave("osRoster", roster);
-    } else {
+    if (hasMsk) osSets = staffDeptSets("msk");
+    else {
         osSets = { PT:{}, OT:{}, ST:{} };
-        ["PT","OT","ST"].forEach(function(d){ Object.keys(sets[d]).forEach(function(n){ if (roster[n]) osSets[d][n] = sets[d][n]; }); });
+        ["PT","OT","ST"].forEach(function(d){ Object.keys(sets[d]).forEach(function(n){ if (sets.os[n]) osSets[d][n] = sets[d][n]; }); });
     }
     var os = { PT: sum(osSets.PT), OT: sum(osSets.OT), ST: sum(osSets.ST) };
     os.T = os.PT + os.OT + os.ST;
@@ -3000,11 +3010,9 @@ function renderStaffCount(keepFocus) {
                      cell("") + cell(fmtNum(os.T)) + "</tr></table>" +
             " <button class='step-btn' onclick='copyStaffCount()' style='margin-left:8px;background:#2471a3;border-color:#2471a3;color:#fff;'>📋 당일 인원 복사</button>";
     if (!nOn) h += "<div style='margin-top:5px;color:#999;font-size:12px;'>시간표를 붙여넣으면 출근 인원이 계산됩니다.</div>";
-    var rk0 = Object.keys(roster);
-    h += "<details style='margin-top:6px;font-size:12px;color:#555;'><summary style='cursor:pointer;color:#7d3c98;font-weight:700;'>근골(os) 명단 " + rk0.length + "명 " +
-         (hasMsk ? "— 근골 시간표에서 자동으로 모음" : "— 주말 등 한 시트일 때 이 명단으로 os 를 가름") + "</summary>" +
-         "<textarea onchange='osRosterEdit(this.value)' style='width:100%;box-sizing:border-box;min-height:40px;margin-top:4px;font-size:12px;font-family:inherit;'>" +
-         rk0.join(" ") + "</textarea><div style='color:#999;'>이름을 띄어 써서 넣고 칸 밖을 누르면 저장됩니다 (이 PC에 기억).</div></details>";
+    var osNames = []; ["PT","OT","ST"].forEach(function(d){ Object.keys(osSets[d]).forEach(function(n){ osNames.push(n); }); });
+    if (nOn) h += "<div style='margin-top:4px;color:#7d3c98;font-size:12px;'>os: " + (osNames.length ? osNames.join(" · ") : "없음") +
+                  (hasMsk ? " (근골 칸 시간표)" : " (머리글 연하늘색)") + "</div>";
     var rk = Object.keys(sets.red);
     if (rk.length) h += "<div style='margin-top:5px;color:#c0392b;font-size:12px;'>빨간 이름: " +
         rk.map(function(n){ return n + " " + fmtNum(sets.red[n]); }).join(" · ") + "</div>";

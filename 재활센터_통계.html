@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b142</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b143</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2984,6 +2984,8 @@ function staffDeptSets(wardFilter) {
     var ex = window._staffExtraPT || {};
     Object.keys(ex).forEach(function(w){ if (wardFilter && w !== wardFilter) return; Object.keys(ex[w] || {}).forEach(function(n) {
         var o = ex[w][n], v = (typeof o === "object") ? o.v : 1;
+        // 방문 · 재택은 주말에 출근하지 않는다 — 주말 시간표에 이름이 있어도 세지 않는다
+        if (o && o.visit && /토요일|일요일|주말/.test(typeof schedDateText === "string" ? schedDateText : "")) return;
         if (o && o.visit) visit[n] = 1;
         var d = STAFF_VISIT_DEPT[n] || "PT";
         if (!(n in dep.PT) && !(n in dep.OT) && !(n in dep.ST)) { dep[d][n] = v; if (o && o.red) red[n] = v; }

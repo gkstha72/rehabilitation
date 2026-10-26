@@ -1898,6 +1898,28 @@ function isMemoCell(txt){
   return false;
 }
 
+// 외진·외출 명단 칸 — 시간표 오른쪽에 "514 임훈성 | 날짜 | 외진 | 사유 | 정리 메모" 식으로 적어둔 표.
+//   첫 줄이 치료사 머리행과 같은 줄에 걸쳐 있으면 그 열이 치료사 열로 잡혀,
+//   호실+이름만 적힌 칸이 옆 행의 시간을 물려받아 엉뚱하게 채워진다.
+//   '호실+이름'만 있는 칸이고, 오른쪽 1~3칸에 날짜나 외진·외출·외박 표기가 있으면 명단으로 보고 건너뛴다.
+//   ※ '513 유제덕 3차'처럼 회차가 붙은 실제 치료 칸이나, 옆이 치료 칸인 경우는 그대로 읽는다.
+const ABSENCE_NAME_RE = /^\s*[1-9]\d{2}\s*[\)\.]?\s*[가-힣]{2,}\d?\s*$/;
+const ABSENCE_WORD_RE = /(외진|외출|외박|공단)/;
+function isAbsenceListCell(ws, r, c){
+  const cell = ws[XLSX.utils.encode_cell({r, c})];
+  if(!cell || typeof cell.v !== 'string' || !ABSENCE_NAME_RE.test(cell.v)) return false;
+  for(let k = 1; k <= 3; k++){
+    const n = ws[XLSX.utils.encode_cell({r, c: c + k})];
+    if(!n || n.v == null || n.v === '') continue;
+    if(n.t === 'd') return true;                                         // 날짜 셀
+    if(n.t === 'n' && n.w && /\d{1,4}[\/\-.]\d{1,2}/.test(n.w)) return true; // 날짜 서식 숫자
+    const s = String(n.v);
+    if(ABSENCE_WORD_RE.test(s)) return true;
+    if(/^\s*\d{1,3}\/\d{1,2}/.test(s)) return true;                      // '10/19~10/20' 같은 기간
+  }
+  return false;
+}
+
 // 제외할 "블록" 찾기 — 시트 맨 윗줄(치료사/구분 이름이 적힌 줄)에서
 //   방문재활·재택/방문·재택교육·회복기 리스트 같은 머리글을 찾아,
 //   그 머리글부터 다음 머리글 직전까지의 열 전체를 제외한다.
@@ -3567,6 +3589,7 @@ function processSheetForDay(wb, sheetName, day, nameMap, opts){
       if(allowedCols && !allowedCols.has(c)) continue;   // 치료사 열이 아님 (시간 행 × 치료사 열만)
       if(listCols[c] !== undefined && r > listCols[c]) continue;
       if(isMemoCell(cell.v)) continue;   // 메모·참고 표기
+      if(isAbsenceListCell(ws, r, c)) continue;   // 외진·외출 명단 칸
       if(underlineSet.has(ref)) continue;
       // 컬럼 헤더 오버라이드 (외래/재택 → 제외)
       const colOv = getColOverride(colHeaders, r, c);

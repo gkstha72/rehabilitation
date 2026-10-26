@@ -2784,12 +2784,38 @@ const EQUIP_WORDS = new Set([
 //   ※ '전동상지' 같은 치료명과 겹치지 않게 단어를 고른다. (전동은 넣지 않음)
 //   ※ '보호자상주' 처럼 치료 칸 안에 들어가는 말은 넣지 않는다.
 const MEMO_WORDS_RE = /(미용|외출|귀원|외박|면회|퇴원|귀가|조퇴|정리했|정리 했|확인바|부탁드|취소됨)/;
+// 3층에만 있는 기구 (근골 기록에 이 기구가 있는데 (3층) 표기가 없으면 검증에서 확인 요청)
+//   슬라이드(슬라)·스마트 발란스(스마트)는 1층에도 있어서 넣지 않는다.
+const FLOOR3_EQUIP_RE = /\+\s*(코끼리|코로|코|런닝|워킹|아크|경사|바로|동적|기립|클라|어댑핏|등속성|전동상지)(?![가-힣])/;
+const FLOOR_TAG_RE = /\((?:3층|1층|병동|침상|HOLD|외래|음악치료실)\)|치료실\s*[→\->]+\s*병동|병동\s*[→\->]+\s*치료실/;
 function isMemoCell(txt){
   if(!txt) return false;
   const t = String(txt);
   const times = t.match(/\d{1,2}:\d{2}/g);
   if(times && times.length >= 2) return true;      // 시각이 여러 개 = 인수인계 메모
   if(MEMO_WORDS_RE.test(t)) return true;           // 미용·외출·귀원 등 메모
+  return false;
+}
+
+// 외진·외출 명단 칸 — 시간표 오른쪽에 "514 임훈성 | 날짜 | 외진 | 사유 | 정리 메모" 식으로 적어둔 표.
+//   첫 줄이 치료사 머리행과 같은 줄에 걸쳐 있으면 그 열이 치료사 열로 잡혀,
+//   호실+이름만 적힌 칸이 옆 행의 시간을 물려받아 엉뚱하게 채워진다.
+//   '호실+이름'만 있는 칸이고, 오른쪽 1~3칸에 날짜나 외진·외출·외박 표기가 있으면 명단으로 보고 건너뛴다.
+//   ※ '513 유제덕 3차'처럼 회차가 붙은 실제 치료 칸이나, 옆이 치료 칸인 경우는 그대로 읽는다.
+const ABSENCE_NAME_RE = /^\s*[1-9]\d{2}\s*[\)\.]?\s*[가-힣]{2,}\d?\s*$/;
+const ABSENCE_WORD_RE = /(외진|외출|외박|공단)/;
+function isAbsenceListCell(ws, r, c){
+  const cell = ws[XLSX.utils.encode_cell({r, c})];
+  if(!cell || typeof cell.v !== 'string' || !ABSENCE_NAME_RE.test(cell.v)) return false;
+  for(let k = 1; k <= 3; k++){
+    const n = ws[XLSX.utils.encode_cell({r, c: c + k})];
+    if(!n || n.v == null || n.v === '') continue;
+    if(n.t === 'd') return true;                                         // 날짜 셀
+    if(n.t === 'n' && n.w && /\d{1,4}[\/\-.]\d{1,2}/.test(n.w)) return true; // 날짜 서식 숫자
+    const s = String(n.v);
+    if(ABSENCE_WORD_RE.test(s)) return true;
+    if(/^\s*\d{1,3}\/\d{1,2}/.test(s)) return true;                      // '10/19~10/20' 같은 기간
+  }
   return false;
 }
 
@@ -2974,6 +3000,7 @@ function computeExpectedFills(wb, sheetName, defaultCategory){
       if(allowedCols && !allowedCols.has(c)) continue;   // 치료사 열이 아님
       if(listCols[c] !== undefined && r > listCols[c]) continue;   // 세로 명단 열
       if(isMemoCell(cell.v)) continue;               // 인수인계 메모 칸
+      if(isAbsenceListCell(ws, r, c)) continue;   // 외진·외출 명단 칸
       if(underlineSet.has(ref)) continue;
       const colOv = getColOverride(colHeaders, r, c);
       if(colOv && colOv.exclude) continue;
@@ -3183,9 +3210,11 @@ function runVerification(){
   // 이번 검증 파싱에서 나온 '비슷한 이름' 메모 초기화
   resetNameSimilarNotes();
 
+  let muscleFills = [];
   function applyExpected(src, tag){
     if(!src) return;
     const { fills, unmatchedNames, ambiguousNames, homonymNotes } = computeExpectedFills(src.wb, src.sheetName, src.defaultCategory);
+    if(tag === '근골') muscleFills = fills;   // 3층 기구 표기 검사용
     Object.entries(homonymNotes || {}).forEach(([k, v])=>{
       if(!allHomonym[k]) allHomonym[k] = {...v, slots:[...v.slots], files:[tag]};
       else{
@@ -3225,6 +3254,30 @@ function runVerification(){
   }
   applyExpected(lastImport.neuro, '신경계');
   applyExpected(lastImport.muscle, '근골');
+
+  // 1.1) 3층 기구인데 (3층) 표기가 빠진 근골 기록
+  //   근골 시간표는 기본이 1층이라, 3층 기구(코끼리·런닝 등)를 쓰면서 (3층)을 빠뜨리면
+  //   원본도 1층·표도 1층으로 '일치'해 그냥 통과됐다. → 기구 이름으로 따로 잡아 확인을 요청한다.
+  //   슬라이드·스마트 발란스는 1층에도 있어서 대상에서 뺀다.
+  const floor3Missing = [];
+  if(lastImport.muscle){
+    const mws = lastImport.muscle.wb.Sheets[lastImport.muscle.sheetName];
+    const mFills = muscleFills;
+    const seen3 = new Set();
+    mFills.forEach(f=>{
+      if(f.cat !== '1층' || f.weak) return;
+      const cell = mws && mws[f.ref];
+      if(!cell || typeof cell.v !== 'string') return;
+      const line = cell.v.split(/\r?\n/).find(l=>l.includes(f.name));
+      if(!line || FLOOR_TAG_RE.test(line)) return;
+      const eq = line.slice(line.indexOf(f.name) + f.name.length).match(FLOOR3_EQUIP_RE);
+      if(!eq) return;
+      const key = `${f.room}-${f.p}-${f.slot}`;
+      if(seen3.has(key)) return;
+      seen3.add(key);
+      floor3Missing.push({ key, room:f.room, p:f.p, slot:f.slot, name:f.name, ref:f.ref, equip:eq[1], line:line.trim() });
+    });
+  }
 
   // 1.2) 시간 중복 — 같은 호실·자리·시간에 서로 다른 구분이 2개 이상
   //      어느 쪽이 맞는지 정하지 않고 '확인 필요'로 따로 뺀다 (누락으로 잡히지 않게 expected에서 제거)
@@ -3302,6 +3355,12 @@ function runVerification(){
     }
   }
 
+  // 3층 기구 표기 누락 — 표가 아직 1층이면 문제 (직접 3층으로 고쳤으면 통과)
+  problems.floor3 = floor3Missing.filter(x=>{
+    const actual = state.rooms[x.room] && state.rooms[x.room].cells[x.key];
+    return actual === '1층';
+  });
+
   // rTMS 자리 검증 — 무조건 '외래'여야 함
   for(const [key, rex] of Object.entries(rtmsExpected)){
     checkedCells++;
@@ -3326,7 +3385,7 @@ function runVerification(){
   if(rtmsCount > 0){
     fileChecks.push(`rTMS 고정 검사 — 오늘(${today||'?'}요일) ${rtmsCount}자리 확인`);
   }
-  fileChecks.push(`누락 검사 · 층 일치 검사 · 시간 중복 검사 완료`);
+  fileChecks.push(`누락 검사 · 층 일치 검사 · 시간 중복 검사 · 3층 기구 표기 검사 완료`);
 
   // 비슷한 이름(정순 / 정순태) 점검 결과
   const vNameMap = buildNameMap();
@@ -3417,7 +3476,8 @@ function showVerificationReport(problems, meta){
   const hmCheck = hmList.filter(x=>x.kind==='numMismatch');   // 사람이 확인해야 하는 것
   const hmInfo  = hmList.filter(x=>x.kind==='exact' || x.kind==='plain' || x.kind==='skip');  // 참고
   const setupIssues = meta.setupIssues || [];
-  const totalProblems = problems.missing.length + problems.wrongFloor.length
+  const floor3Problems = (problems.floor3 || []).length;
+  const totalProblems = problems.missing.length + problems.wrongFloor.length + floor3Problems
                       + rtmsProblems + conflictProblems + ambiguousProblems
                       + hmCheck.length + setupIssues.length;
   const pass = totalProblems === 0;
@@ -3468,6 +3528,15 @@ function showVerificationReport(problems, meta){
       html += `<div class="vf-row"><span class="vf-room">${m.room}호</span> <span class="vf-nm">${m.name||'(이름?)'}</span> <span class="vf-slot">${m.slot}</span> → 표 <b>${floorName(m.actual)}</b> / 원본 <b>${floorName(m.expected)}</b></div>`;
     });
     if(problems.wrongFloor.length > 60) html += `<div class="vf-more">…외 ${problems.wrongFloor.length-60}건</div>`;
+    html += `</div>`;
+  }
+  if(floor3Problems){
+    html += `<div class="vf-sec"><div class="vf-sec-title" style="color:#b3352c">🏋️ 3층 기구인데 1층 — 근골 원본에 (3층) 표기 빠짐 (${floor3Problems})</div>`;
+    problems.floor3.slice(0, 40).forEach(m=>{
+      html += `<div class="vf-row"><span class="vf-room">${m.room}호</span> <span class="vf-nm">${m.name}</span> <span class="vf-slot">${m.slot}</span> → <b>${escapeHtml(m.equip)}</b>는 3층 기구 · 원본 <span class="vf-slot">(${m.ref})</span> "${escapeHtml(m.line)}"</div>`;
+    });
+    if(floor3Problems > 40) html += `<div class="vf-more">…외 ${floor3Problems-40}건</div>`;
+    html += `<div class="vf-row" style="color:#8a97ab;font-size:12px">※ 실제로 3층이면 칸을 눌러 3층으로 바꿔주세요(바꾸면 다음 검증에서 통과). 1층이 맞으면 무시하셔도 됩니다. 코디 선생님께 (3층) 표기 요청도 함께.</div>`;
     html += `</div>`;
   }
   if(problems.conflict && problems.conflict.length){
@@ -3950,6 +4019,7 @@ function autoFillFromWorkbook(wb, defaultCategory, ev){
           if(allowedCols && !allowedCols.has(c)) continue;   // 치료사 열이 아님
           if(listCols[c] !== undefined && r > listCols[c]) continue;   // 세로 명단 열
           if(isMemoCell(cell.v)) continue;   // 인수인계 메모 칸
+          if(isAbsenceListCell(ws, r, c)) continue;   // 외진·외출 명단 칸
           // 밑줄 친 셀(액팅 처리) → 이동반 제외
           if(underlineSet.has(ref)){
             console.log(`[밑줄제외] ${ref} "${String(cell.v).replace(/\n/g,'⏎').slice(0,20)}" → 이동반 제외`);

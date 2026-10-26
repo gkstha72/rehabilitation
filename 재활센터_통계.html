@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-26 b148</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-26 b149</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2933,6 +2933,8 @@ function staffFraction(filled, mins) {
 }
 // 아르바이트 · 시간제 — 출근해도 당일 인원에 이 값으로 센다 (0 = 세지 않음)
 var STAFF_PART_TIME = { "심원빈": 0.5 };   // 언어 알바 — 출근하면 0.5
+// 통계표 비고에 적는 사람 — 출근한 날만 "ST 알바 0.5 - 심원빈" 처럼 메모로 보여 준다
+var STAFF_REMARK = { "심원빈": "ST 알바", "서연아": "물리 계약직" };
 // 열전기 · 방문재활 · 재택 구역 담당은 기본 PT. OT 인 사람만 여기 적는다.
 var STAFF_VISIT_DEPT = { "임건우": "OT", "노을": "OT" };
 // 다른 파트 칸(주말 관리자 칸 등)에 이름이 있어도 실제 파트로 센다
@@ -3125,6 +3127,12 @@ function renderStaffCount(keepFocus) {
                   (hasMsk ? " (근골 칸 시간표)" : " (머리글 연하늘색)") + "</div>";
     var visNames = []; ["PT","OT","ST"].forEach(function(d){ Object.keys(visitSets[d]).forEach(function(n){ visNames.push(n + "(" + d + ")"); }); });
     if (nOn && visNames.length) h += "<div style='margin-top:2px;color:#1e8449;font-size:12px;'>방문: " + visNames.join(" · ") + "</div>";
+    var remarks = [];
+    Object.keys(STAFF_REMARK).forEach(function(n) {
+        var v = (n in sets.PT) ? sets.PT[n] : (n in sets.OT) ? sets.OT[n] : (n in sets.ST) ? sets.ST[n] : 0;
+        if (v > 0) remarks.push(STAFF_REMARK[n] + " " + fmtNum(v) + " - " + n);
+    });
+    if (nOn && remarks.length) h += "<div style='margin-top:5px;font-size:12px;color:#555;'>비고: <span style='white-space:pre;'>" + remarks.join("\n") + "</span></div>";
     var rk = Object.keys(sets.red);
     // 휴무자 — 쉰 만큼 표시 (종일 1 · 반차 0.5 · 반반차 0.25)
     if (rk.length) h += "<div style='margin-top:5px;color:#c0392b;font-size:12px;'>휴무자: " +

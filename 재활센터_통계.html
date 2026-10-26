@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-26 b149</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-26 b150</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3123,10 +3123,10 @@ function renderStaffCount(keepFocus) {
             " <button class='step-btn' onclick='copyStaffCount()' style='margin-left:8px;background:#2471a3;border-color:#2471a3;color:#fff;'>📋 당일 인원 복사</button>";
     if (!nOn) h += "<div style='margin-top:5px;color:#999;font-size:12px;'>시간표를 붙여넣으면 출근 인원이 계산됩니다.</div>";
     var osNames = []; ["PT","OT","ST"].forEach(function(d){ Object.keys(osSets[d]).forEach(function(n){ osNames.push(n); }); });
-    if (nOn) h += "<div style='margin-top:4px;color:#7d3c98;font-size:12px;'>os: " + (osNames.length ? osNames.join(" · ") : "없음") +
+    if (false) h += "<div style='margin-top:4px;color:#7d3c98;font-size:12px;'>os: " + (osNames.length ? osNames.join(" · ") : "없음") +
                   (hasMsk ? " (근골 칸 시간표)" : " (머리글 연하늘색)") + "</div>";
     var visNames = []; ["PT","OT","ST"].forEach(function(d){ Object.keys(visitSets[d]).forEach(function(n){ visNames.push(n + "(" + d + ")"); }); });
-    if (nOn && visNames.length) h += "<div style='margin-top:2px;color:#1e8449;font-size:12px;'>방문: " + visNames.join(" · ") + "</div>";
+    if (false && visNames.length) h += "<div style='margin-top:2px;color:#1e8449;font-size:12px;'>방문: " + visNames.join(" · ") + "</div>";
     var remarks = [];
     Object.keys(STAFF_REMARK).forEach(function(n) {
         var v = (n in sets.PT) ? sets.PT[n] : (n in sets.OT) ? sets.OT[n] : (n in sets.ST) ? sets.ST[n] : 0;

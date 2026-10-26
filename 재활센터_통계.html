@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-25 b146</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-26 b147</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2932,7 +2932,7 @@ function staffFraction(filled, mins) {
     return 0.75;                     // 둘 다 있는데 빨간 이름 — 반반차
 }
 // 아르바이트 · 시간제 — 출근해도 당일 인원에 이 값으로 센다 (0 = 세지 않음)
-var STAFF_PART_TIME = { "심원빈": 0 };
+var STAFF_PART_TIME = { "심원빈": 0.5 };   // 언어 알바 — 출근하면 0.5
 // 열전기 · 방문재활 · 재택 구역 담당은 기본 PT. OT 인 사람만 여기 적는다.
 var STAFF_VISIT_DEPT = { "임건우": "OT", "노을": "OT" };
 // 다른 파트 칸(주말 관리자 칸 등)에 이름이 있어도 실제 파트로 센다
@@ -2943,7 +2943,7 @@ var STAFF_ROSTER_PT = ["장일용","김윤량","김영신","황보슬","박세�
 // 재활센터 인원현황 OT 명단 (2026-10) — 여기 있는 사람은 어느 칸에 있든 OT 로 센다 (주말 PT 관리자 칸의 홍은기 등)
 var STAFF_ROSTER_OT = ["우광식","이진광","김한솜","정승희","홍은기","김수현","강은서","모정민","김민지","김태규","조시연","이다혜","임건우","정다경","노을","양영모","한혜수","양가영","임서윤","임정현","황은비","문원혁","박준오","김수진","이수진","윤희지","김지수","윤수연","엄주영","김남준","정희성","오서율","김다은","임희정","송가은","윤혜미","박채원","박철민","김용훈","서지원","진하민","박민희","김혜민","김수현2","김나현","구하빈","박상규","이병주","이원석","정영빈","정찬웅","손다은","이어진","김영우","오유진","박윤지","강민혁","김가은","김선중","박은영","이명이","조수현","황수아","강채린","이지현","황다정"];
 // 재활센터 인원현황 ST 명단 (2026-10)
-var STAFF_ROSTER_ST = ["김민정","양세미","양소희","우주연","조수진"];
+var STAFF_ROSTER_ST = ["김민정","양세미","양소희","우주연","조수진","심원빈"];
 function staffDeptSets(wardFilter) {
     function inWard(gid, c) { return !wardFilter || wardOfCol(gid, c) === wardFilter; }
     var dep = { PT: {}, OT: {}, ST: {} };       // 이름 → 출근 값 (1 · 0.75 · 0.5 · 0.25 · 0)

@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-26 b150</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-26 b151</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3050,20 +3050,20 @@ var _staffCnt = null;
 // 그래서 전체 인원(정원)은 한 번 적어 두면 이 브라우저에 기억해 두고,
 // 당일 인원 = 전체 − 근태 명단 으로 낸다.
 // 근태 명단의 파트는 시간표에서 찾고, 시간표에 없는 사람은 한 번 골라 주면 기억한다.
-var STAFF_FULL_DEFAULT = { PT: 69, OT: 66, ST: 5.5, CO: 2 };
+var STAFF_FULL_DEFAULT = { PT: 70, OT: 66, ST: 5.5, CO: 2 };   // 2026-10-26 PT 70 (서연아 계약직 포함)
 function staffLoad(key, def) {
     try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch (e) { return def; }
 }
 function staffSave(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
 function staffFull() {
-    var f = staffLoad("staffFull", null) || {};
+    var f = staffLoad("staffFull_v2", null) || {};
     var o = {};
     Object.keys(STAFF_FULL_DEFAULT).forEach(function(k){ o[k] = (f[k] !== undefined && f[k] !== null && f[k] !== "") ? +f[k] : STAFF_FULL_DEFAULT[k]; });
     return o;
 }
 function setStaffFull(k, v) {
     var f = staffFull(); f[k] = parseFloat(v) || 0;
-    staffSave("staffFull", f);
+    staffSave("staffFull_v2", f);
     renderStaffCount(true);
 }
 function renderStaffCount(keepFocus) {

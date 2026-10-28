@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-28 b156</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-28 b157</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -781,7 +781,7 @@ function handlePainPaste(e) { handleGridPaste(e, "painGridTable"); }
 var gridCellFmt = {};
 function setCellFmt(gid, r, c, f) {
     if (!gridCellFmt[gid]) gridCellFmt[gid] = {};
-    if (f && (f.u || f.s || f.b || f.r || f.o || f.g)) gridCellFmt[gid][r+"-"+c] = f;
+    if (f && (f.u || f.s || f.b || f.r || f.o || f.g || f.x)) gridCellFmt[gid][r+"-"+c] = f;
     else delete gridCellFmt[gid][r+"-"+c];
 }
 function cellFmt(gid, r, c) {
@@ -803,6 +803,25 @@ function cellLines(gid, r, c, txt) {
     return [{ text: txt, u: f.u, s: f.s }];
 }
 function clearGridFmt(gid) { gridCellFmt[gid] = {}; }
+// 가운데선(취소선) 그어진 이름은 시간표 칸에서 지운다 — 시행만 하고 액팅은 안 넘긴 건이라 집계 · 점검에서 어차피 빠진다.
+//   부도(주황) 칸은 부도 집계에 써야 하므로 그대로 둔다.
+//   지운 칸은 x 표시를 남겨, 인원 계산에서는 "그 시간에 치료함" 으로 본다.
+function stripStruckCells(gids) {
+    (gids || ["ptGridTable","otGridTable","stGridTable","etGridTable","mtGridTable","painGridTable"]).forEach(function(gid) {
+        var fm = gridCellFmt[gid] || {};
+        Object.keys(fm).forEach(function(k) {
+            var f = fm[k];
+            if (!f || !f.s || f.b) return;
+            var el = document.getElementById(gid + "-cell-" + k);
+            if (!el) return;
+            var keepLines = (f.lines || []).filter(function(ln){ return !ln.s; });
+            el.value = keepLines.map(function(ln){ return ln.text; }).join("\n");
+            el.style.textDecoration = "";
+            el.title = "";
+            fm[k] = { u: keepLines.some(function(ln){ return ln.u; }), s: false, r: f.r, o: f.o, g: f.g, x: true, lines: keepLines };
+        });
+    });
+}
 
 // 한 칸 안에서 줄(이름) 단위로 밑줄·취소선을 읽는다.
 //   "H임훈성+슬라 / H송순심+등속성 / H이종권+슬라" 처럼 한 칸에 여러 명이 들어가고
@@ -1030,6 +1049,7 @@ function handleGridPaste(e, tableId) {
     resetHeaderRowCache();
     if (parsed) distributeMatrix(parsed.matrix, tableId, e.target, parsed.fmt);
     else distributeMatrix(parsePastedText(cb.getData("Text")), tableId, e.target, null);
+    stripStruckCells([tableId]);
 }
 
 function parsePastedText(pastedData) {
@@ -1437,6 +1457,7 @@ else { initOnLoad(); }
             excludeUndo = keep;
             renderExcludedList();
         }
+        stripStruckCells();
         // 날짜 — 신경계 우선
         schedDateText = wardDates.neuro || wardDates.msk || "";
         renderDateBanner();
@@ -3018,7 +3039,7 @@ function staffDeptSets(wardFilter) {
                         // 간부 회색 칸 = 업무. 단 오후 끝(15:49 이후) 회색은 매일 칠해 두는 칸이라 보지 않는다
                         var gm = toMinutes(slot[r]); if (gm !== null && gm < 8 * 60) gm += 12 * 60;
                         var grayWork = cf.g && STAFF_MANAGERS.indexOf(n) !== -1 && gm !== null && gm < 15 * 60 + 45;
-                        var f = (!cellValIsBlankOrInvalid(cv) && !cf.b) || grayWork;
+                        var f = (!cellValIsBlankOrInvalid(cv) && !cf.b) || grayWork || !!cf.x;
                         per[n].rows[r] = per[n].rows[r] || f;
                     }
                 });

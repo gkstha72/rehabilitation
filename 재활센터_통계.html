@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-28 b152</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-28 b153</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -280,7 +280,7 @@ td.clickable:hover { opacity:0.75; }
 <div class="s3-box" style="border-color:#b9d3ea;background:#f5f9fd;margin:8px 0 12px;">
   <div class="s12-head">
     <span class="s12-title" style="color:#2471a3;">👥 치료사 인원</span>
-    <span class="s12-hint">시간표에 이름이 있는 치료사를 셉니다 · 빨간 이름은 전부 비면 0 · 오전이나 오후만 있으면 0.5 · 둘 다 있으면 0.75 (부도 칸은 빈 칸으로 봄) · 전체 인원은 한 번 적어 두면 기억합니다</span>
+    <span class="s12-hint">시간표에 이름이 있는 치료사를 셉니다 · 빨간 이름은 11:55 · 17:30 빼고 — 종일 비면 연차 · 오전이나 오후 통째로 비면 반차 · 3타임 이상 비면 반반차 (부도 칸은 빈 칸으로 봄) · 전체 인원은 한 번 적어 두면 기억합니다</span>
   </div>
   <div id="staffCountArea" style="margin-top:6px;font-size:13px;"></div>
 </div>
@@ -2918,18 +2918,26 @@ function staffHeaderNames(gid) {
 //   중간에 빈 칸(치료 없는 시간)은 빠진 것으로 보지 않는다.
 function staffFraction(filled, mins) {
     // filled[i] = 그 시간에 치료가 있는지, mins[i] = 그 시간(분)
-    // 오전(12:00 전) · 오후(13:00 이후)로 나눠 본다. 점심 칸은 보지 않는다.
-    var am = false, pm = false;
+    // 11:55 · 17:30 타임은 보지 않는다 (점심 · 마지막 타임).
+    //   하루 종일 비면 연차(0) · 오전이나 오후가 통째로 비면 반차(0.5)
+    //   그 외 3타임 이상 비면 반반차(0.75) · 2타임 이하로 비면 출근(1)
+    var amAny = false, pmAny = false, amCnt = 0, pmCnt = 0, miss = 0;
     for (var i = 0; i < filled.length; i++) {
-        if (!filled[i]) continue;
         var m = mins ? mins[i] : null;
-        if (m === null || m === undefined) { am = true; pm = true; continue; }
-        if (m < 12 * 60) am = true;
-        else if (m >= 13 * 60) pm = true;
+        if (m === null || m === undefined || isNaN(m)) continue;
+        if (m < 8 * 60) m += 12 * 60;                       // 01:30 → 13:30
+        if (m >= 11 * 60 + 50 && m < 13 * 60) continue;     // 11:55 · 점심
+        if (m >= 17 * 60 + 20) continue;                    // 17:30
+        var am = m < 12 * 60;
+        if (am) amCnt++; else pmCnt++;
+        if (filled[i]) { if (am) amAny = true; else pmAny = true; }
+        else miss++;
     }
-    if (!am && !pm) return 0;        // 하루 전부 비움 — 연차 · 휴무
-    if (am !== pm) return 0.5;       // 반나절 비움 — 반차
-    return 0.75;                     // 둘 다 있는데 빨간 이름 — 반반차
+    if (!amCnt && !pmCnt) return 0;
+    if (!amAny && !pmAny) return 0;                   // 연차
+    if ((amCnt && !amAny) || (pmCnt && !pmAny)) return 0.5;   // 반차
+    if (miss >= 3) return 0.75;                       // 반반차
+    return 1;
 }
 // 아르바이트 · 시간제 — 출근해도 당일 인원에 이 값으로 센다 (0 = 세지 않음)
 var STAFF_PART_TIME = { "심원빈": 0.5 };   // 언어 알바 — 출근하면 0.5

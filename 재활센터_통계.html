@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-30 b161</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-30 b162</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -283,6 +283,14 @@ td.clickable:hover { opacity:0.75; }
     <span class="s12-hint">시간표에 이름이 있는 치료사를 셉니다 · 빨간 이름은 11:55 · 17:30 빼고 — 종일 비면 연차 · 오전이나 오후 통째로 비면 반차 · 3타임 이상 비면 반반차 (부도 칸은 빈 칸으로 봄) · 전체 인원은 한 번 적어 두면 기억합니다</span>
   </div>
   <div id="staffCountArea" style="margin-top:6px;font-size:13px;"></div>
+  <details id="leaveRosterBox" style="margin-top:8px;font-size:12.5px;">
+    <summary style="cursor:pointer;color:#2471a3;font-weight:700;">📅 전체 근무표 (연차자) 붙여넣기 — 선택 <span id="leaveRosterStatus" style="font-weight:400;color:#7f8c8d;"></span></summary>
+    <div style="margin-top:5px;color:#7f8c8d;">전체 근무표 시트에서 날짜 줄 · 연차자 줄이 들어가게 통째로 복사해 붙여넣으세요. 한 번 넣으면 이 PC에 그 달 동안 기억합니다.
+      시간표 날짜의 연차자(연차 · 반차 · 공가 · 이름(날짜)=휴무)를 시간표 빨간 이름과 함께 반영합니다.</div>
+    <textarea id="leaveRosterPaste" placeholder="전체 근무표 붙여넣기" onpaste="setTimeout(saveLeaveRoster, 30)"
+              style="width:100%;height:60px;box-sizing:border-box;margin-top:5px;padding:6px;font-size:12px;border:1px solid #b9d3ea;border-radius:6px;"></textarea>
+    <button class="step-btn" onclick="clearLeaveRoster()" style="padding:2px 9px;font-size:12px;">근무표 지우기</button>
+  </details>
 </div>
 <!-- 부도 ns · 부도 os · 외래 명단을 한 줄에 3칸으로 -->
 <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;margin:0 0 12px;">
@@ -3108,19 +3116,121 @@ function staffDeptSets(wardFilter) {
     // 한 사람이 두 파트에 잡히면 작업 · 언어 쪽을 우선한다
     Object.keys(dep.OT).forEach(function(n){ delete dep.PT[n]; });
     Object.keys(dep.ST).forEach(function(n){ delete dep.PT[n]; delete dep.OT[n]; });
-    return { PT: dep.PT, OT: dep.OT, ST: dep.ST, red: red, os: osName, visit: visit, elec: elec };
+    // 전체 근무표 연차자 — 시간표보다 많이 쉰 것으로 적혀 있으면 그 값을 쓴다
+    var leave = leaveForToday(), leaveCat = {}, conflicts = [];
+    Object.keys(leave).forEach(function(n) {
+        var L = leave[n];
+        ["PT","OT","ST"].forEach(function(d) {
+            if (!(n in dep[d])) return;
+            var before = dep[d][n], v = Math.min(before, 1 - L.off);
+            if (!(n in red) && before >= 1 && L.off > 0)
+                conflicts.push(n + " — 근무표 " + L.cat + "인데 시간표에 빨간 이름 아님");
+            dep[d][n] = v; red[n] = v; leaveCat[n] = L.cat;
+        });
+    });
+    if (Object.keys(leave).length) Object.keys(red).forEach(function(n) {
+        if (!(n in leave) && red[n] < 1) conflicts.push(n + " — 시간표 빨간 이름인데 근무표 연차자에 없음");
+    });
+    return { PT: dep.PT, OT: dep.OT, ST: dep.ST, red: red, os: osName, visit: visit, elec: elec, leaveCat: leaveCat, leave: leave, conflicts: conflicts };
 }
 function fmtNum(x) { return String(Math.round(x * 100) / 100); }
+// ── 전체 근무표 연차자 ─────────────────────────────────────────────
+//   근무표 시트: 날짜 줄(11 12 13 …) 아래 "연차자" 줄에 그날 쉬는 사람이 적혀 있다.
+//   "황보슬 연차" · "정형우연차" · "서지원 오후반차" · "우광식 공가(7/26)" · "강은서(7/19)"(= 휴무) · "한혜수 반차/휴무"
+function rosterDeptOf(n) {
+    if (STAFF_ROSTER_PT.indexOf(n) !== -1) return "PT";
+    if (STAFF_ROSTER_OT.indexOf(n) !== -1) return "OT";
+    if (STAFF_ROSTER_ST.indexOf(n) !== -1) return "ST";
+    return "";
+}
+function parseLeaveCell(txt) {
+    var out = {};
+    var t = String(txt||"").replace(/\r?\n/g, ",")
+        .replace(/(오전|오후)?\s*(반반차|반차|공가|연차|휴무|병가)/g, " $1$2 ")
+        .replace(/\(\s*(\d{1,2}\s*\/\s*\d{1,2})\s*\)/g, " ($1) ");
+    var toks = t.split(/[\s,，·]+/).filter(Boolean), last = "";
+    function put(n, off, cat) {
+        if (!n) return;
+        if (!out[n] || off > out[n].off) out[n] = { off: off, cat: cat };
+    }
+    toks.forEach(function(tk) {
+        if (/^\(\d{1,2}\/\d{1,2}\)$/.test(tk)) { put(last, 1, "휴무"); return; }
+        var ty = tk.match(/^(오전|오후)?(반반차|반차|공가|연차|휴무|병가)$/);
+        if (ty) {
+            var w = ty[2], half = !!ty[1];
+            if (w === "반반차") put(last, 0.25, "반반차");
+            else if (w === "반차") put(last, 0.5, "반차");
+            else if (w === "휴무") put(last, 1, "휴무");
+            else put(last, half ? 0.5 : 1, half ? "반차" : "연차");   // 연차 · 공가 · 병가 (오후공가 = 반차)
+            return;
+        }
+        var nm = tk.replace(/\(.*$/, "").match(/^[가-힣]{2,4}\d?$/);
+        if (nm && rosterDeptOf(nm[0])) last = nm[0];
+    });
+    return out;
+}
+function parseLeaveRoster(text) {
+    var m = parsePastedText(text) || [], byDay = {};
+    for (var r = 0; r < m.length; r++) {
+        var row = m[r] || [], cols = {};
+        for (var c = 1; c < row.length; c++) {
+            var v = String(row[c] || "").trim();
+            if (/^\d{1,2}$/.test(v) && +v >= 1 && +v <= 31) cols[c] = +v;
+        }
+        if (Object.keys(cols).length < 3) continue;
+        for (var k = r + 1; k < Math.min(m.length, r + 6); k++) {
+            if (!/연차자/.test(String((m[k] || [])[0] || ""))) continue;
+            Object.keys(cols).forEach(function(c) {
+                var cell = String((m[k] || [])[c] || "");
+                byDay[cols[c]] = parseLeaveCell(cell);
+            });
+            break;
+        }
+    }
+    return byDay;
+}
+function saveLeaveRoster() {
+    var ta = document.getElementById("leaveRosterPaste");
+    if (!ta || !ta.value.trim()) return;
+    var byDay = parseLeaveRoster(ta.value);
+    var days = Object.keys(byDay).length;
+    if (!days) { alert("근무표에서 날짜 줄 · 연차자 줄을 찾지 못했습니다."); return; }
+    var d = parseAnyDate(schedDateText), now = new Date();
+    var mo = d ? d.mo : now.getMonth() + 1;
+    staffSave("leaveRoster", { mo: mo, byDay: byDay });
+    ta.value = "";
+    renderLeaveStatus(); renderStaffCount();
+}
+function clearLeaveRoster() { try { localStorage.removeItem("leaveRoster"); } catch (e) {} renderLeaveStatus(); renderStaffCount(); }
+function renderLeaveStatus() {
+    var el = document.getElementById("leaveRosterStatus"); if (!el) return;
+    var L = staffLoad("leaveRoster", null);
+    el.innerText = L ? "· " + L.mo + "월 근무표 저장됨 (" + Object.keys(L.byDay || {}).length + "일)" : "· 없음";
+}
+// 시간표 날짜의 연차자 { 이름: { off, cat } } — 근무표가 없거나 다른 달이면 빈 값
+function leaveForToday() {
+    var L = staffLoad("leaveRoster", null), d = parseAnyDate(typeof schedDateText === "string" ? schedDateText : "");
+    if (!L || !d || L.mo !== d.mo) return {};
+    return (L.byDay || {})[d.d] || {};
+}
+window.addEventListener("DOMContentLoaded", function(){ try { renderLeaveStatus(); } catch (e) {} });
 // 휴무자 명단 — 빨간 이름은 쉰 만큼(연차 1 · 반차 0.5 · 반반차 0.25),
 //   명단(PT · OT · ST)에 있는데 시간표에 이름이 아예 없는 사람은 휴무로 본다.
 var _staffOffText = "";
 function staffOffList(sets) {
     var g = { "연차": [], "반차": [], "반반차": [], "휴무": [] };
     function deptOf(n) { return (n in sets.PT) ? "PT" : (n in sets.OT) ? "OT" : (n in sets.ST) ? "ST" : ""; }
+    var listed = {};
     Object.keys(sets.red).forEach(function(n) {
         var off = 1 - sets.red[n];
-        var k = off >= 1 ? "연차" : off >= 0.5 ? "반차" : off > 0 ? "반반차" : "";
-        if (k) g[k].push(deptOf(n) + " " + n);
+        var k = (sets.leaveCat && sets.leaveCat[n]) || (off >= 1 ? "연차" : off >= 0.5 ? "반차" : off > 0 ? "반반차" : "");
+        if (k && off > 0) { g[k].push(deptOf(n) + " " + n); listed[n] = 1; }
+    });
+    // 근무표 연차자인데 시간표에 이름이 아예 없는 사람 — 근무표 구분대로 적는다
+    Object.keys(sets.leave || {}).forEach(function(n) {
+        if (listed[n] || deptOf(n)) return;
+        var d = rosterDeptOf(n); if (!d) return;
+        g[sets.leave[n].cat].push(d + " " + n); listed[n] = 1;
     });
     // 시간표에 나온 이름 (김수연1 → 김수연 처럼 번호 붙은 별칭도 같은 사람)
     var seen = {};
@@ -3129,7 +3239,7 @@ function staffOffList(sets) {
         p[1].forEach(function(n) {
             if (n === "지영현") return;                       // 지영헌 의 다른 표기
             if (n in STAFF_PART_TIME) return;                  // 알바는 휴무로 적지 않는다
-            if (seen[n] || seen[n + "1"] || seen[n + "2"]) return;
+            if (seen[n] || seen[n + "1"] || seen[n + "2"] || listed[n]) return;
             if (/\d$/.test(n) && seen[n]) return;
             g["휴무"].push(p[0] + " " + n);
         });
@@ -3243,6 +3353,8 @@ function renderStaffCount(keepFocus) {
     if (nOn && remarks.length) h += "<div style='margin-top:5px;font-size:12px;color:#555;'>비고: <span style='white-space:pre;'>" + remarks.join("\n") + "</span></div>";
     // 휴무자 명단 — 연차 · 반차 · 반반차 · 휴무 (통계표에 붙이는 양식)
     _staffOffText = nOn ? staffOffList(sets) : "";
+    if (nOn && sets.conflicts && sets.conflicts.length)
+        h += "<div style='margin-top:5px;font-size:12px;color:#b9770e;'>⚠️ 근무표 ↔ 시간표 확인 필요: " + sets.conflicts.join(" · ") + "</div>";
     if (_staffOffText) h += "<div style='margin-top:6px;font-size:12px;'><b style='color:#c0392b;'>휴무자</b>" +
         " <button class='step-btn' onclick='copyStaffOff()' style='margin-left:6px;padding:2px 9px;font-size:12px;background:#c0392b;border-color:#c0392b;color:#fff;'>📋 휴무자 복사</button>" +
         "<pre style='margin:3px 0 0;padding:6px 10px;background:#fff;border:1px solid #f1c4bd;border-radius:6px;font-family:inherit;font-size:12.5px;line-height:1.6;white-space:pre-wrap;'>" +

@@ -18,7 +18,7 @@
   .sub{color:var(--muted);margin:0 0 14px;font-size:13px}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
   .field{display:grid;gap:4px;margin-bottom:10px}
-  .field label{font-size:12px;color:var(--muted);font-weight:600}
+  .field label{font-size:12px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   input,select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--fg);width:100%}
   input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
@@ -84,9 +84,8 @@
     <div class="panel">
       <div class="row2">
         <div class="field">
-          <label for="date">휴무 날짜</label>
+          <label for="date">휴무 날짜 <span class="wd" id="wdLabel"></span></label>
           <input type="date" id="date">
-          <span class="wd" id="wdLabel"></span>
         </div>
         <div class="field">
           <label for="role">직종</label>

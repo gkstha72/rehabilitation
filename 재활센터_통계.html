@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-29 b160</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-30 b161</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -268,7 +268,7 @@ td.clickable:hover { opacity:0.75; }
 <h2 class="result-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">&#128202; [7] 최종 청구 실적 교차 대조 결과창<div style="display:flex;gap:6px;align-items:center;"><button class="btn-calc" style="background:#2c3e50;font-size:13px;padding:8px 20px;margin:0;" onclick="analyzeAllInOne()">&#9889; 전체 한 번에 집계</button><button class="btn-reset" style="font-size:13px;padding:8px 15px;margin:0;" onclick="resetAllGrids()">&#128465; 전체 그리드 지우기</button></div></h2>
 <div style="margin-bottom:15px;">
 <button class="btn-calc" style="background:#8e44ad;font-size:14px;padding:10px 25px;margin-right:8px;" onclick="copyMismatchList()">&#128242; 액팅 틀린 치료사 명단 복사</button>
-<button class="btn-calc" style="background:#16a085;font-size:14px;padding:10px 25px;margin-right:8px;" onclick="copyTotalsSheet()" title="물리 · 작업 · 언어 · 평가 합계를 통계표 양식 그대로 복사 (A1 칸에 붙여넣기)">&#128203; 통계표 양식으로 합계 복사</button>
+<button class="btn-calc" style="background:#16a085;font-size:14px;padding:10px 25px;margin-right:8px;" onclick="copyTotalsSheet()" title="일일업무보고서 양식 그대로 복사 — B4 칸(NS 첫 NDT)에 Ctrl+Shift+V. NS · OS · 통증 · 평가 치료사까지 한 번에">&#128203; 통계표 양식으로 합계 복사</button>
 <span id="errorCountBadge" style="display:none;"></span>
 </div>
 <div id="ptTripleArea"></div>
@@ -2704,6 +2704,8 @@ function analyzeEvalLogic() {
 }
 
 function renderMasterParallelTable(targetAreaId, members, displayOrder, timeStats, emrStats, labelText, room) {
+    window._lastTimeStats = window._lastTimeStats || {};
+    window._lastTimeStats[targetAreaId] = timeStats;
     var area = document.getElementById(targetAreaId);
     if (!area) return;
     area.innerHTML = "";
@@ -3268,35 +3270,101 @@ function copyStaffCount() {
     document.body.removeChild(ta);
 }
 
+// 통계표(일일업무보고서) 양식 그대로 — B4 칸(NS 첫 처방명 NDT)에 한 번 붙이면 NS · OS 블록이 다 채워진다.
+//   B4:H36  NS — 물리(신경계) · 작업(신경계) · 언어 · 평가(+치료사)
+//   B40     OS 머리글 (같은 글자로 덮어씀)
+//   B41:G73 OS — 물리(근골) · 작업(근골) · 통증
+function evalNamesFromEmr() {
+    var out = {};
+    if (!globalEmrRows || globalEmrCodeIdx === -1) return out;
+    var seenE = {}, cnt = {};
+    globalEmrRows.forEach(function(row) {
+        if (!row) return;
+        var rc = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
+        var lb = evalCodeMap[rc];
+        if (!lb) return;
+        var k = evalEmrSeenKey(row, rc);
+        if (!k || seenE[k]) return;
+        seenE[k] = 1;
+        var nm = globalEmrTherapistIdx !== -1 ? String(row[globalEmrTherapistIdx]||"").trim() : String(row[globalEmrNameIdx]||"").trim();
+        if (!nm) return;
+        nm = cleanTherapistName(nm) || nm;
+        if (!cnt[lb]) cnt[lb] = {};
+        cnt[lb][nm] = (cnt[lb][nm] || 0) + 1;
+    });
+    Object.keys(cnt).forEach(function(lb) {
+        out[lb] = Object.keys(cnt[lb]).map(function(n){ return cnt[lb][n] > 1 ? n + "(" + cnt[lb][n] + ")" : n; }).join(", ");
+    });
+    return out;
+}
+// 근골(os) 치료사 이름 — 평일은 근골 칸 시간표, 주말은 머리글 연하늘색
+function osTherapistSet() {
+    var hasMsk = window._wardCols && Object.keys(window._wardCols).some(function(g){ return window._wardCols[g].some(function(x){ return x.ward === "msk"; }); });
+    var set = {};
+    if (hasMsk) {
+        var m = staffDeptSets("msk");
+        ["PT","OT","ST"].forEach(function(d){ Object.keys(m[d]).forEach(function(n){ set[n] = 1; }); });
+    } else {
+        var a = staffDeptSets();
+        Object.keys(a.os || {}).forEach(function(n){ set[n] = 1; });
+    }
+    return set;
+}
+// 치료사별 시간표 집계를 ns / os 로 나눠 더한다
+function wardTotalsOf(areaId, order, osSet) {
+    var ts = (window._lastTimeStats || {})[areaId];
+    var ns = {}, os = {};
+    order.forEach(function(k){ ns[k] = 0; os[k] = 0; });
+    if (!ts) return null;
+    Object.keys(ts).forEach(function(th) {
+        var isOs = !!(osSet[th] || osSet[String(th).replace(/\d+$/, "")]);
+        order.forEach(function(k){ var v = ts[th][k] || 0; if (isOs) os[k] += v; else ns[k] += v; });
+    });
+    return { ns: ns, os: os };
+}
 function copyTotalsSheet() {
-    var pt = summaryTotalsOf("ptTripleArea"), ot = summaryTotalsOf("otTripleArea"),
-        st = summaryTotalsOf("stTripleArea"), ev = evalTotalsFromEmr();
+    var osSet = osTherapistSet();
+    var pt = wardTotalsOf("ptTripleArea", ptOrder, osSet), ot = wardTotalsOf("otTripleArea", otOrder, osSet),
+        st = summaryTotalsOf("stTripleArea"), pain = summaryTotalsOf("painTripleArea"),
+        ev = evalTotalsFromEmr(), evNames = evalNamesFromEmr();
     var miss = [];
     if (!pt) miss.push("물리"); if (!ot) miss.push("작업");
     if (!st && isSectionActive("stGridTable")) miss.push("언어");
+    if (!pain && isSectionActive("painGridTable")) miss.push("통증");
     if (!ev) miss.push("평가(EMR 미연동)");
     if (miss.length && !confirm("아직 집계되지 않은 파트가 있습니다: " + miss.join(" · ") +
             "\n빈 파트는 0으로 채워 복사할까요?")) return;
     function v(map, k) { return map && map[k] !== undefined ? map[k] : 0; }
-    var stLabels = ["비회","H2","H3","평가"];   // 평가 = 언어 평가 건수 (웨스턴실어증검사 제외 — 평가 칸에 따로 적음)
-    var rows = [["처방명","건수","처방명","건수","처방명","건수"]];
-    var ptSheet = ptOrder.filter(function(p){ return p !== "H1"; });   // 통계표 물리 줄에는 H1 이 없다
-    var n = Math.max(ptSheet.length, evalOrder.length);
-    for (var i = 0; i < n; i++) {
-        var r = ["","","","","",""];
-        if (i < ptSheet.length) { r[0] = ptSheet[i]; r[1] = v(pt, ptSheet[i]); }
-        var j = i - otOrder.length;          // 작업 끝 → 한 칸 비움 → 머리글 → 언어
-        if (i < otOrder.length) { r[2] = otOrder[i]; r[3] = v(ot, otOrder[i]); }
-        else if (j === 1) { r[2] = "처방명"; r[3] = "건수"; }
-        else if (j >= 2 && j - 2 < stLabels.length) { r[2] = stLabels[j-2]; r[3] = v(st, stLabels[j-2]); }
-        if (i < evalOrder.length) { r[4] = evalOrder[i]; r[5] = v(ev, evalOrder[i]); }
+    var stLabels = ["비회","H2","H3","평가"];   // 평가 = 언어 평가 건수 (웨스턴실어증검사 제외)
+    var rows = [];
+    // NS — 33줄 (B4:H36)
+    for (var i = 0; i < 33; i++) {
+        var r = ["","","","","","",""];
+        if (i < ptOrder.length) { r[0] = ptOrder[i]; r[1] = v(pt && pt.ns, ptOrder[i]); }
+        if (i < otOrder.length) { r[2] = otOrder[i]; r[3] = v(ot && ot.ns, otOrder[i]); }
+        else if (i === otOrder.length + 1) { r[2] = "처방명"; r[3] = "건수"; }
+        else if (i >= otOrder.length + 2 && i - otOrder.length - 2 < stLabels.length) {
+            var sl = stLabels[i - otOrder.length - 2]; r[2] = sl; r[3] = v(st, sl);
+        }
+        if (i < evalOrder.length) { r[4] = evalOrder[i]; r[5] = v(ev, evalOrder[i]); r[6] = evNames[evalOrder[i]] || ""; }
         rows.push(r);
     }
-    var tsv = rows.map(function(r){ return r.join("\t"); }).join("\n");
+    // 빈 줄 3개 (37~39) · OS 머리글 (40)
+    rows.push(["","","","","","",""], ["","","","","","",""], ["","","","","","",""]);
+    rows.push(["처방명","합계","처방명","합계","처방명","합계",""]);
+    // OS — 33줄 (B41:G73)
+    for (var j = 0; j < 33; j++) {
+        var q = ["","","","","","",""];
+        if (j < ptOrder.length) { q[0] = ptOrder[j]; q[1] = v(pt && pt.os, ptOrder[j]); }
+        if (j < otOrder.length) { q[2] = otOrder[j]; q[3] = v(ot && ot.os, otOrder[j]); }
+        if (j < painOrder.length) { q[4] = painOrder[j]; q[5] = v(pain, painOrder[j]); }
+        rows.push(q);
+    }
+    var tsv = rows.map(function(r){ return r.map(function(x){ x = String(x); return /[\t\n"]/.test(x) ? '"' + x.replace(/"/g,'""') + '"' : x; }).join("\t"); }).join("\n");
     var ta = document.createElement("textarea");
     ta.value = tsv; ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); alert("✅ 통계표 양식으로 복사했습니다.\n통계표 A1 칸(처방명)을 누르고 붙여넣으세요."); }
+    try { document.execCommand("copy"); alert("✅ 통계표 양식으로 복사했습니다.\n통계표 B4 칸(NS 첫 처방명 NDT)을 누르고 Ctrl+Shift+V 로 붙여넣으세요.\nNS · OS 블록과 평가 치료사까지 한 번에 들어갑니다."); }
     catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
     document.body.removeChild(ta);
 }

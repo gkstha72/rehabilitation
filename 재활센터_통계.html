@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-29 b158</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-29 b159</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3107,6 +3107,41 @@ function staffDeptSets(wardFilter) {
     return { PT: dep.PT, OT: dep.OT, ST: dep.ST, red: red, os: osName, visit: visit, elec: elec };
 }
 function fmtNum(x) { return String(Math.round(x * 100) / 100); }
+// 휴무자 명단 — 빨간 이름은 쉰 만큼(연차 1 · 반차 0.5 · 반반차 0.25),
+//   명단(PT · OT · ST)에 있는데 시간표에 이름이 아예 없는 사람은 휴무로 본다.
+var _staffOffText = "";
+function staffOffList(sets) {
+    var g = { "연차": [], "반차": [], "반반차": [], "휴무": [] };
+    function deptOf(n) { return (n in sets.PT) ? "PT" : (n in sets.OT) ? "OT" : (n in sets.ST) ? "ST" : ""; }
+    Object.keys(sets.red).forEach(function(n) {
+        var off = 1 - sets.red[n];
+        var k = off >= 1 ? "연차" : off >= 0.5 ? "반차" : off > 0 ? "반반차" : "";
+        if (k) g[k].push(deptOf(n) + " " + n);
+    });
+    // 시간표에 나온 이름 (김수연1 → 김수연 처럼 번호 붙은 별칭도 같은 사람)
+    var seen = {};
+    ["PT","OT","ST"].forEach(function(d){ Object.keys(sets[d]).forEach(function(n){ seen[n] = 1; seen[n.replace(/\d+$/, "")] = 1; }); });
+    [["PT", STAFF_ROSTER_PT], ["OT", STAFF_ROSTER_OT], ["ST", STAFF_ROSTER_ST]].forEach(function(p) {
+        p[1].forEach(function(n) {
+            if (n === "지영현") return;                       // 지영헌 의 다른 표기
+            if (n in STAFF_PART_TIME) return;                  // 알바는 휴무로 적지 않는다
+            if (seen[n] || seen[n + "1"] || seen[n + "2"]) return;
+            if (/\d$/.test(n) && seen[n]) return;
+            g["휴무"].push(p[0] + " " + n);
+        });
+    });
+    return ["연차","반차","반반차","휴무"].map(function(k){ return k + " : " + g[k].join(", "); }).join("\n");
+}
+function copyStaffOff() {
+    if (!_staffOffText) { alert("시간표를 먼저 붙여넣어 주세요."); return; }
+    var ta = document.createElement("textarea");
+    ta.value = "\"" + _staffOffText.replace(/"/g, '""') + "\"";   // 한 칸에 여러 줄로
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); alert("✅ 휴무자 명단 복사 완료\n\n" + _staffOffText); }
+    catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
+    document.body.removeChild(ta);
+}
 var _staffCnt = null;
 // 전체 인원은 시간표에서 셀 수 없다 — 쉬는 사람은 시간표에 아예 없기 때문.
 // 그래서 전체 인원(정원)은 한 번 적어 두면 이 브라우저에 기억해 두고,
@@ -3202,10 +3237,12 @@ function renderStaffCount(keepFocus) {
         if (v > 0) remarks.push(STAFF_REMARK[n] + " " + fmtNum(v) + " - " + n);
     });
     if (nOn && remarks.length) h += "<div style='margin-top:5px;font-size:12px;color:#555;'>비고: <span style='white-space:pre;'>" + remarks.join("\n") + "</span></div>";
-    var rk = Object.keys(sets.red);
-    // 휴무자 — 쉰 만큼 표시 (종일 1 · 반차 0.5 · 반반차 0.25)
-    if (rk.length) h += "<div style='margin-top:5px;color:#c0392b;font-size:12px;'>휴무자: " +
-        rk.map(function(n){ return n + " " + fmtNum(1 - sets.red[n]); }).join(" · ") + "</div>";
+    // 휴무자 명단 — 연차 · 반차 · 반반차 · 휴무 (통계표에 붙이는 양식)
+    _staffOffText = nOn ? staffOffList(sets) : "";
+    if (_staffOffText) h += "<div style='margin-top:6px;font-size:12px;'><b style='color:#c0392b;'>휴무자</b>" +
+        " <button class='step-btn' onclick='copyStaffOff()' style='margin-left:6px;padding:2px 9px;font-size:12px;background:#c0392b;border-color:#c0392b;color:#fff;'>📋 휴무자 복사</button>" +
+        "<pre style='margin:3px 0 0;padding:6px 10px;background:#fff;border:1px solid #f1c4bd;border-radius:6px;font-family:inherit;font-size:12.5px;line-height:1.6;white-space:pre-wrap;'>" +
+        _staffOffText + "</pre></div>";
     if (keepFocus === true) {
         var tds = area.querySelectorAll("table tr");
         if (tds.length >= 6) { tds[1].lastChild.innerHTML = fmtNum(tFull); tds[2].lastChild.innerHTML = nOn ? fmtNum(ns.T) : dash;

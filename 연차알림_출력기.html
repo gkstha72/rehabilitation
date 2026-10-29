@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>연차알림 출력기</title>
+<style>
+  :root{
+    --bg:#f3f5f4; --panel:#ffffff; --fg:#1d2422; --muted:#66706d; --line:#d6dcda;
+    --accent:#1f6b5c; --accent-soft:#e3efec; --warn:#b4532a;
+    --font:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px}
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px;display:grid;grid-template-columns:400px 1fr;gap:20px;align-items:start}
+  @media (max-width:900px){.wrap{grid-template-columns:1fr}}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 14px;font-size:13px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .field{display:grid;gap:4px;margin-bottom:10px}
+  .field label{font-size:12px;color:var(--muted);font-weight:600}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  input,select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--fg);width:100%}
+  input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+  .wd{font-size:12px;color:var(--accent);font-weight:700}
+  table.slots{width:100%;border-collapse:collapse;margin-top:6px}
+  table.slots th{font-size:12px;color:var(--muted);text-align:left;padding:4px;border-bottom:1px solid var(--line)}
+  table.slots td{padding:3px 4px}
+  table.slots td.t{font-variant-numeric:tabular-nums;font-weight:700;width:58px;color:var(--accent)}
+  table.slots td.room{width:90px}
+  table.slots tr.lunch td{border-top:2px dashed var(--line)}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  button{font:inherit;padding:9px 14px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:600}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button:hover{filter:brightness(.96)}
+  .chk{display:flex;gap:6px;align-items:center;font-size:13px;margin-top:8px;color:var(--fg)}
+  .chk input{width:auto}
+  .count{font-size:13px;color:var(--muted);margin:0 0 10px}
+  .count b{color:var(--accent)}
+  .preview{display:grid;gap:16px;justify-items:center}
+  .empty{padding:60px 20px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:10px}
+
+  /* ===== 인쇄 용지 ===== */
+  .page{width:210mm;height:297mm;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.12);display:grid;grid-template-rows:1fr 1fr;overflow:hidden}
+  .slip{height:148.5mm;padding:10mm 12mm 8mm;display:flex;flex-direction:column;gap:5mm;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .slip + .slip{border-top:1px dashed #999}
+  .slip.blank{visibility:hidden}
+  .s-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #111;padding-bottom:2.5mm}
+  .s-title{font-size:24pt;font-weight:800;letter-spacing:.12em}
+  .s-org{font-size:11pt;font-weight:600;color:#333}
+  .s-body{flex:1;display:grid;grid-template-columns:1.5fr 1fr;gap:7mm;min-height:0}
+  .s-left{display:flex;flex-direction:column;gap:4mm;justify-content:center}
+  .s-who{font-size:30pt;font-weight:800;line-height:1.1;word-break:keep-all}
+  .s-who .room{margin-right:3mm}
+  .s-info{border-top:1.5px solid #111;border-bottom:1.5px solid #111}
+  .s-info div{display:grid;grid-template-columns:28mm 1fr;align-items:center;height:14mm;border-top:1px solid #bbb;font-size:18pt}
+  .s-info div:first-child{border-top:0}
+  .s-info dt{font-size:13pt;font-weight:700;color:#444;letter-spacing:.05em}
+  .s-info dd{margin:0;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
+  .s-info .hl dd{font-size:20pt;font-weight:800}
+  .s-sent{font-size:20pt;font-weight:800;line-height:1.4;word-break:keep-all}
+  .s-sent b{border-bottom:2.5px solid #111}
+  .s-right{background:#ececec;border-radius:3mm;padding:8mm 7mm;display:flex;flex-direction:column;justify-content:center;gap:5mm}
+  .s-icon{width:15mm;height:15mm;border:2.5px solid #111;border-radius:50%;display:grid;place-items:center;font-size:20pt;font-weight:800}
+  .s-msg{font-size:19pt;line-height:1.55;font-weight:700;word-break:keep-all}
+  .s-foot{font-size:10pt;color:#555;text-align:right}
+
+  @media print{
+    @page{size:A4 portrait;margin:0}
+    body{background:#fff}
+    .wrap{display:block;padding:0;max-width:none}
+    .ctrl,.count,.empty,h1,.sub{display:none!important}
+    .preview{display:block}
+    .page{box-shadow:none;page-break-after:always;break-after:page}
+    .page:last-child{page-break-after:auto;break-after:auto}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="ctrl">
+    <h1>연차알림 출력기</h1>
+    <p class="sub">치료사 정보와 시간대별 환자만 입력하면 A4 반장짜리 알림지가 만들어집니다.</p>
+    <div class="panel">
+      <div class="row2">
+        <div class="field">
+          <label for="date">휴무 날짜</label>
+          <input type="date" id="date">
+          <span class="wd" id="wdLabel"></span>
+        </div>
+        <div class="field">
+          <label for="role">직종</label>
+          <select id="role">
+            <option>물리치료사</option><option selected>작업치료사</option><option>언어치료사</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="name">치료사 이름</label>
+        <input id="name" placeholder="예: 홍길동">
+      </div>
+
+      <table class="slots">
+        <thead><tr><th>시간</th><th>호실</th><th>환자 성함</th></tr></thead>
+        <tbody id="slotBody"></tbody>
+      </table>
+
+      <label class="chk"><input type="checkbox" id="merge" checked> 같은 환자는 한 장으로 합치기</label>
+      <div class="btns">
+        <button class="primary" id="printBtn">인쇄하기</button>
+        <button id="clearBtn">환자 목록 비우기</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="count" id="count"></p>
+    <div class="preview" id="preview"></div>
+  </div>
+</div>
+
+<script>
+const TIMES=["09:00","09:35","10:10","10:45","11:20","13:30","14:05","14:40","15:15","15:50","16:25","17:00"];
+const WD=["일","월","화","수","목","금","토"];
+const KEY="leaveNotice_v1";
+const $=id=>document.getElementById(id);
+
+// 시간표 입력칸 만들기
+const body=$("slotBody");
+TIMES.forEach((t,i)=>{
+  const tr=document.createElement("tr");
+  if(t==="13:30") tr.className="lunch";
+  tr.innerHTML=`<td class="t">${t}</td>
+    <td class="room"><input id="r${i}" inputmode="numeric" placeholder="호실"></td>
+    <td><input id="p${i}" placeholder="성함"></td>`;
+  body.appendChild(tr);
+});
+
+// 엔터로 다음 칸 이동
+const order=["date","role","name"];TIMES.forEach((_,i)=>order.push("r"+i,"p"+i));
+order.forEach((id,k)=>{
+  $(id).addEventListener("keydown",e=>{
+    if(e.key==="Enter"){e.preventDefault();const n=$(order[k+1]);if(n){n.focus();n.select&&n.select();}}
+  });
+});
+
+// 기본 날짜: 내일
+(function(){const d=new Date();d.setDate(d.getDate()+1);
+  $("date").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");})();
+
+// 저장된 값 불러오기
+try{
+  const s=JSON.parse(localStorage.getItem(KEY)||"null");
+  if(s){
+    if(s.role) $("role").value=s.role;
+    if(s.name) $("name").value=s.name;
+    if(s.date) $("date").value=s.date;
+    (s.slots||[]).forEach((x,i)=>{if($("r"+i)){$("r"+i).value=x.r||"";$("p"+i).value=x.p||"";}});
+    if(typeof s.merge==="boolean") $("merge").checked=s.merge;
+  }
+}catch(e){}
+
+function save(){
+  try{
+    localStorage.setItem(KEY,JSON.stringify({
+      role:$("role").value,name:$("name").value,date:$("date").value,
+      merge:$("merge").checked,
+      slots:TIMES.map((_,i)=>({r:$("r"+i).value,p:$("p"+i).value}))
+    }));
+  }catch(e){}
+}
+
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+function roomText(r){
+  r=r.trim(); if(!r) return "";
+  return /호$/.test(r)?r:r+"호";
+}
+
+function render(){
+  const dv=$("date").value;
+  let dateStr="", wd="";
+  if(dv){const [y,m,d]=dv.split("-").map(Number);const dt=new Date(y,m-1,d);
+    wd=WD[dt.getDay()]+"요일";dateStr=`${m}월 ${d}일 ${wd}`;}
+  $("wdLabel").textContent=wd;
+
+  const role=$("role").value.trim(), name=$("name").value.trim();
+
+  // 시간대별 항목 모으기
+  let items=[];
+  TIMES.forEach((t,i)=>{
+    const r=$("r"+i).value.trim(), p=$("p"+i).value.trim();
+    if(r||p) items.push({room:r,pt:p,times:[t]});
+  });
+  if($("merge").checked){
+    const m=new Map();
+    items.forEach(it=>{
+      const k=roomText(it.room)+"|"+it.pt;
+      if(m.has(k)) m.get(k).times.push(...it.times); else m.set(k,{...it,times:[...it.times]});
+    });
+    items=[...m.values()];
+  }
+
+  const pv=$("preview");
+  if(!items.length){
+    pv.innerHTML=`<div class="empty">왼쪽 시간표에 호실과 환자 성함을 입력하면<br>여기에 인쇄될 알림지가 나타납니다.</div>`;
+    $("count").innerHTML="";save();return;
+  }
+
+  const slip=it=>{
+    const who=`${it.room?`<span class="room">${esc(roomText(it.room))}</span>`:""}${esc(it.pt)}${it.pt&&!/님$/.test(it.pt)?"님":""}`;
+    const t=it.times.join(", ");
+    return `<div class="slip">
+      <div class="s-head"><span class="s-title">연차 알림</span><span class="s-org">광주365재활병원 재활센터</span></div>
+      <div class="s-body">
+        <div class="s-left">
+          <div class="s-who">${who}</div>
+          <dl class="s-info">
+            <div><dt>날짜</dt><dd>${esc(dateStr)}</dd></div>
+            <div><dt>담당</dt><dd>${esc(role)} ${esc(name)}</dd></div>
+            <div class="hl"><dt>치료 시간</dt><dd>${t}</dd></div>
+          </dl>
+          <div class="s-sent">${esc(role)} ${esc(name)} 휴무로<br><b>${t}</b> 치료 쉽니다.</div>
+        </div>
+        <div class="s-right">
+          <div class="s-icon">!</div>
+          <div class="s-msg">대체가 없을 경우<br>병동을 통해<br>알림해드리겠습니다.</div>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  let html="";
+  for(let i=0;i<items.length;i+=2){
+    html+=`<div class="page">${slip(items[i])}${items[i+1]?slip(items[i+1]):'<div class="slip blank"></div>'}</div>`;
+  }
+  pv.innerHTML=html;
+  $("count").innerHTML=`알림지 <b>${items.length}장</b> · A4 <b>${Math.ceil(items.length/2)}매</b> 인쇄`
+    +(!name?` · <span style="color:var(--warn)">치료사 이름을 입력하세요</span>`:"");
+  save();
+}
+
+document.addEventListener("input",render);
+document.addEventListener("change",render);
+$("printBtn").onclick=()=>{render();window.print();};
+$("clearBtn").onclick=()=>{TIMES.forEach((_,i)=>{$("r"+i).value="";$("p"+i).value="";});render();$("r0").focus();};
+render();
+</script>
+</body>
+</html>

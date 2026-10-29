@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-29 b159</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-29 b160</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2308,7 +2308,8 @@ function analyzeStMasterLogic() {
             if (isEvalMemoCell(cellText)) {
                 // 검사명이 실제로 적힌 칸만 평가로 센다.
                 // "김정금 팀회의" · "업무" 는 평가도 치료도 아니라 세지 않는다.
-                if (isEvalContentCell(cellText, "stGridTable")) {
+                // 웨스턴실어증검사(WAB)는 통계표 평가 칸에 따로 적으므로 언어 "평가" 건수에서 뺀다
+                if (isEvalContentCell(cellText, "stGridTable") && !/웨스턴|실어증|WAB/i.test(cellText)) {
                     therapists.forEach(function(th){ timeStats[th]["평가"] += 1; logST(th, "평가"); });
                 }
                 return;
@@ -2340,6 +2341,7 @@ function analyzeStMasterLogic() {
             if (globalEmrDcIdx !== -1 && String(row[globalEmrDcIdx]||"").trim() !== "") return;
             var rc = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
             if (!evalCodeMap[rc]) return;
+            if (evalCodeMap[rc] === "웨스턴실어증검사") return;   // 평가 칸에 따로 적음
             var stk = emrChartOf(row) + "||" + rc;
             if (stEvalSeen[stk]) return;          // 세부 줄은 1건으로
             stEvalSeen[stk] = 1;
@@ -3276,7 +3278,7 @@ function copyTotalsSheet() {
     if (miss.length && !confirm("아직 집계되지 않은 파트가 있습니다: " + miss.join(" · ") +
             "\n빈 파트는 0으로 채워 복사할까요?")) return;
     function v(map, k) { return map && map[k] !== undefined ? map[k] : 0; }
-    var stLabels = ["비회","H2","H3"];
+    var stLabels = ["비회","H2","H3","평가"];   // 평가 = 언어 평가 건수 (웨스턴실어증검사 제외 — 평가 칸에 따로 적음)
     var rows = [["처방명","건수","처방명","건수","처방명","건수"]];
     var ptSheet = ptOrder.filter(function(p){ return p !== "H1"; });   // 통계표 물리 줄에는 H1 이 없다
     var n = Math.max(ptSheet.length, evalOrder.length);

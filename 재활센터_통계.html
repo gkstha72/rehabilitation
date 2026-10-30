@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-30 b165</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-30 b164</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -853,8 +853,7 @@ function buildClassDeco(doc) {
             var rd = isRedBg(body);
             var oc = isOsBg(body);
             var gy = isGrayBg(body);
-            var gd = isGoldBg(body);
-            if (!u && !st && !bo && !rd && !oc && !gy && !gd) continue;
+            if (!u && !st && !bo && !rd && !oc && !gy) continue;
             m[1].split(",").forEach(function(sel) {
                 var cls = sel.trim().match(/\.([A-Za-z0-9_\-]+)/);
                 if (!cls) return;
@@ -862,7 +861,6 @@ function buildClassDeco(doc) {
                 if (rd) e.r = true;
                 if (oc) e.o = true;
                 if (gy) e.g = true;
-                if (gd) e.gd = true;
                 if (u) e.u = true;
                 if (st) e.s = true;
                 if (bo) e.b = true;
@@ -908,27 +906,6 @@ function isRedBg(css) {
         else return /^red\b/i.test(v);
     }
     return r >= 0xC0 && g <= 0x50 && b <= 0x50;
-}
-// 금색 · 진노랑 칸 (#FFC000 · #FFB300 …) — 로봇 칸에도 쓰여서 그 자체로는 부도가 아니다.
-//   단 "언어대신" 칸이 이 색이면 부도로 본다.
-function isGoldBg(css) {
-    var t = String(css||"");
-    var m = t.match(/background(?:-color)?\s*:\s*([^;]+)/i);
-    if (!m) return false;
-    var hx = m[1].trim().match(/#([0-9a-f]{6})\b/i), r, g, b;
-    if (hx) { var n = parseInt(hx[1], 16); r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255; }
-    else {
-        var rg = m[1].match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-        if (!rg) return false; r = +rg[1]; g = +rg[2]; b = +rg[3];
-    }
-    return r >= 0xE0 && g >= 0x90 && g <= 0xD8 && b <= 0x50;
-}
-function tdIsGold(td) {
-    if (!td || !td.getAttribute) return false;
-    var bg = td.getAttribute("bgcolor");
-    if (bg && isGoldBg("background:" + bg)) return true;
-    if (isGoldBg(td.getAttribute("style") || "")) return true;
-    return !!classDecoOf(td).gd;
 }
 // 회색 칸 — 간부 선생님 시간표에서 치료 대신 업무를 본 시간 (#D0D4D9 · #D9D9D9 · #BFBFBF …)
 function isGrayBg(css) {
@@ -991,7 +968,7 @@ function classDecoOf(node) {
     if (!cn) return out;
     cn.split(/\s+/).forEach(function(c) {
         var e = _clsDeco[c];
-        if (e) { if (e.u) out.u = true; if (e.s) out.s = true; if (e.b) out.b = true; if (e.r) out.r = true; if (e.o) out.o = true; if (e.g) out.g = true; if (e.gd) out.gd = true; }
+        if (e) { if (e.u) out.u = true; if (e.s) out.s = true; if (e.b) out.b = true; if (e.r) out.r = true; if (e.o) out.o = true; if (e.g) out.g = true; }
     });
     return out;
 }
@@ -1034,9 +1011,7 @@ function tdDecoration(td) {
     walk(td, false, false);
     push();
     // 부도 칸은 칸 전체를 취소선처럼 처리한다
-    //   "언어대신" 칸은 주황뿐 아니라 금색 · 진노랑으로 칠해도 부도
-    var _txtAll = (td.textContent || "").replace(/\s+/g, "");
-    if (tdIsBudo(td) || (/언어대신/.test(_txtAll) && tdIsGold(td))) {
+    if (tdIsBudo(td)) {
         lines.forEach(function(x){ x.s = true; x.u = false; });
         return { u:false, s:true, b:true, lines:lines };
     }

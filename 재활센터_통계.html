@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-30 b167</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-30 b168</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2214,7 +2214,7 @@ function analyzeOtMasterLogic() {
             var cellText = liveCellText("otGridTable", r, colIdx,
                     document.getElementById("otGridTable-cell-"+r+"-"+colIdx).value.trim());
             if (!cellText || cellValIsBlankOrInvalid(cellText)) return;
-            if (isNoOrderTdcs(cellText)) return;          // H○○○+tDCS(F) — 액팅 없음
+            // H○○○+tDCS(F) — (F) 를 떼고 아래에서 H 이름으로 회Ⅲ 로 잡힌다
             var recInCR = isRecoveryInTimeCR(cellText);   // H○○○+CR7+메디+TDCS — 회Ⅲ로 셈
             var items = cellText.replace(/\r?\n|\r/g," ").trim().split(/[\s,]+/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>0; });
             var localHCount = 0;
@@ -3783,7 +3783,7 @@ var prescriptionDesc = {
     "VITAL STIM": { emr: "슬립코드: MZ0081, MZ0082", sched: "비회복기 V○○○ 만 집계\n예) V이다혜\n※ H○○○+V · ○○○V 는 바이탈로 세지 않음 (H○○○+V 는 회Ⅲ/회Ⅱ)" },
     "경두개직류": { emr: "슬립코드: DF003B", sched: "시간표에서 경두개 포함 토큰" },
     "CR6(비)":    { emr: "슬립코드: 51020, 51020^, EX022", sched: "시간표에서 CR6(비) 또는 CR6 포함 토큰\n※ CR6(F) 보다 나중에 체크 (우선순위: CR6(F) > CR6(비))" },
-    "CR7(비)":    { emr: "슬립코드: EX022A", sched: "시간표에서 CR7(비) 또는 CR7 포함 토큰\n※ CR7(F) 보다 나중에 체크\n※ H환자의 맨 CR7(예: H김순복+CR7+메디+TDCS)은 회복기 치료시간 내라 회Ⅲ로 집계\n※ H조연호+tDCS(F) 는 오더 없는 tDCS라 집계 제외" },
+    "CR7(비)":    { emr: "슬립코드: EX022A", sched: "시간표에서 CR7(비) 또는 CR7 포함 토큰\n※ CR7(F) 보다 나중에 체크\n※ H환자의 맨 CR7(예: H김순복+CR7+메디+TDCS)은 회복기 치료시간 내라 회Ⅲ로 집계\n※ H조연호+tDCS(F) 는 (F)가 붙어도 회Ⅲ로 집계" },
     "CR6(F),CR7(F)": { emr: "슬립코드: EX022B, MM113A", sched: "시간표에서 CR6(F), CR7(F), CR6(필), CR7(필) 포함 토큰\n예) CR6(비)서윤수 → CR6(비)로 집계\n예) CR6(F)서윤수 → CR6(F),CR7(F)로 집계" },
     "RS":         { emr: "슬립코드: DF002", sched: "시간표에서 RS 포함 토큰" },
     // 언어치료
@@ -4320,7 +4320,7 @@ function resetSchedTimeIndex() { _schedTimeIdx = null; }
 // 작업치료 시간표 기입명에서 기대 액팅을 뽑아 EMR 실제 액팅과 대조합니다.
 //   CR4        → 메디 표기 시 MZ012B 만 확인
 //   H○○○+CR7  → 회복기 치료시간 내 (2026-11) · 메디 표기 시 MZ012A 만 확인
-//   H○○○+tDCS(F) → 오더 없는 tDCS · 점검 제외
+//   H○○○+tDCS(F) → 회Ⅲ특수작업 (오더 없는 tDCS) · 이 점검 대상 아님
 //                (회Ⅲ특수작업치료는 CR 전용 오더가 아니라 원래 작업치료 액팅 → 액팅 대조에서 확인)
 //   CR6(F)     → (Free)특수작업치료(MM113A)                · 메디 표기 시 MZ012C
 //   CR7(F)     → (Free)특수작업치료(MM113A)                · 메디 표기 시 MZ012A
@@ -5317,7 +5317,8 @@ function isRecoveryInTimeCR(text) {
     return /^H\d?[가-힣]/.test(u) && /CR[67](?!\(F\)|\(필|\(비)/.test(u);
 }
 // 회복기 치료시간 외에 tDCS 를 오더 없이 더 하는 경우 — 예) H조연호+tDCS(F)
-//   → 따로 비용 없음 · 액팅 없음 → 집계·오더 점검·퇴원 점검에서 모두 제외
+//   → tDCS 비용은 없고 그 시간은 (회Ⅲ)특수작업치료로 넘긴다.
+//     (F) 가 붙어도 (Free)특수작업치료(MM113A)가 아님 · ① tDCS·CR 점검 대상 아님
 function isNoOrderTdcs(text) {
     return /TDCS\(F\)/.test(String(text||"").toUpperCase().replace(/\s+/g, ""));
 }
@@ -5326,7 +5327,6 @@ function isNoOrderTdcs(text) {
 function classifyOtTokenForDischarge(token) {
     var u = String(token||"").trim().toUpperCase();
     if (!u) return "";
-    if (isNoOrderTdcs(u)) return "";
     if (u.includes("(F)") || u.includes("(필")) {
         var af = u.replace(/^\(F\)|^\(필[^)]*\)/, "").replace(/\(F\)|\(필[^)]*\)/g, "").trim();
         if (!/^[CSADVH]/.test(af)) return "CR6(F),CR7(F)";
@@ -5492,9 +5492,9 @@ function analyzeDischargeLogic() {
                         // 작업치료 칸 하나가 오더 두 개를 요구하는 경우가 있다.
                         //   김필순+CR7(비)+(F)+TDCS → EX022A(전산화인지) + MM113A((Free)특수작업)
                         if (g[0] === "otGridTable") {
-                            if (isNoOrderTdcs(t) || isNoOrderTdcs(v)) return;   // H○○○+tDCS(F) — 액팅 없음
                             var cu = String(t).toUpperCase();
                             var pushed = false;
+                            if (isNoOrderTdcs(t)) cu = cu.replace(/\(F\)/g, "");   // H○○○+tDCS(F) → 회Ⅲ
                             if (cu.includes("CR6(비")) { put("CR6(비)"); pushed = true; }
                             if (cu.includes("CR7(비")) { put("CR7(비)"); pushed = true; }
                             var freeF = cu.includes("CR6(F)") || cu.includes("CR7(F)") ||

@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-30 b164</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-30 b166</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2899,6 +2899,8 @@ function computeBudo(wardFilter) {
                     var w = p.replace(/[^가-힣A-Za-z]/g, "");
                     if (w && BUDO_ROBOT_WORDS.test(w)) addR(w);
                 });
+                // 환자 이름은 처방 접두(H · N · G · M …)가 붙은 글자만 — "언어대신" · "업무" 같은 메모는 이름이 아니다
+                if (!/^[A-Za-z]/.test(head)) return;
                 var nm = head.replace(/^[A-Za-z0-9]+/, "").match(/^[가-힣]{2,4}/);
                 if (nm && names.indexOf(nm[0]) === -1) names.push(nm[0]);
             });

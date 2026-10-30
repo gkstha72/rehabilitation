@@ -535,7 +535,7 @@ function detectLayout(rows, colors){
     if(anchor.kind === "therapist"){
       anchor.cols.forEach(col=>{
         col.color = (colorGrid[anchor.row] || [])[col.col] || "";
-        if(isFirstFloorColor(col.color)) col.floor = "1층";
+        /* 이름칸 색으로 층을 정하지 않습니다 — 표 위치로 정함 (1층 치료사가 3층 환자를 볼 수 있음) */
       });
     }
   });
@@ -580,7 +580,7 @@ function detectLayout(rows, colors){
 
   blocks.forEach(anchor=>{
     const colored = anchor.cols.filter(col => col.floor === "1층").length;
-    if(colored > 0 && colored === anchor.cols.length){
+    if(false){
       anchor.floor = "1층";
       anchor.floorKnown = true;
       return;
@@ -874,7 +874,8 @@ function buildEvents(rows, layout, fontColors){
             row: r,
             ref: cellRef(r, col.col),
             red: isRedColor(((fontColors || [])[r] || [])[col.col]),
-            floor: col.floor || block.floor,
+            /* 칸에 (3층) (1층)이 적혀 있으면 그 층, 아니면 붙어 있는 표의 층 */
+            floor: (chunk.raw.match(/\(([13])층/) || [])[1] ? chunk.raw.match(/\(([13])층/)[1] + "층" : block.floor,
             raw: chunk.raw
           };
 
@@ -1077,7 +1078,8 @@ function analyzeDay(parsed, day, settings){
     const note = patientNotes[name] || null;
     const outpatient = (parsed.outpatients || []).includes(name);
     const timeOnlyToday = !!(note && note.dayOnly.some(d => d.day === day));
-    const routine = (!settings.checks.routine || outpatient || timeOnlyToday) ? { ok:true, lines:[] } : checkRoutine(type, count, settings, floor, note);
+    const bed = (parsed.bedPatients || []).includes(name);
+    const routine = (!settings.checks.routine || outpatient || timeOnlyToday || bed) ? { ok:true, lines:[] } : checkRoutine(type, count, settings, floor, note);
 
     /* 특이사항 */
     if(note && settings.checks.notes){
@@ -1169,7 +1171,10 @@ function setText(list){
 function checkRoutine(type, c, s, floor, note){
 
   /* 특이사항에 기구X · 전기X 가 있으면 그 개수는 루틴에서 보지 않습니다 (특이사항 검사에서 따로 봄) */
-  const skipMachine = !!(note && note.noMachine);
+  /* 기구 안 함 · 정해진 기구만(오토사이클만 등)인 환자는 기구 개수를 루틴에서 보지 않음.
+     기구를 안 하는 환자는 그만큼 1:1이 늘 수 있어서 1:1은 기준 ~ 기준+기구 개수까지 허용 */
+  const skipMachine = !!(note && (note.noMachine || (note.fixed.length && note.machineCount === null)));
+  const extraOne = !!(note && note.noMachine);
   const skipElectric = !!(note && note.noElectric);
   const inSet = (list, n, skip) => skip || list.includes(n);
 
@@ -1183,7 +1188,8 @@ function checkRoutine(type, c, s, floor, note){
 
     const evalWith = (one, machine) => {
       const bad = [];
-      if(!inSet(rec.one, one)) bad.push("1:1 " + one + "개 (기준 " + setText(rec.one) + ")");
+      const oneOk = inSet(rec.one, one) || (extraOne && rec.one.some(n => one >= n && one <= n + Math.max(...base.machine)));
+      if(!oneOk) bad.push("1:1 " + one + "개 (기준 " + setText(rec.one) + ")");
       if(!inSet(rec.machine, machine, skipMachine)) bad.push("기구 " + machine + "개 (기준 " + setText(rec.machine) + ")");
       return bad;
     };
@@ -2026,6 +2032,7 @@ function issueBox(key, list, render, floor){
   const body = el("div", { class:"issue-body" });
   let note = key === "routine" ? routineNote(floor) : ISSUE_INFO[key].note;
   if(key === "routine" && parsed.outpatients.length) note += " / 외래환자 제외: " + parsed.outpatients.join(", ");
+  if(key === "routine" && parsed.bedPatients.length) note += " / 침상재활 제외: " + parsed.bedPatients.join(", ");
   if(key === "continuity" && parsed.bedPatients.length) note += " (침상재활: " + parsed.bedPatients.join(", ") + ")";
   if(note) body.append(el("p", { class:"note", text: note }));
   if(list.length === 0) body.append(el("div", { class:"empty-msg", text:"이상 없음" }));

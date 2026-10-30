@@ -254,13 +254,14 @@ button.delete-sheet:hover{color:#a5342a;border-color:#e0bab5;background:#fdf4f3;
   color:var(--muted);
 }
 
-.layout-warn{
-  margin-top:8px;
-  padding:6px 9px;
-  border-radius:8px;
-  background:#fdf3e2;
-  color:#a8701a;
-  font-size:12.5px;
+.same-name-note{
+  margin:0 0 14px;
+  padding:9px 12px;
+  background:var(--warn-soft);
+  border:1px solid var(--warn);
+  border-radius:9px;
+  font-size:13px;
+  color:var(--warn);
 }
 
 .color-line{
@@ -462,17 +463,65 @@ button.sort-button{margin-top:8px;font-size:12px;}
   *{transition:none!important;}
 }
 
+@page{
+  size:A4;
+  margin:20mm 16mm;
+}
+
 @media print{
-  body{background:#fff;padding:0;color:#000;}
-  .masthead,.card,.edit-button{display:none;}
-  #result h2{margin:0 0 6px;font-size:17px;}
-  #result h3{margin:14px 0 0;color:#000;}
-  table.result{border:1px solid #999;border-radius:0;}
-  table.result th{background:#f2f2f2;color:#000;}
-  table.result td{padding:8px 12px;}
-  table.result tbody tr:not([data-row-type="lunch"]) td:first-child{border-right:1.5px solid #999;color:#000;}
-  table.result tbody tr:not([data-row-type="lunch"]) td:first-child::after{background:#000;box-shadow:0 0 0 3px #fff;}
-  #result .schedule-note{color:#333;}
+  body{background:#fff;padding:0;color:#000;font-size:16px;}
+  .masthead,.card,.edit-button,.same-name-note{display:none;}
+
+  /* A4 너비를 살짝만 남기고 씁니다.
+     숫자(160mm)를 키우면 표가 넓어지고, 줄이면 좁아집니다. */
+  main{max-width:none;margin:0;}
+  #result{
+    width:160mm;
+    max-width:100%;
+    margin:0 auto;
+  }
+
+  #result h2{margin:0 0 8px;font-size:23px;}
+  #result h3{margin:16px 0 0;color:#000;font-size:17px;}
+
+  table.result{border:1px solid #999;border-radius:0;margin-top:10px;}
+
+  table.result th{
+    background:#f2f2f2;
+    color:#000;
+    font-size:13px;
+    padding:9px 18px;
+  }
+
+  table.result td{
+    padding:11px 18px;
+    font-size:17px;
+  }
+
+  table.result tbody tr:not([data-row-type="lunch"]) td:first-child{
+    width:112px;
+    font-size:16px;
+    padding-right:20px;
+    border-right:1.5px solid #999;
+    color:#000;
+  }
+
+  table.result tbody tr:not([data-row-type="lunch"]) td:first-child::after{
+    background:#000;
+    box-shadow:0 0 0 3px #fff;
+  }
+
+  table.result tr[data-row-type="lunch"] td{
+    font-size:14px;
+    padding:9px 14px;
+  }
+
+  /* 표가 페이지 사이에서 잘리지 않게 합니다. */
+  table.result{page-break-inside:avoid;break-inside:avoid;}
+  table.result tr{page-break-inside:avoid;break-inside:avoid;}
+  #result h3{page-break-after:avoid;break-after:avoid;}
+
+  #result .schedule-note{color:#333;font-size:13px;}
 }
 
 </style>
@@ -562,6 +611,20 @@ let pastedSheets = [];
 
 /* 층 표기는 뒤에 괄호로 붙입니다. 예) 회복기재활치료-임희정 (1층)
    3층은 기본이라 표시하지 않습니다. */
+/* 칸에 (3층) (1층)이 적혀 있으면 그 층으로 봅니다.
+   예) H강순덕(1층)  →  1층 / 3층 시간표 칸이라도 1층 표시
+   표시가 없으면 붙어 있는 표의 층을 따릅니다. */
+function floorTagFor(cellCompact, targetName){
+  let floor = "";
+  splitPersonChunks(cellCompact).forEach(chunk=>{
+    if(floor) return;
+    if(findNameIndex(chunk, targetName) === -1) return;
+    const m = chunk.match(/\(([13])층/);
+    if(m) floor = m[1] + "층";
+  });
+  return floor;
+}
+
 function withFloor(floor, treatment){
 
   if(!floor) return treatment;
@@ -600,30 +663,17 @@ const sections = [
   }
 ];
 
-/* 시간표 칸의 코드표.
-   name : 개인 시간표에 나갈 치료 이름
-   withTherapist : true 면 뒤에 담당 치료사 이름을 붙입니다.
-   도수·신장은 담당이 따로 있어 치료사 이름을 붙이지 않습니다.
-   코드가 늘면 여기에 한 줄만 추가하면 됩니다. */
 const specialCodes = {
-  "V":    { name:"바이탈",   withTherapist:true },
-  "S":    { name:"특수작업", withTherapist:true },
-  "A":    { name:"일상생활", withTherapist:true },
-  "D":    { name:"연하치료", withTherapist:true },
-  "N":    { name:"중추운동", withTherapist:true },
-  "도수":  { name:"도수", withTherapist:false },
-  "8":    { name:"도수", withTherapist:false },
-  "12":   { name:"도수", withTherapist:false },
-  "14":   { name:"도수", withTherapist:false },
-  "16":   { name:"도수", withTherapist:false },
-  "신장6": { name:"신장분사치료", withTherapist:false },
-  "신장8": { name:"신장분사치료", withTherapist:false }
+  "V":"바이탈",
+  "S":"특수작업",
+  "A":"일상생활",
+  "D":"연하치료",
+  "N":"중추운동",
+  "8":"도수",
+  "12":"도수",
+  "14":"도수",
+  "16":"도수"
 };
-
-/* 긴 코드부터 맞춰봅니다. ("신장8"이 "8"보다 먼저) */
-const specialCodeKeys =
-  Object.keys(specialCodes)
-    .sort((a,b) => b.length - a.length);
 
 /* 로봇치료 코드표
    시간표 칸에 "GR환자명코드" 형태로 적힌 경우 로봇치료로 인식합니다.
@@ -658,7 +708,7 @@ function findRobotName(cellCompact, targetName){
 
     const name = compact(match[1]);
 
-    if(isSameName(name, targetName)){
+    if(robotNameMatches(name, targetName)){
 
       return robotCodes[match[2].toUpperCase()] || "";
     }
@@ -676,147 +726,11 @@ function stripRobotSegments(cellCompact, targetName){
       const compactName = compact(name);
 
       const isTarget =
-        isSameName(compactName, targetName);
+        robotNameMatches(compactName, targetName);
 
       return isTarget ? "" : whole;
     }
   );
-}
-
-/* ===== 동명이인·비슷한 이름 구분 (이동반 시간표와 같은 규칙) =====
-   ① 이름은 한글 덩어리 단위로 읽고, 입력한 이름과 '정확히' 같을 때만 인정
-      → "정순"을 찾을 때 정순태·김정순은 제외
-   ② 이름 뒤 숫자 = 동명이인 번호  예) 이다혜 / 이다혜2
-      · '1'은 번호 없음과 같은 사람 (김옥자1 = 김옥자)
-      · 숫자 뒤에 : 분 층 호 가 오면 번호가 아님 (정순2층 → 정순)
-      · 번호까지 입력해야 그 사람만 뽑힘 (정순2 입력 → 정순2만)
-   ③ 이름 앞 한글 코드(도수), 이름 뒤 치료·기구 설명(견인·평가·슬라 등)은
-      떼고 비교  예) 도수정순 → 정순 / 정순견인 → 정순 */
-const hangulCodeKeys =
-  specialCodeKeys.filter(key => /^[가-힣]+$/.test(key));
-
-const NAME_TAIL_WORDS = new Set([
-  '음악치료실','음악치료','인지치료','언어치료','연하치료','호흡치료','호흡훈련',
-  '도수중재','열전기치료','전기자극','상지운동','하지운동','안면운동',
-  '상지압박','하지압박','상지','체외','견인','평가',
-  '슬라','런닝','코로','워킹','아크','경사','바로','동적','기립','체어','리포머','캐딜락',
-  '전기','안면전기','전기펜','전기장갑','전동상지','어댑핏','클라','오토','패시브','스마트',
-  '하네스','엔젤','엑소','엘봇','알봇','로봇','필라테스','진동기','등속성','저속','한발로',
-  '크라이오','스트레칭','도수','물리','작업','식이치료','재활'
-]);
-
-/* 띄어쓰기를 "/"로 바꿔 이름 경계를 남긴 칸 텍스트 */
-function nameKey(value){
-  return normalize(value).replace(/\s+/g,"/");
-}
-
-/* 입력한 환자명 → {base, num}   "정순2" → 정순/2, "정순1" → 정순/없음 */
-function parseTargetName(value){
-  const t = compact(value);
-  const m = t.match(/^([가-힣]+)(\d)?$/);
-  if(!m) return { base:t, num:null };
-  return { base:m[1], num:(m[2] && m[2] !== "1") ? m[2] : null };
-}
-
-/* 칸 텍스트 안의 이름 토큰들 [{base, num, start}]
-   base를 정할 때 코드·치료설명을 떼는 기준은 찾는 이름(wantBase) */
-function nameTokens(text, wantBase){
-
-  const out = [];
-  const re = /([가-힣]{2,})(\d)?/g;
-  let m;
-
-  while((m = re.exec(text)) !== null){
-
-    let token = m[1];
-    let start = m.index;
-
-    const stripTail = t => {
-      if(wantBase && t !== wantBase && t.startsWith(wantBase) &&
-         NAME_TAIL_WORDS.has(t.slice(wantBase.length)))
-        return { t:wantBase, tail:true };
-      return { t, tail:false };
-    };
-
-    let res = stripTail(token);
-
-    if(res.t !== wantBase){
-      const code = hangulCodeKeys.find(key =>
-        token.startsWith(key) && token.length - key.length >= 2);
-      if(code){
-        const res2 = stripTail(token.slice(code.length));
-        if(res2.t === wantBase || !wantBase){
-          res = res2;
-          start += code.length;
-        }
-      }
-    }
-
-    let num = null;
-
-    if(!res.tail && m[2]){
-      const after = text[m.index + m[0].length] || "";
-      if(!/[:분층호]/.test(after) && m[2] !== "1")
-        num = m[2];
-    }
-
-    out.push({ base:res.t, num, start });
-  }
-
-  return out;
-}
-
-function findNameIndex(text, targetName){
-
-  const tg = parseTargetName(targetName);
-  if(tg.base.length < 2) return -1;
-
-  const hit = nameTokens(text, tg.base)
-    .find(tk => tk.base === tg.base && tk.num === tg.num);
-
-  return hit ? hit.start : -1;
-}
-
-function hasName(value, targetName){
-  return findNameIndex(nameKey(value), targetName) !== -1;
-}
-
-/* 로봇 칸(GR이름코드)의 이름이 찾는 환자인지 */
-function isSameName(name, targetName){
-  const a = parseTargetName(name);
-  const b = parseTargetName(targetName);
-  return a.base === b.base && a.num === b.num;
-}
-
-/* 입력한 이름과 헷갈릴 수 있는 이름들
-   homonyms : 같은 이름, 다른 번호 (정순 ↔ 정순2)
-   similar  : 입력 이름을 포함하는 다른 이름 (정순태, 김정순) */
-function findRelatedNames(targetName){
-
-  const tg = parseTargetName(targetName);
-  const homonyms = new Set();
-  const similar = new Set();
-
-  if(tg.base.length < 2) return { homonyms:[], similar:[] };
-
-  pastedSheets.forEach(sheet=>{
-    sheet.rows.forEach(row=>{
-      row.forEach(cell=>{
-        const text = nameKey(cell);
-        if(!text.includes(tg.base)) return;
-        nameTokens(text, tg.base).forEach(tk=>{
-          const label = tk.base + (tk.num || "");
-          if(tk.base === tg.base){
-            if(tk.num !== tg.num) homonyms.add(label);
-          }else if(tk.base.includes(tg.base)){
-            similar.add(label);
-          }
-        });
-      });
-    });
-  });
-
-  return { homonyms:Array.from(homonyms), similar:Array.from(similar) };
 }
 
 /* ===== 시간표 구조 자동 인식 =====
@@ -1038,8 +952,8 @@ function detectLayout(rows, colors){
         col.color =
           (colorGrid[anchor.row] || [])[col.col] || "";
 
-        if(isFirstFloorColor(col.color))
-          col.floor = "1층";
+        /* 이름칸 색(하늘색 등)으로는 층을 정하지 않습니다.
+           1층 치료사가 3층 환자를 볼 수 있어서, 붙어 있는 표의 층을 따릅니다. */
       });
     }
   });
@@ -1049,7 +963,7 @@ function detectLayout(rows, colors){
     const colored =
       anchor.cols.filter(col => col.floor === "1층").length;
 
-    if(colored > 0 && colored === anchor.cols.length){
+    if(false){
 
       anchor.floor = "1층";
       anchor.floorKnown = true;
@@ -1066,27 +980,7 @@ function detectLayout(rows, colors){
     anchor.skyBlue = colored > 0;
   });
 
-  const layout =
-    anchors.filter(a => a.cols.length > 0);
-
-  /* 치료사 이름을 못 찾아 통째로 빠진 표는 따로 기록해서 화면에 알립니다.
-     예전에 여백 열 때문에 PT 표가 조용히 빠진 적이 있어 눈에 보이게 했습니다. */
-  /* 치료사 표(PT·작업치료)만 알립니다.
-     "기구" 같은 이름표는 오른쪽 요약 영역에도 또 있어서
-     그것까지 알리면 매번 헛경고가 뜹니다. */
-  layout.skipped =
-    anchors
-      .filter(a =>
-        a.cols.length === 0 &&
-        a.kind === "therapist"
-      )
-      .map(a => ({
-        label:a.label,
-        row:a.row,
-        col:a.col
-      }));
-
-  return layout;
+  return anchors.filter(a => a.cols.length > 0);
 }
 
 /* 같은 시간열을 쓰는 다음 머리글 전까지,
@@ -1294,11 +1188,14 @@ function collectBlockCols(rows, anchor, anchorKeys){
     return cols;
   }
 
-  /* 머리글(예: "PT(목)")과 첫 치료사 사이에 빈 여백 칸이 있는 시트가 있어
-     시작 전 빈 칸은 두 개까지 건너뜁니다.
-     이름이 한 번 나온 뒤로는 빈 칸에서 표가 끝난 것으로 봅니다. */
-  let started = false;
-  let lead = 0;
+  /* 이름칸 사이에 빈 칸이 하나둘 끼어 있어도 표는 이어집니다.
+     (예: 9/5 시트는 "PT(토)" 바로 옆 칸이 비어 있습니다.)
+     그래서 빈 칸을 만나자마자 멈추지 않고,
+     연달아 3칸 넘게 비면 그때 표가 끝난 걸로 봅니다.
+     표와 표 사이는 항상 그보다 넓게 띄어져 있습니다. */
+  const MAX_BLANK_RUN = 3;
+
+  let blankRun = 0;
 
   for(
     let c = anchor.col + 1;
@@ -1313,21 +1210,34 @@ function collectBlockCols(rows, anchor, anchorKeys){
 
     if(!name){
 
-      if(started) break;
+      blankRun++;
 
-      lead++;
+      if(blankRun >= MAX_BLANK_RUN)
+        break;
 
-      if(lead > 2) break;
+      cols.push({
+        col:c,
+        name:anchor.fixedName || "치료사 확인 필요",
+        blankHeader:true
+      });
 
       continue;
     }
 
-    started = true;
+    blankRun = 0;
 
     cols.push({
       col:c,
       name:anchor.fixedName || name
     });
+  }
+
+  /* 표 끝에 붙은 빈 칸은 떼어냅니다. */
+  while(
+    cols.length > 0 &&
+    cols[cols.length - 1].blankHeader
+  ){
+    cols.pop();
   }
 
   return cols;
@@ -1485,7 +1395,7 @@ function renderSheetLayout(){
       nameCell.textContent =
         block.label +
         (colored.length
-          ? " — 하늘색 1층 : " + colored.join(", ")
+          ? " — 1층 : " + colored.join(", ")
           : "") +
         (block.floorKnown ? "" : " (추정 — 확인해주세요)");
 
@@ -1507,21 +1417,6 @@ function renderSheetLayout(){
 
     box.appendChild(table);
 
-    (sheet.layout.skipped || []).forEach(item=>{
-
-      const warn =
-        document.createElement("div");
-
-      warn.className = "layout-warn";
-
-      warn.textContent =
-        item.label + " (" + (item.row + 1) + "행 " +
-        columnName(item.col) + "열) — 치료사 이름을 찾지 못해 이 표는 빠졌습니다";
-
-      box.appendChild(warn);
-    });
-
-    renderColorPicker(box, sheet);
 
     wrap.appendChild(box);
   });
@@ -1645,13 +1540,9 @@ function sheetSummaryText(sheet){
   const unknown =
     sheet.layout.filter(block => !block.floorKnown).length;
 
-  const skipped =
-    (sheet.layout.skipped || []).length;
-
   return "표 " + sheet.layout.length + "개" +
     (colored ? " · 근골 " + colored + "명" : "") +
-    (unknown ? " · 층 확인 " + unknown + "개" : "") +
-    (skipped ? " · 읽지 못한 표 " + skipped + "개" : "");
+    (unknown ? " · 확인 필요 " + unknown + "개" : "");
 }
 
 function removeSheet(index){
@@ -1811,6 +1702,7 @@ function handlePaste(event){
 
   let rows = [];
   let colors = [];
+  let underlines = [];
 
   if(html && html.includes("<table")){
 
@@ -1819,6 +1711,7 @@ function handlePaste(event){
 
     rows = parsed.values;
     colors = parsed.colors;
+    underlines = parsed.underlines;
 
   }else{
 
@@ -1852,6 +1745,12 @@ function handlePaste(event){
 
       if(color)
         cell.style.background = color;
+
+      if((underlines[r] || [])[c]){
+
+        cell.style.textDecoration = "underline";
+        cell.dataset.acting = "1";
+      }
     });
   });
 }
@@ -1868,13 +1767,17 @@ function parseHtmlTableWithMergedCells(html){
     doc.querySelector("table");
 
   if(!table)
-    return { values:[], colors:[] };
+    return { values:[], colors:[], underlines:[] };
 
   const classColors =
     buildClassColors(doc);
 
+  const classUnderlines =
+    buildClassUnderlines(doc);
+
   const values = [];
   const colors = [];
+  const underlines = [];
   const occupied = {};
 
   const trList =
@@ -1884,6 +1787,7 @@ function parseHtmlTableWithMergedCells(html){
 
     if(!values[r]) values[r] = [];
     if(!colors[r]) colors[r] = [];
+    if(!underlines[r]) underlines[r] = [];
 
     let c = 0;
 
@@ -1901,6 +1805,9 @@ function parseHtmlTableWithMergedCells(html){
 
       const color =
         cellBackground(cell, classColors);
+
+      const underlined =
+        cellUnderline(cell, classUnderlines);
 
       const rowspan =
         parseInt(
@@ -1923,9 +1830,11 @@ function parseHtmlTableWithMergedCells(html){
 
           if(!values[targetR]) values[targetR] = [];
           if(!colors[targetR]) colors[targetR] = [];
+          if(!underlines[targetR]) underlines[targetR] = [];
 
           values[targetR][targetC] = value;
           colors[targetR][targetC] = color;
+          underlines[targetR][targetC] = underlined;
 
           occupied[
             `${targetR},${targetC}`
@@ -1937,7 +1846,7 @@ function parseHtmlTableWithMergedCells(html){
     });
   });
 
-  return { values, colors };
+  return { values, colors, underlines };
 }
 
 /* 엑셀은 배경색을 칸에 직접 쓰기도 하고
@@ -1973,6 +1882,95 @@ function buildClassColors(doc){
   });
 
   return map;
+}
+
+/* ===== 액팅선(밑줄) =====
+   시간표에서 이름에 밑줄을 그으면 "액팅선"입니다.
+   실제로 진행되는 치료가 아니므로 개인 시간표에 잡히면 안 됩니다.
+
+   가운데 줄(취소선)은 "실시선"이라 실제로 시행한 치료입니다.
+   그래서 가운데 줄은 그대로 살려 둡니다. 밑줄만 걸러냅니다. */
+function hasUnderlineStyle(styleText){
+
+  const text =
+    String(styleText || "").toLowerCase();
+
+  const match =
+    text.match(
+      /text-decoration(?:-line)?\s*:\s*([^;"']+)/
+    );
+
+  if(!match) return false;
+
+  return match[1].includes("underline");
+}
+
+function buildClassUnderlines(doc){
+
+  const map = {};
+
+  Array.from(doc.querySelectorAll("style")).forEach(styleTag=>{
+
+    styleTag.textContent.split("}").forEach(chunk=>{
+
+      const parts = chunk.split("{");
+
+      if(parts.length < 2) return;
+
+      if(!hasUnderlineStyle(parts[1])) return;
+
+      parts[0].split(",").forEach(selector=>{
+
+        const name =
+          selector.trim().replace(/^\./,"");
+
+        if(name)
+          map[name] = true;
+      });
+    });
+  });
+
+  return map;
+}
+
+function cellUnderline(cell, classUnderlines){
+
+  if(cell.querySelector("u,ins"))
+    return true;
+
+  const nodes =
+    [cell].concat(
+      Array.from(cell.querySelectorAll("*"))
+    );
+
+  for(const node of nodes){
+
+    if(hasUnderlineStyle(node.getAttribute("style")))
+      return true;
+
+    const classList =
+      (node.getAttribute("class") || "").split(/\s+/);
+
+    for(const name of classList){
+
+      if(classUnderlines[name])
+        return true;
+    }
+  }
+
+  return false;
+}
+
+/* 액팅선(밑줄)이 그어진 칸은 비어 있는 것으로 보고 읽습니다. */
+function maskActingLines(rows, underlines){
+
+  if(!underlines) return rows;
+
+  return rows.map((row, r)=>
+    row.map((cell, c)=>
+      ((underlines[r] || [])[c] ? "" : cell)
+    )
+  );
 }
 
 function cellBackground(cell, classColors){
@@ -2059,6 +2057,9 @@ function addCurrentSheet(){
   const colors =
     getGridColors();
 
+  const underlines =
+    getGridUnderlines();
+
   const layout =
     detectLayout(rows, colors);
 
@@ -2066,6 +2067,7 @@ function addCurrentSheet(){
     sheetName,
     rows,
     colors,
+    underlines,
     layout
   });
 
@@ -2082,22 +2084,10 @@ function addCurrentSheet(){
   const unknown =
     layout.filter(block => !block.floorKnown).length;
 
-  const skipped =
-    (layout.skipped || [])
-      .map(item =>
-        "\n· " + item.label + " (" + (item.row + 1) + "행 " +
-        columnName(item.col) + "열) — 치료사 이름을 찾지 못했습니다"
-      )
-      .join("");
-
   alert(
     sheetName + " 추가 완료\n\n" +
     "[인식된 표 구조]\n" +
     layoutSummary(layout) +
-    (skipped
-      ? "\n\n※ 아래 표는 읽지 못했습니다. 머리글 오른쪽 칸에 치료사 이름이 있는지 확인해주세요." +
-        skipped
-      : "") +
     (unknown
       ? "\n\n※ 층을 확정하지 못한 표가 " + unknown +
         "개 있습니다.\n아래 목록에서 노란색으로 표시된 곳의 층을 확인해주세요."
@@ -2129,6 +2119,30 @@ function getGridRows(){
   }
 
   return rows;
+}
+
+function getGridUnderlines(){
+
+  const underlines = [];
+
+  for(let r=0;r<ROWS;r++){
+
+    const row = [];
+
+    for(let c=0;c<COLS;c++){
+
+      const cell =
+        (cellRefs[r] || [])[c];
+
+      row.push(
+        !!(cell && cell.dataset.acting === "1")
+      );
+    }
+
+    underlines.push(row);
+  }
+
+  return underlines;
 }
 
 function getGridColors(){
@@ -2165,6 +2179,8 @@ function clearGrid(){
 
       cell.innerText = "";
       cell.style.background = "";
+      cell.style.textDecoration = "";
+      delete cell.dataset.acting;
     });
 }
 
@@ -2213,7 +2229,7 @@ function findPatientPositions(){
 
       row.forEach((cell,c)=>{
 
-        if(hasName(cell, targetName)){
+        if(nameMatches(compact(cell), targetName)){
 
           found.push({
             sheet: sheetIndex + 1,
@@ -2228,14 +2244,8 @@ function findPatientPositions(){
 
   if(found.length === 0){
 
-    const related = findRelatedNames(targetName);
-    const others = related.homonyms.concat(related.similar);
-
     alert(
-      "붙여넣은 표 안에서 환자명을 찾지 못했습니다." +
-      (others.length
-        ? "\n비슷한 이름: " + others.join(", ")
-        : "")
+      "붙여넣은 표 안에서 환자명을 찾지 못했습니다."
     );
 
     return;
@@ -2287,7 +2297,9 @@ function parseSchedule(patientName){
 
   pastedSheets.forEach((sheet, sheetIndex)=>{
 
-    const rows = sheet.rows;
+    /* 액팅선(밑줄) 칸은 빈 칸으로 보고 읽습니다. */
+    const rows =
+      maskActingLines(sheet.rows, sheet.underlines);
 
     const layout =
       sheet.layout && sheet.layout.length
@@ -2350,7 +2362,11 @@ function parseSchedule(patientName){
   });
 
   const filteredResults =
-    removeTherapistScheduleDuplicates(results)
+    removeTherapistScheduleDuplicates(
+      removeInlineMachineDuplicates(
+        removeRideAlongElectric(results)
+      )
+    )
       .filter(item => !isHiddenScheduleTime(item.time));
 
   filteredResults.sort((a,b)=>{
@@ -2405,14 +2421,21 @@ function parseWithLayout(
         if(!cellText) return;
 
         const cellCompact =
-          nameKey(cellText);
+          compact(cellText);
 
-        if(findNameIndex(cellCompact, targetName) === -1)
+        if(!nameMatches(cellCompact, targetName))
           return;
 
+        const cellFloor =
+          floorTagFor(cellCompact, targetName) || col.floor || block.floor;
+
         let treatment;
+        let hasFesNote = false;
 
         if(block.kind === "therapist"){
+
+          hasFesNote =
+            isRideAlongElectric(cellCompact, targetName);
 
           treatment =
             makeTreatmentName(
@@ -2422,11 +2445,36 @@ function parseWithLayout(
               col.name
             );
 
+          findInlineMachines(
+            cellCompact,
+            targetName
+          ).forEach(machineName=>{
+
+            results.push({
+              sheetIndex,
+              dayTitle,
+              time,
+              sortTime: timeOrder(time),
+              treatment:
+                withFloor(
+                  cellFloor,
+                  "기구-" + machineName
+                ),
+              fromTherapistCell: true
+            });
+          });
+
         }else if(block.kind === "machine"){
 
           treatment = "기구-" + col.name;
 
         }else{
+
+          if(
+            block.kind === "electric" &&
+            isRideAlongElectric(cellCompact, targetName)
+          )
+            return;
 
           treatment = col.name;
         }
@@ -2436,7 +2484,8 @@ function parseWithLayout(
           dayTitle,
           time,
           sortTime: timeOrder(time),
-          treatment: withFloor(col.floor || block.floor, treatment)
+          treatment: withFloor(cellFloor, treatment),
+          fesRideAlong: hasFesNote
         });
       });
     }
@@ -2484,9 +2533,9 @@ function parseMainTherapies(
         if(!cellText) continue;
 
         const cellCompact =
-          nameKey(cellText);
+          compact(cellText);
 
-        if(findNameIndex(cellCompact, targetName) === -1)
+        if(!nameMatches(cellCompact, targetName))
           continue;
 
         const therapist =
@@ -2506,7 +2555,9 @@ function parseMainTherapies(
           dayTitle,
           time,
           sortTime: timeOrder(time),
-          treatment: withFloor(section.floor, treatment)
+          treatment: withFloor(section.floor, treatment),
+          fesRideAlong:
+            isRideAlongElectric(cellCompact, targetName)
         });
       }
     }
@@ -2540,7 +2591,7 @@ function parseFirstFloorPT(
 
       if(!cellText) continue;
 
-      if(!hasName(cellText, targetName))
+      if(!nameMatches(compact(cellText), targetName))
         continue;
 
       results.push({
@@ -2586,7 +2637,7 @@ function parseFirstFloorMachines(
 
       if(!cellText) continue;
 
-      if(!hasName(cellText, targetName))
+      if(!nameMatches(compact(cellText), targetName))
         continue;
 
       const machineName =
@@ -2635,7 +2686,7 @@ function parseMachines(
 
       if(!cellText) continue;
 
-      if(!hasName(cellText, targetName))
+      if(!nameMatches(compact(cellText), targetName))
         continue;
 
       const machineName =
@@ -2679,7 +2730,10 @@ function parseElectric(
 
       if(!cellText) continue;
 
-      if(!hasName(cellText, targetName))
+      if(!nameMatches(compact(cellText), targetName))
+        continue;
+
+      if(isRideAlongElectric(compact(cellText), targetName))
         continue;
 
       results.push({
@@ -2693,29 +2747,81 @@ function parseElectric(
   }
 }
 
-/* 코드표에 있는 치료 이름들 (중추운동·특수작업·일상생활·연하치료·바이탈·도수·신장분사치료) */
-const specialTreatmentNames =
-  Array.from(
-    new Set(
-      Object.keys(specialCodes)
-        .map(key => specialCodes[key].name)
-    )
-  );
-
-function isSpecialTreatmentName(treatment){
-
-  return specialTreatmentNames.some(name =>
-    treatment === name ||
-    treatment.startsWith(name + "-") ||
-    treatment.startsWith(name + "(") ||
-    treatment.startsWith(name + " ")
-  );
-}
-
 function isMachineOrElectricName(treatment){
 
   return /(^|\s)기구-/.test(treatment) ||
     /(^|\s)전기치료$/.test(treatment);
+}
+
+function isElectricName(treatment){
+
+  return /전기치료/.test(treatment);
+}
+
+/* 1:1 칸에 "이름+FES"라고 적혀 있으면
+   그 시간의 전기치료는 1:1 시간에 함께 시행한 것이므로
+   전기치료 줄을 빼고 회복기재활치료만 남깁니다.
+   전기 시간표에 이름이 따로 들어가 있어도 마찬가지입니다. */
+function removeRideAlongElectric(items){
+
+  return items.filter(item=>{
+
+    if(!isElectricName(item.treatment))
+      return true;
+
+    const hasFesNote =
+      items.some(other=>{
+
+        return (
+          other.fesRideAlong &&
+          other.sheetIndex === item.sheetIndex &&
+          other.dayTitle === item.dayTitle &&
+          other.time === item.time
+        );
+      });
+
+    return !hasFesNote;
+  });
+}
+
+/* 기구 시간표에서 제대로 찾은 기구가 있으면
+   치료사 칸에서 읽은 기구는 버립니다. (중복 방지) */
+function removeInlineMachineDuplicates(items){
+
+  const seen = [];
+
+  return items.filter(item=>{
+
+    if(!item.fromTherapistCell)
+      return true;
+
+    const hasRealMachine =
+      items.some(other=>{
+
+        return (
+          !other.fromTherapistCell &&
+          other.sheetIndex === item.sheetIndex &&
+          other.dayTitle === item.dayTitle &&
+          other.time === item.time &&
+          isMachineOrElectricName(other.treatment)
+        );
+      });
+
+    if(hasRealMachine)
+      return false;
+
+    const key =
+      item.sheetIndex + "|" +
+      item.time + "|" +
+      item.treatment;
+
+    if(seen.indexOf(key) !== -1)
+      return false;
+
+    seen.push(key);
+
+    return true;
+  });
 }
 
 function removeTherapistScheduleDuplicates(items){
@@ -2726,12 +2832,6 @@ function removeTherapistScheduleDuplicates(items){
       isMachineOrElectricName(item.treatment);
 
     if(isMachineOrElectric){
-      return true;
-    }
-
-    /* 중추운동·특수작업 등은 기구·전기와 별개로 청구되는 치료라
-       같은 시간에 기구가 있어도 지우지 않습니다. */
-    if(isSpecialTreatmentName(item.treatment)){
       return true;
     }
 
@@ -2752,6 +2852,126 @@ function removeTherapistScheduleDuplicates(items){
 
     return true;
   });
+}
+
+/* 치료사 칸 안에 "+장비" 로 적힌 기구를 읽습니다.
+   예) G박종기+런닝 / H김민남+PWB+런닝 / M김태석(q케인)+워킹
+
+   기구 시간표(오른쪽 표)에 이름이 빠져 있어도,
+   치료사 칸에 기구가 적혀 있으면 그걸로 기구치료를 찾아냅니다.
+   기구 시간표에 제대로 들어가 있으면 그쪽이 우선이라 중복되지 않습니다.
+
+   새 장비가 생기면 "줄임말":"표시할이름" 한 줄만 추가하면 됩니다. */
+const inlineMachineWords = {
+  "경사":"경사",
+  "슬라":"슬라이드",
+  "슬라이드":"슬라이드",
+  "워킹":"워킹",
+  "런닝":"런닝",
+  "러닝":"런닝",
+  "기립":"기립",
+  "코끼리":"코끼리",
+  "스마트":"스마트",
+  "코로":"코로",
+  "바로":"바로",
+  "동적":"동적",
+  "어댑핏":"어댑핏",
+  "전상":"전동상지",
+  "전동상지":"전동상지",
+  "에르":"등속성에르고미터",
+  "아크":"아크트레이너",
+  "클라":"클라이밋",
+  "진동":"진동기",
+  "리포머":"리포머",
+  "캐포머":"캐포머",
+  "체어":"체어",
+  "오토":"오토사이클",
+  "오토사이클":"오토사이클",
+  "CPM":"CPM"
+};
+
+/* 한 칸에 여러 명이 붙어 있을 때 사람 단위로 잘라 줍니다.
+   코드문자(H, G, M, N, S, A, D, V, F, X) 바로 뒤에 한글이 오면
+   거기서부터 새로운 사람으로 봅니다. */
+function splitPersonChunks(text){
+
+  return text
+    .replace(
+      /([HGMNSADVFXhgmnsadvfx])(?=[가-힣])/g,
+      "\u0001$1"
+    )
+    .split("\u0001");
+}
+
+function findInlineMachines(cellCompact, targetName){
+
+  const list = [];
+
+  const text =
+    stripRobotSegments(cellCompact, targetName);
+
+  splitPersonChunks(text).forEach(chunk=>{
+
+    const index =
+      findNameIndex(chunk, targetName);
+
+    if(index === -1) return;
+
+    const after =
+      chunk.slice(index + targetName.length);
+
+    /* "+" 로 이어 붙인 것만 기구로 봅니다.
+       이름 바로 뒤 괄호((1:1), (토) 등)는 기구가 아닙니다. */
+    after.split("+").slice(1).forEach(token=>{
+
+      const word =
+        token.replace(/[(].*$/,"").trim();
+
+      const machineName =
+        inlineMachineWords[word] ||
+        inlineMachineWords[word.toUpperCase()];
+
+      if(!machineName) return;
+
+      if(list.indexOf(machineName) === -1)
+        list.push(machineName);
+    });
+  });
+
+  return list;
+}
+
+/* 전기치료를 1:1 치료 시간에 함께 붙여서 하는 경우
+   전기 칸에 "이름+FES" 처럼 적습니다.
+   이때는 따로 전기치료로 잡지 않고
+   1:1(회복기재활치료)만 남깁니다. */
+const rideAlongElectricWords = ["FES"];
+
+function isRideAlongElectric(cellCompact, targetName){
+
+  let found = false;
+
+  splitPersonChunks(cellCompact).forEach(chunk=>{
+
+    const index =
+      findNameIndex(chunk, targetName);
+
+    if(index === -1) return;
+
+    const after =
+      chunk.slice(index + targetName.length);
+
+    after.split("+").slice(1).forEach(token=>{
+
+      const word =
+        token.replace(/[(].*$/,"").trim().toUpperCase();
+
+      if(rideAlongElectricWords.indexOf(word) !== -1)
+        found = true;
+    });
+  });
+
+  return found;
 }
 
 function makeTreatmentName(
@@ -2779,18 +2999,16 @@ function makeTreatmentName(
       targetName
     );
 
-  const special = specialCodes[code];
+  if(specialCodes[code]){
 
-  if(special){
+    if(specialCodes[code] === "도수")
+      return "도수-" + therapist;
 
-    const base =
-      robotName
-        ? special.name + "(로봇-" + robotName + ")"
-        : special.name;
+    if(robotName)
+      return specialCodes[code] +
+        "(로봇-" + robotName + ")";
 
-    return special.withTherapist
-      ? base + "-" + therapist
-      : base;
+    return specialCodes[code];
   }
 
   if(robotName)
@@ -2815,13 +3033,19 @@ function getCodeBeforeName(
     return "";
 
   const before =
-    cellCompact.slice(0,index).replace(/\/+$/,"");
+    cellCompact.slice(0,index);
 
-  const matched =
-    specialCodeKeys.find(key => before.endsWith(key));
+  if(before.endsWith("16"))
+    return "16";
 
-  if(matched)
-    return matched;
+  if(before.endsWith("14"))
+    return "14";
+
+  if(before.endsWith("12"))
+    return "12";
+
+  if(before.endsWith("8"))
+    return "8";
 
   return before.slice(-1);
 }
@@ -2866,36 +3090,35 @@ function renderSchedule(patientName, items){
 
   result.appendChild(h2);
 
+  const sameNames =
+    findSameNameVariants(
+      compact(patientName)
+    );
+
+  if(sameNames.length > 0){
+
+    const note =
+      document.createElement("p");
+
+    note.className = "same-name-note";
+
+    note.innerText =
+      "이름 확인: 표 안에 " +
+      sameNames.join(", ") +
+      " 도 있습니다. 이 시간표에는 \"" +
+      compact(patientName) +
+      "\" 칸만 들어갔습니다.";
+
+    result.appendChild(note);
+  }
+
   if(items.length === 0){
 
-    const related =
-      findRelatedNames(patientName);
-    const others =
-      related.homonyms.concat(related.similar);
-
     result.innerHTML +=
-      "<p>검색 결과가 없습니다.</p>" +
-      (others.length
-        ? "<p>비슷한 이름: " +
-          others.map(escapeHtml).join(", ") + "</p>"
-        : "");
+      "<p>검색 결과가 없습니다.</p>";
 
     return;
   }
-
-  const homonymNote =
-    findRelatedNames(patientName).homonyms;
-
-  if(homonymNote.length){
-
-    const p = document.createElement("p");
-    p.style.color = "#c53a3a";
-    p.textContent =
-      "⚠️ 동명이인 있음: " + homonymNote.join(", ") +
-      " — 번호까지 입력하면 그 환자만 따로 뽑힙니다.";
-    result.appendChild(p);
-  }
-
 
   const grouped = {};
 
@@ -3194,6 +3417,181 @@ function compact(value){
 
   return normalize(value)
     .replace(/\s+/g,"");
+}
+
+/* ===== 동명이인(이름+숫자) 구분 =====
+   동명이인은 두 번째 환자 이름 뒤에 숫자를 붙여서 씁니다. (예: 김부영 / 김부영2)
+   그냥 includes()로 찾으면 "김부영"으로 검색할 때 "김부영2"까지 걸립니다.
+   그래서 찾은 이름 바로 뒤에 숫자가 붙어 있으면 다른 사람으로 보고 건너뜁니다.
+   - "김부영"  검색 → H김부영   O  /  H김부영2  X
+   - "김부영2" 검색 → H김부영2  O  /  H김부영   X
+   이름 앞의 숫자(H1, H2, 신장8 등)는 코드이므로 앞쪽은 검사하지 않습니다. */
+
+function isDigitChar(ch){
+
+  return ch >= "0" && ch <= "9";
+}
+
+/* 한글 글자인지 확인합니다.
+   찾은 이름 바로 뒤에 한글이 더 붙어 있으면
+   그건 이름이 더 긴 다른 사람입니다.
+   예) "정순" 으로 찾을 때 "정순태" 는 다른 사람 */
+function isHangulChar(ch){
+
+  return /[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(ch || "");
+}
+
+function findNameIndex(haystack, needle, fromIndex){
+
+  const text = haystack || "";
+  const name = needle || "";
+
+  if(!name) return -1;
+
+  let from = fromIndex || 0;
+
+  while(true){
+
+    const index =
+      text.indexOf(name, from);
+
+    if(index === -1)
+      return -1;
+
+    const prevChar =
+      index > 0 ? text.charAt(index - 1) : "";
+
+    const nextChar =
+      text.charAt(index + name.length);
+
+    /* 이름의 앞뒤가 한글이면 사실은 다른 사람입니다.
+         뒤에 한글  → 더 긴 이름   (정순 / 정순태)
+         앞에 한글  → 성이 더 붙음 (정순 / 김정순)
+       뒤에 숫자가 붙으면 동명이인입니다. (김부영 / 김부영2)
+
+       앞에 오는 H, G, M, 숫자 등은 치료 코드라서
+       앞쪽은 한글만 확인합니다. */
+    if(
+      !isHangulChar(prevChar) &&
+      !isDigitChar(nextChar) &&
+      !isHangulChar(nextChar)
+    )
+      return index;
+
+    from = index + 1;
+  }
+}
+
+function nameMatches(haystack, needle){
+
+  return findNameIndex(haystack, needle) !== -1;
+}
+
+/* 검색한 이름과 동명이인이 표에 함께 있는지 찾아서 알려줍니다.
+   "김부영" 검색 → 표에 김부영2 가 있으면 알려주고,
+   "김부영2" 검색 → 표에 김부영 이 있으면 알려줍니다. */
+function findSameNameVariants(targetName){
+
+  const list = [];
+
+  if(!targetName)
+    return list;
+
+  const baseName =
+    targetName.replace(/[0-9]+$/,"") || targetName;
+
+  pastedSheets.forEach(sheet=>{
+
+    (sheet.rows || []).forEach(row=>{
+
+      (row || []).forEach(cell=>{
+
+        const text = compact(cell);
+
+        if(!text) return;
+
+        let from = 0;
+
+        while(true){
+
+          const index =
+            text.indexOf(baseName, from);
+
+          if(index === -1) break;
+
+          /* 앞에 한글이 붙어 있으면 성이 더 있는 다른 사람입니다.
+             (정순 을 찾을 때 김정순2 를 "정순2" 로 읽으면 안 됩니다.) */
+          if(
+            index > 0 &&
+            isHangulChar(text.charAt(index - 1))
+          ){
+            from = index + 1;
+            continue;
+          }
+
+          let end = index + baseName.length;
+
+          /* 뒤에 붙은 한글(정순 → 정순태)과
+             숫자(김부영 → 김부영2)를 모아
+             표에 실제로 적힌 이름을 만듭니다.
+             한글은 두 글자까지만 봅니다. */
+          let extra = "";
+          let hangul = 0;
+
+          while(end < text.length){
+
+            const ch = text.charAt(end);
+
+            if(isDigitChar(ch)){
+
+              extra += ch;
+              end++;
+              continue;
+            }
+
+            if(isHangulChar(ch) && hangul < 2){
+
+              extra += ch;
+              hangul++;
+              end++;
+              continue;
+            }
+
+            break;
+          }
+
+          const fullName = baseName + extra;
+
+          if(
+            fullName !== targetName &&
+            list.indexOf(fullName) === -1
+          ){
+            list.push(fullName);
+          }
+
+          from = index + 1;
+        }
+      });
+    });
+  });
+
+  return list;
+}
+
+/* 로봇 표기(GR환자명코드)의 이름 비교용.
+   표기가 조금 달라도 인정하되, 동명이인 숫자는 구분합니다. */
+function robotNameMatches(name, targetName){
+
+  if(!name || !targetName)
+    return false;
+
+  if(name === targetName)
+    return true;
+
+  return (
+    nameMatches(name, targetName) ||
+    nameMatches(targetName, name)
+  );
 }
 
 function escapeHtml(str){

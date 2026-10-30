@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-30 b168</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-30 b169</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -6120,6 +6120,27 @@ function analyzeCrPairLogic() {
                        "MZ012C":"메디페인[기타](MZ012C)" };
     function mediLabel(code) { return MEDI_LABEL[code] || ("메디페인(" + code + ")"); }
 
+    // 메디페인은 작업치료 짝과 시간이 달라도 된다 (2026-11 tDCS 규칙 — 예: CR4 10:10 · 메디 09:00).
+    // 그래서 메디 시각·책임자는 작업치료 칸이 아니라 메디페인 시간표에서 그 환자 칸을 찾아 쓴다.
+    var mediSlotOf = {};
+    (function() {
+        var mSlotMap = buildRowSlotMap("ptGridTable");
+        for (var r0 = 1; r0 < ROW_COUNT; r0++) for (var c0 = 0; c0 < COL_COUNT; c0++) {
+            var e0 = document.getElementById("mtGridTable-cell-"+r0+"-"+c0);
+            var t0 = e0 ? liveCellText("mtGridTable", r0, c0, e0.value.trim()) : "";
+            if (!t0 || cellValIsBlankOrInvalid(t0)) continue;
+            splitMedipainCell(t0).forEach(function(one) {
+                if (!isMedipainEntry(one)) return;
+                var pn = mediPatientName(one);
+                if (pn && !mediSlotOf[pn] && mSlotMap[r0]) mediSlotOf[pn] = mSlotMap[r0];
+            });
+        }
+    })();
+    function mediActual(list) {
+        return list.filter(function(x){ return /^MZ012/.test(x.code); })
+                   .map(function(x){ return x.code + " " + (x.time||"") + " (" + x.who + ")"; });
+    }
+
     Object.keys(cols).forEach(function(c) {
         for (var r = 1; r < ROW_COUNT; r++) {
             var el = document.getElementById("otGridTable-cell-"+r+"-"+c);
@@ -6199,12 +6220,17 @@ function analyzeCrPairLogic() {
             seenP[patient] = true;
             if (has메디) { seenMedi[key] = true; seenMediP[patient] = true; }
 
+            // 실제 액팅: 작업치료 슬롯 것 + 메디페인은 시간이 달라도 하루 전체에서 (시각 함께 표시)
+            var actualList = atSlot.filter(function(x){ return !/^MZ012/.test(x.code); })
+                                   .map(function(x){ return x.code + " (" + x.who + ")"; });
+            if (has메디) actualList = actualList.concat(mediActual(list));
             rows.push({
                 patient: patient, slot: slot, therapist: therapists.join("·"),
+                mediSlot: has메디 ? (mediSlotOf[patient] || "") : "",
                 cell: txt.replace(/\r?\n|\r/g," "),
                 cr: crName + (has메디 ? " + 메디" : "") + (hasTdcs ? " + tDCS" : ""),
                 expect: expect.map(function(e){ return e.label; }).join(", "),
-                actual: atSlot.map(function(x){ return x.code + " (" + x.who + ")"; }).join(", "),
+                actual: actualList.join(", "),
                 ok: missing.length === 0,
                 missing: missing.slice(),
                 note: missing.length ? missing.join(" · ") : "일치"
@@ -6278,7 +6304,7 @@ function analyzeCrPairLogic() {
                 cell: "메디페인 · " + mtxtOne.replace(/\r?\n|\r/g," "),
                 cr: mLabel.replace("메디페인",""),
                 expect: want ? mediLabel(want) : "-",
-                actual: mAt.map(function(x){ return x.code + " (" + x.who + ")"; }).join(", "),
+                actual: mediActual(mList).join(", "),
                 ok: false, missing: mBad.slice(), note: mBad.join(" · ")
             });
             }
@@ -6358,7 +6384,7 @@ function analyzeCrPairLogic() {
     })();
     // 이미 "없음"으로 끝나는 문구에 "없음"을 또 붙여 "… 없음 없음"이 되던 것 방지
     function addNoneSuffix(s) {
-        return /없음$|확인$/.test(s) ? s : s + " 없음";
+        return /없음$|확인$|넘어감$/.test(s) ? s : s + " 없음";
     }
     var issueSeen = {};
     rows.forEach(function(r) {
@@ -6387,8 +6413,9 @@ function analyzeCrPairLogic() {
         });
         if (theirs.length) pushIssue("tDCS·CR", r.therapist, r.patient, r.slot, theirs.map(addNoneSuffix).join(" · "));
         if (mine.length) {
-            var etWho = etTherapistAtSlot(r.slot) || "전기 담당";
-            pushIssue("tDCS·CR", etWho, r.patient, r.slot, mine.map(addNoneSuffix).join(" · "));
+            var mSlotUse = r.mediSlot || r.slot;   // 메디는 작업치료 짝과 시간이 다를 수 있다
+            var etWho = etTherapistAtSlot(mSlotUse) || "전기 담당";
+            pushIssue("tDCS·CR", etWho, r.patient, mSlotUse, mine.map(addNoneSuffix).join(" · "));
         }
     });
 
@@ -6402,7 +6429,8 @@ function analyzeCrPairLogic() {
     html += "</tr></thead><tbody>";
     if (rows.length === 0) html += "<tr><td colspan='8'>CR · tDCS 오더 건이 없습니다.</td></tr>";
     rows.forEach(function(r) {
-        html += "<tr" + (r.ok ? "" : " class='error-cell'") + "><td>" + r.patient + "</td><td>" + (r.slot||"-") +
+        var slotTxt = (r.slot||"-") + (r.mediSlot && r.mediSlot !== r.slot ? "<br><span style='font-size:12px;color:#888;'>메디 " + r.mediSlot + "</span>" : "");
+        html += "<tr" + (r.ok ? "" : " class='error-cell'") + "><td>" + r.patient + "</td><td>" + slotTxt +
                 "</td><td>" + r.therapist + "</td><td style='text-align:left;'>" + r.cell + "</td><td>" + r.cr +
                 "</td><td style='text-align:left;'>" + r.expect + "</td><td style='text-align:left;'>" + (r.actual||"-") +
                 "</td><td style='text-align:left;'>" + (r.ok ? "✅ 일치" : "⚠️ " + r.note) + "</td></tr>";

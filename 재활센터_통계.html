@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b175</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b176</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2663,6 +2663,16 @@ function analyzePainMasterLogic() {
         }
     }
     var emrStats = calculateEmrStatsLogic(members, painOrder, painMap);
+    // 물리 개인 시간표에 C○○○(+CPM) 로 있는 환자의 C.P.M(MM102A)은 물리 실적이다.
+    // 통증 담당이 물리 칸도 같이 맡는 날(주말 등) 그 액팅이 통증 COMPLEX 로도 잡히던 것을 뺀다.
+    var ptCSet = ptGridComplexNames();
+    if (globalEmrRows && globalEmrPatientIdx !== -1) globalEmrRows.forEach(function(row) {
+        if (!row) return;
+        var cd = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
+        if (painMap[cd] !== "COMPLEX") return;
+        var nm = String(row[globalEmrNameIdx]||"").trim(), pt = String(row[globalEmrPatientIdx]||"").trim();
+        if (ptCSet[pt] && emrStats[nm] && emrStats[nm]["COMPLEX"] > 0) emrStats[nm]["COMPLEX"] -= 1;
+    });
     renderMasterParallelTable("painTripleArea", members, painOrder, timeStats, emrStats, "통증치료", "pain");
     notify("통증치료 교차 검증 통계 리포트가 도출되었습니다!");
 }
@@ -4044,6 +4054,8 @@ function computeDetailDiff(therapist, label, room) {
             if (!matchCodes.includes(rowCode)) return;
             var slipName = globalEmrSlipNameIdx !== -1 ? String(row[globalEmrSlipNameIdx]||"").trim() : "";
             var patient  = globalEmrPatientIdx  !== -1 ? String(row[globalEmrPatientIdx]||"").trim()  : "";
+            // 통증 COMPLEX 상세 — 물리 개인 시간표 C○○○ 환자의 C.P.M 은 물리 실적이라 빼고 보여 준다
+            if (room === "pain" && label === "COMPLEX" && ptGridComplexNames()[patient]) return;
             emrItems.push({ code: rowCode, slipName: slipName, patient: patient,
                             time: globalEmrTimeIdx !== -1 ? String(row[globalEmrTimeIdx]||"").trim() : "" });
         });

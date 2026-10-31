@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b179</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b180</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -1315,6 +1315,12 @@ else { initOnLoad(); }
                 if ((allowFirstBlank || isPainSection) && c === seg.col + 1) {
                     end = c;
                     continue;
+                }
+                // 주말 시간표 — "PT(일) | (빈 관리자 칸) | 이호승 …" 처럼 제목 바로 옆이 비고
+                // 그 다음부터 치료사 이름이 오면 시간표가 이어지는 것이다 (2026-10-31)
+                if (c === seg.col + 1) {
+                    var nn = String(hrow[c + 1] !== undefined ? hrow[c + 1] : "").trim();
+                    if (/^[가-힣]{2,4}\d?$/.test(nn)) { end = c; continue; }
                 }
 
                 // 전기치료는 "시간 | 갯수 | 담당" 처럼 제목이 비어 있는 열이
@@ -3114,7 +3120,7 @@ function staffDeptSets(wardFilter) {
                     if (n && n.length >= 2) names[n] = 1;
                 });
                 Object.keys(names).forEach(function(n) {
-                    if (!per[n]) per[n] = { red: false, rows: {} };
+                    if (!per[n]) per[n] = { red: false, rows: {}, gray: {} };
                     if (isRed) per[n].red = true;
                     if (isOs) osName[n] = 1;
                     for (var r = hr + 1; r < hrEnd; r++) {
@@ -3127,6 +3133,7 @@ function staffDeptSets(wardFilter) {
                         var grayWork = cf.g && STAFF_MANAGERS.indexOf(n) !== -1 && gm !== null && gm < 15 * 60 + 45;
                         var f = (!cellValIsBlankOrInvalid(cv) && !cf.b) || !!cf.x;   // 회색 칸 규칙은 쓰지 않음 (2026-10-29)
                         per[n].rows[r] = per[n].rows[r] || f;
+                        if (cf.g && !f) per[n].gray[r] = true;
                     }
                 });
             }
@@ -3137,6 +3144,24 @@ function staffDeptSets(wardFilter) {
             dep[g[1]][n] = p.red ? staffFraction(rows.map(function(r){ return p.rows[r]; }),
                                                  rows.map(function(r){ return toMinutes(slot[r]); })) : 1;
             if (p.red) red[n] = dep[g[1]][n];
+            else {
+                // 빨간 이름이 아니어도 (2026-10-31)
+                //  ① 오전이나 오후가 통째로 회색 빈 칸이면 반차(0.5) — 예: 10/31 정승희 오후 회색
+                //  ② 치료가 하나도 없고 회색 칸도 없는 칸(주말 관리자 칸 등)은 출근으로 세지 않는다 — 예: 10/31 김한솜
+                //     단 부장(장일용)은 치료가 없어도 출근
+                var amN = 0, pmN = 0, amG = 0, pmG = 0, anyF = false;
+                rows.forEach(function(r) {
+                    var m = toMinutes(slot[r]); if (m === null || isNaN(m)) return;
+                    if (m < 8 * 60) m += 12 * 60;
+                    if (p.rows[r]) anyF = true;
+                    if (m >= 11 * 60 + 50 && m < 13 * 60) return;
+                    if (m >= 17 * 60 + 20) return;
+                    if (m < 12 * 60) { amN++; if (p.gray[r]) amG++; } else { pmN++; if (p.gray[r]) pmG++; }
+                });
+                var offH = (amN && amG === amN ? 0.5 : 0) + (pmN && pmG === pmN ? 0.5 : 0);
+                if (offH > 0) { dep[g[1]][n] = 1 - offH; red[n] = dep[g[1]][n]; }
+                else if (!anyF && !Object.keys(p.gray).length && n !== "장일용") dep[g[1]][n] = 0;
+            }
         });
     });
     // ② 전기 · 통증 · 열전기 담당 — PT (개인 시간표에 이미 있으면 그 값을 쓴다)

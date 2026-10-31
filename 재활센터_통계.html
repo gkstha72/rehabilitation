@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b176</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b177</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3529,9 +3529,9 @@ function wardTotalsOf(areaId, order, osSet) {
     });
     return { ns: ns, os: os };
 }
-// 통계표(일일업무보고서) NS · OS 블록 — 각 33줄 × 7칸
+// 통계표(일일업무보고서) NS 블록 33줄 · OS 블록 34줄 × 7칸
 //   NS: B4:H36  (물리 처방명·합계 | 작업 처방명·합계 + 언어 | 평가·건수·치료사)
-//   OS: B41:G73 (물리 처방명·합계 | 작업 처방명·합계 | 통증 처방명·합계)
+//   OS: B41:G74 (물리 처방명·합계(CPM 줄 포함) | 작업 처방명·합계 | 통증 처방명·합계)
 function totalsSheetBlocks() {
     var osSet = osTherapistSet();
     var pt = wardTotalsOf("ptTripleArea", ptOrder, osSet), ot = wardTotalsOf("otTripleArea", otOrder, osSet),
@@ -3558,11 +3558,15 @@ function totalsSheetBlocks() {
         if (i < evalOrder.length) { r[4] = evalOrder[i]; r[5] = v(ev, evalOrder[i]); r[6] = evNames[evalOrder[i]] || ""; }
         ns.push(r);
     }
-    for (var j = 0; j < 33; j++) {
+    // OS 물리 칸은 통계표에 COMPLEX 다음 "CPM" 줄이 하나 더 있어 34줄 (B41:B74).
+    //   CPM 줄 = 통증 시간표 CPM 칸(외래 C○○○) 건수. 통증 칸(F)은 COMPLEX 없이 20줄.
+    var ptOs = ptOrder.slice(); ptOs.splice(ptOs.indexOf("COMPLEX") + 1, 0, "CPM");
+    var painOs = painOrder.filter(function(k){ return k !== "COMPLEX"; });
+    for (var j = 0; j < ptOs.length; j++) {
         var q = ["","","","","","",""];
-        if (j < ptOrder.length) { q[0] = ptOrder[j]; q[1] = v(pt && pt.os, ptOrder[j]); }
+        q[0] = ptOs[j]; q[1] = ptOs[j] === "CPM" ? v(pain, "COMPLEX") : v(pt && pt.os, ptOs[j]);
         if (j < otOrder.length) { q[2] = otOrder[j]; q[3] = v(ot && ot.os, otOrder[j]); }
-        if (j < painOrder.length) { q[4] = painOrder[j]; q[5] = v(pain, painOrder[j]); }
+        if (j < painOs.length) { q[4] = painOs[j]; q[5] = v(pain, painOs[j]); }
         os.push(q);
     }
     return { ns: ns, os: os, miss: miss };

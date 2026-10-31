@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b172</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b173</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2481,7 +2481,10 @@ function painTherapistCols() {
             // 환자 성함은 담당 이름으로 세지 않는다 (SSP 칸이 담당 열로 잡히던 문제)
             if (nm && !painNameIsPatient(nm)) nameCnt++; else dataCnt++;
         }
-        if (nameCnt >= 2 && nameCnt > dataCnt) cols.push(c);
+        // 머리글이 "담당" 이면 이름이 한 명만 적혀 있어도 담당 열이다 (토요일 통증처럼 담당이 한 칸뿐인 날)
+        var hEl = document.getElementById("painGridTable-cell-0-"+c);
+        var isThHead = /담당|치료사|선생|성명/.test(hEl ? hEl.value.trim() : "");
+        if ((nameCnt >= 2 || (isThHead && nameCnt >= 1)) && nameCnt > dataCnt) cols.push(c);
     }
     return cols;
 }

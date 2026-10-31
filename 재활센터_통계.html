@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b174</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b175</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -275,6 +275,7 @@ td.clickable:hover { opacity:0.75; }
 <div id="otTripleArea"></div>
 <div id="stTripleArea"></div>
 <div id="painTripleArea"></div>
+<div id="totalsSheetArea"></div>
 <details class="grid-fold" id="secStaff" open style="border-color:#b9d3ea;">
 <summary><span class="gf-title" style="color:#2471a3;">&#128101; 재활센터 인원현황 <span class="gf-sub">출근 인원 · 휴무자 · 부도 · 외래</span></span><span class="gf-hint">▾ 펼치기 / 접기</span></summary>
 <div class="gf-body">
@@ -2765,13 +2766,13 @@ function renderMasterParallelTable(targetAreaId, members, displayOrder, timeStat
         html += cellData + "</tr>";
     });
     html += "</tbody></table>";
-    html += wardSplitTableHtml(targetAreaId, members, displayOrder, timeStats, emrStats);
     wrap.innerHTML = html;
     area.appendChild(wrap);
     setTimeout(function(){ updateErrorCount(); }, 100);
+    scheduleTotalsSheetView();
 }
 
-// ── NS · OS 합계표 (2026-10-31) ─────────────────────────────────────────
+// ── (사용 안 함) 파트별 NS · OS 합계표 ─────────────────────────────────────────
 // 위 대조표의 합계를 신경계(ns) · 근골(os) 치료사로 나눠 따로 보여 준다.
 // os 치료사 판정은 통계표 복사와 같다 (평일 근골 칸 시간표 · 주말 머리글 연하늘색).
 // 대조표 칸 순서를 건드리지 않도록 아래에 별도 표로 붙인다.
@@ -3518,7 +3519,10 @@ function wardTotalsOf(areaId, order, osSet) {
     });
     return { ns: ns, os: os };
 }
-function copyTotalsSheet() {
+// 통계표(일일업무보고서) NS · OS 블록 — 각 33줄 × 7칸
+//   NS: B4:H36  (물리 처방명·합계 | 작업 처방명·합계 + 언어 | 평가·건수·치료사)
+//   OS: B41:G73 (물리 처방명·합계 | 작업 처방명·합계 | 통증 처방명·합계)
+function totalsSheetBlocks() {
     var osSet = osTherapistSet();
     var pt = wardTotalsOf("ptTripleArea", ptOrder, osSet), ot = wardTotalsOf("otTripleArea", otOrder, osSet),
         st = summaryTotalsOf("stTripleArea"), pain = summaryTotalsOf("painTripleArea"),
@@ -3528,44 +3532,103 @@ function copyTotalsSheet() {
     if (!st && isSectionActive("stGridTable")) miss.push("언어");
     if (!pain && isSectionActive("painGridTable")) miss.push("통증");
     if (!ev) miss.push("평가(EMR 미연동)");
-    if (miss.length && !confirm("아직 집계되지 않은 파트가 있습니다: " + miss.join(" · ") +
-            "\n빈 파트는 0으로 채워 복사할까요?")) return;
     function v(map, k) { return map && map[k] !== undefined ? map[k] : 0; }
     var stLabels = ["비회","H2","H3","평가"];
     // 통계표 언어 "평가" 건수에는 웨스턴실어증검사를 넣지 않는다 (오른쪽 평가 칸에 따로 적음).
-    //   교차검증은 시간표 · EMR 모두 웨스턴 포함으로 대조하고, 복사할 때만 EMR 웨스턴 건수를 뺀다.
     if (st && st["평가"]) st = Object.assign({}, st, { "평가": Math.max(0, st["평가"] - stWabCount()) });
-    var rows = [];
-    // NS — 33줄 (B4:H36)
+    var ns = [], os = [];
     for (var i = 0; i < 33; i++) {
         var r = ["","","","","","",""];
         if (i < ptOrder.length) { r[0] = ptOrder[i]; r[1] = v(pt && pt.ns, ptOrder[i]); }
         if (i < otOrder.length) { r[2] = otOrder[i]; r[3] = v(ot && ot.ns, otOrder[i]); }
-        else if (i === otOrder.length + 1) { r[2] = "처방명"; r[3] = "건수"; }
+        else if (i === otOrder.length + 1) { r[2] = "처방명"; r[3] = "합계"; }
         else if (i >= otOrder.length + 2 && i - otOrder.length - 2 < stLabels.length) {
             var sl = stLabels[i - otOrder.length - 2]; r[2] = sl; r[3] = v(st, sl);
         }
         if (i < evalOrder.length) { r[4] = evalOrder[i]; r[5] = v(ev, evalOrder[i]); r[6] = evNames[evalOrder[i]] || ""; }
-        rows.push(r);
+        ns.push(r);
     }
-    // 빈 줄 3개 (37~39) · OS 머리글 (40)
-    rows.push(["","","","","","",""], ["","","","","","",""], ["","","","","","",""]);
-    rows.push(["처방명","합계","처방명","합계","처방명","합계",""]);
-    // OS — 33줄 (B41:G73)
     for (var j = 0; j < 33; j++) {
         var q = ["","","","","","",""];
         if (j < ptOrder.length) { q[0] = ptOrder[j]; q[1] = v(pt && pt.os, ptOrder[j]); }
         if (j < otOrder.length) { q[2] = otOrder[j]; q[3] = v(ot && ot.os, otOrder[j]); }
         if (j < painOrder.length) { q[4] = painOrder[j]; q[5] = v(pain, painOrder[j]); }
-        rows.push(q);
+        os.push(q);
     }
-    var tsv = rows.map(function(r){ return r.map(function(x){ x = String(x); return /[\t\n"]/.test(x) ? '"' + x.replace(/"/g,'""') + '"' : x; }).join("\t"); }).join("\n");
+    return { ns: ns, os: os, miss: miss };
+}
+function rowsToTsv(rows) {
+    return rows.map(function(r){ return r.map(function(x){ x = String(x); return /[\t\n"]/.test(x) ? '"' + x.replace(/"/g,'""') + '"' : x; }).join("\t"); }).join("\n");
+}
+function copyText(tsv, msg) {
     var ta = document.createElement("textarea");
     ta.value = tsv; ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); alert("✅ 통계표 양식으로 복사했습니다.\n통계표 B4 칸(NS 첫 처방명 NDT)을 누르고 Ctrl+Shift+V 로 붙여넣으세요.\nNS · OS 블록과 평가 치료사까지 한 번에 들어갑니다."); }
+    try { document.execCommand("copy"); alert(msg); }
     catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
     document.body.removeChild(ta);
+}
+function copyTotalsSheet() {
+    var B = totalsSheetBlocks();
+    if (B.miss.length && !confirm("아직 집계되지 않은 파트가 있습니다: " + B.miss.join(" · ") +
+            "\n빈 파트는 0으로 채워 복사할까요?")) return;
+    var blank = ["","","","","","",""];
+    var rows = B.ns.concat([blank, blank, blank, ["처방명","합계","처방명","합계","처방명","합계",""]], B.os);
+    copyText(rowsToTsv(rows), "✅ 통계표 양식으로 복사했습니다.\n통계표 B4 칸(NS 첫 처방명 NDT)을 누르고 Ctrl+Shift+V 로 붙여넣으세요.\nNS · OS 블록과 평가 치료사까지 한 번에 들어갑니다.");
+}
+function copyTotalsBlock(which) {
+    var B = totalsSheetBlocks();
+    if (B.miss.length && !confirm("아직 집계되지 않은 파트가 있습니다: " + B.miss.join(" · ") +
+            "\n빈 파트는 0으로 채워 복사할까요?")) return;
+    if (which === "ns") copyText(rowsToTsv(B.ns), "✅ NS 표를 복사했습니다.\n통계표 B4 칸(NS 첫 처방명 NDT)을 누르고 Ctrl+Shift+V 로 붙여넣으세요.");
+    else copyText(rowsToTsv(B.os), "✅ OS 표를 복사했습니다.\n통계표 B41 칸(OS 첫 처방명 NDT)을 누르고 Ctrl+Shift+V 로 붙여넣으세요.");
+}
+// ── 통계표 모양 그대로 NS · OS 표 보기 (2026-10-31) ─────────────────────
+var _totalsViewTimer = null;
+function scheduleTotalsSheetView() {
+    clearTimeout(_totalsViewTimer);
+    _totalsViewTimer = setTimeout(function(){ try { renderTotalsSheetView(); } catch (e) { console.error("NS·OS 표 오류:", e); } }, 150);
+}
+function renderTotalsSheetView() {
+    var area = document.getElementById("totalsSheetArea"); if (!area) return;
+    var B = totalsSheetBlocks();
+    var C = { pt:"#9fc5e8", ot:"#fff2cc", st:"#d9d2e9", ev:"#cfe2f3", pain:"#cfe2f3", head:"#d9d9d9" };
+    function td(x, bg, opt) {
+        opt = opt || {};
+        var st = "border:1px solid #bfc5cc;padding:2px 7px;font-size:12px;white-space:nowrap;" +
+                 (bg ? "background:" + bg + ";" : "") + (opt.num ? "text-align:center;" : "text-align:center;") +
+                 (opt.bold ? "font-weight:700;" : "") + (opt.dim ? "color:#aaa;" : "");
+        return "<td style='" + st + "'>" + (x === undefined ? "" : x) + "</td>";
+    }
+    function numCell(x, lab) { return td(lab === "" ? "" : x, "", { dim: x === 0 || x === "0" }); }
+    function table(rows, kind) {
+        var hd = kind === "ns" ? ["처방명","합계","처방명","합계","평가","건수","치료사"] : ["처방명","합계","처방명","합계","처방명","합계"];
+        var h = "<table style='border-collapse:collapse;background:#fff;'><tr>" + td("", "") +
+                hd.map(function(x){ return td(x, C.head, { bold: true }); }).join("") + "</tr>";
+        var stStart = otOrder.length + 1;
+        rows.forEach(function(r, i) {
+            var first = i === rows.length - 1 ? td("<b style='font-size:16px;'>" + kind.toUpperCase() + "</b>", "") : td("", "");
+            h += "<tr>" + first;
+            h += td(r[0], r[0] !== "" ? C.pt : "") + numCell(r[1], r[0]);
+            var isStHead = kind === "ns" && i === stStart, isSt = kind === "ns" && i > stStart && r[2] !== "";
+            h += td(r[2], r[2] === "" ? "" : isStHead ? C.head : isSt ? C.st : C.ot, { bold: isStHead }) +
+                 (isStHead ? td(r[3], C.head, { bold: true }) : numCell(r[3], r[2]));
+            h += td(r[4], r[4] !== "" ? (kind === "ns" ? C.ev : C.pain) : "") + numCell(r[5], r[4]);
+            if (kind === "ns") h += td(r[6], "");
+            h += "</tr>";
+        });
+        return h + "</table>";
+    }
+    var btn = "class='btn-copy' style='margin:0 0 6px;'";
+    var h = "<div class='section-box'><h2>&#128203; 통계표 양식 NS · OS 합계</h2>" +
+            "<div style='font-size:12.5px;color:#7f8c8d;margin-bottom:8px;'>통계표(일일업무보고서)와 같은 모양입니다. " +
+            "NS 는 통계표 <b>B4</b>, OS 는 <b>B41</b> 칸을 누르고 Ctrl+Shift+V 로 붙여넣으세요." +
+            (B.miss.length ? " <span style='color:#c0392b;'>· 아직 집계 안 된 파트: " + B.miss.join(" · ") + " (0 으로 표시)</span>" : "") + "</div>" +
+            "<div style='display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;'>" +
+            "<div><button " + btn + " onclick='copyTotalsBlock(\"ns\")'>&#128203; NS 복사 (B4)</button><div style='overflow-x:auto;'>" + table(B.ns, "ns") + "</div></div>" +
+            "<div><button " + btn + " onclick='copyTotalsBlock(\"os\")'>&#128203; OS 복사 (B41)</button><div style='overflow-x:auto;'>" + table(B.os, "os") + "</div></div>" +
+            "</div></div>";
+    area.innerHTML = h;
 }
 
 function copySummaryOnly(tableId) {

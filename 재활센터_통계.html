@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b171</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b172</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -2759,9 +2759,57 @@ function renderMasterParallelTable(targetAreaId, members, displayOrder, timeStat
         html += cellData + "</tr>";
     });
     html += "</tbody></table>";
+    html += wardSplitTableHtml(targetAreaId, members, displayOrder, timeStats, emrStats);
     wrap.innerHTML = html;
     area.appendChild(wrap);
     setTimeout(function(){ updateErrorCount(); }, 100);
+}
+
+// ── NS · OS 합계표 (2026-10-31) ─────────────────────────────────────────
+// 위 대조표의 합계를 신경계(ns) · 근골(os) 치료사로 나눠 따로 보여 준다.
+// os 치료사 판정은 통계표 복사와 같다 (평일 근골 칸 시간표 · 주말 머리글 연하늘색).
+// 대조표 칸 순서를 건드리지 않도록 아래에 별도 표로 붙인다.
+function wardSplitTableHtml(areaId, members, order, timeStats, emrStats) {
+    var osSet;
+    try { osSet = osTherapistSet(); } catch (e) { return ""; }
+    function isOs(m) { return !!(osSet[m] || osSet[String(m).replace(/\d+$/, "")]); }
+    var nsM = members.filter(function(m){ return !isOs(m); }), osM = members.filter(isOs);
+    function tot(list, stats, k) { return list.reduce(function(a, m){ return a + ((stats[m] || {})[k] || 0); }, 0); }
+    var sid = areaId + "-wardsplit";
+    function cell(e, t) {
+        var st = t > e ? "color:#c0392b;font-weight:700;" : e > t ? "color:#2471a3;font-weight:700;" : (e + t ? "font-weight:700;" : "color:#bbb;");
+        return "<td style='" + st + "'>" + e + "</td><td style='" + st + "'>" + t + "</td>";
+    }
+    var h = "<h3 style='margin-top:18px;'>NS · OS 합계표</h3>" +
+            "<button class='btn-copy' onclick='copyWardSplit(\"" + sid + "\")'>&#128203; NS · OS 합계 복사</button>" +
+            "<table class='result-table' id='" + sid + "' style='width:auto;min-width:420px;'><thead>" +
+            "<tr><th rowspan='2' class='th-main'>처방명</th><th colspan='2'>NS (신경계) " + nsM.length + "명</th>" +
+            "<th colspan='2'>OS (근골) " + osM.length + "명</th></tr>" +
+            "<tr><th class='th-sub-label'>EMR</th><th class='th-sub-label'>시간표</th><th class='th-sub-label'>EMR</th><th class='th-sub-label'>시간표</th></tr></thead><tbody>";
+    order.forEach(function(k) {
+        h += "<tr><td style='text-align:left;font-weight:bold;'>" + k + "</td>" +
+             cell(tot(nsM, emrStats, k), tot(nsM, timeStats, k)) +
+             cell(tot(osM, emrStats, k), tot(osM, timeStats, k)) + "</tr>";
+    });
+    h += "</tbody></table>";
+    if (osM.length) h += "<div style='font-size:12px;color:#7d3c98;margin-top:3px;'>os: " + osM.join(" · ") + "</div>";
+    return h;
+}
+// 처방명 · NS 시간표 · OS 시간표 세 칸 복사
+function copyWardSplit(id) {
+    var t = document.getElementById(id); if (!t) return;
+    var tsv = "처방명\tNS\tOS\n";
+    t.querySelectorAll("tbody tr").forEach(function(tr) {
+        var td = tr.querySelectorAll("td");
+        if (td.length < 5) return;
+        tsv += td[0].innerText.trim() + "\t" + td[2].innerText.trim() + "\t" + td[4].innerText.trim() + "\n";
+    });
+    var ta = document.createElement("textarea");
+    ta.value = tsv; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); alert("✅ NS · OS 시간표 합계를 복사했습니다."); }
+    catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
+    document.body.removeChild(ta);
 }
 
 // 전체 집계 중에는 개별 알림을 모았다가 마지막에 한 번만 띄운다

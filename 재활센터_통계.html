@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b177</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b178</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3427,6 +3427,28 @@ function renderStaffCount(keepFocus) {
         if (v > 0) remarks.push(STAFF_REMARK[n] + " " + fmtNum(v) + " - " + n);
     });
     if (nOn && remarks.length) h += "<div style='margin-top:5px;font-size:12px;color:#555;'>비고: <span style='white-space:pre;'>" + remarks.join("\n") + "</span></div>";
+    // 출근 명단 — 누가 몇 명으로 들어갔는지 확인용 (반차 0.5 · 반반차 0.75)
+    if (nOn) {
+        var listH = "";
+        [["ns", null], ["os", osSets], ["방문", visitSets]].forEach(function(w) {
+            ["PT","OT","ST"].forEach(function(d) {
+                var names = Object.keys(sets[d]).filter(function(n) {
+                    if (elecSets[n] !== undefined && w[0] !== "os") return false;
+                    var inOs = n in osSets[d], inVis = n in visitSets[d];
+                    return w[0] === "ns" ? (!inOs && !inVis) : w[0] === "os" ? inOs : inVis;
+                });
+                if (!names.length) return;
+                var tot = names.reduce(function(a, n){ return a + sets[d][n]; }, 0);
+                listH += "<div style='margin:2px 0;'><b>" + w[0] + " " + d + " " + fmtNum(tot) + "</b> (" + names.length + "명) : " +
+                    names.map(function(n){ var v = sets[d][n];
+                        return v < 1 ? "<span style='color:#c0392b;font-weight:700;'>" + n + " " + fmtNum(v) + "</span>" : n; }).join(", ") + "</div>";
+            });
+        });
+        var elN = Object.keys(elecSets);
+        if (elN.length) listH += "<div style='margin:2px 0;'><b>os 열전기 " + fmtNum(elecV) + "</b> : " + elN.join(", ") + "</div>";
+        h += "<details style='margin-top:6px;font-size:12px;'><summary style='cursor:pointer;color:#2471a3;font-weight:700;'>🔎 출근 명단 보기 (빨간 숫자 = 반차 0.5 · 반반차 0.75 · 연차 0 으로 센 사람)</summary>" +
+             "<div style='margin-top:4px;padding:6px 10px;background:#fff;border:1px solid #cfdbe6;border-radius:6px;line-height:1.7;'>" + listH + "</div></details>";
+    }
     // 휴무자 명단 — 연차 · 반차 · 반반차 · 휴무 (통계표에 붙이는 양식)
     _staffOffText = nOn ? staffOffList(sets) : "";
     if (nOn && sets.conflicts && sets.conflicts.length)

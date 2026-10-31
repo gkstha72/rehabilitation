@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-30 b169</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b170</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -275,8 +275,10 @@ td.clickable:hover { opacity:0.75; }
 <div id="otTripleArea"></div>
 <div id="stTripleArea"></div>
 <div id="painTripleArea"></div>
-<h2 class="result-header" style="border-color:#2471a3;">&#128101; 재활센터 인원현황</h2>
-<p>시간표와 EMR을 넣으면 출근 치료사 수 · 부도 환자 · 외래 명단을 통계표에 붙여넣을 수 있게 정리합니다.</p>
+<details class="grid-fold" id="secStaff" open style="border-color:#b9d3ea;">
+<summary><span class="gf-title" style="color:#2471a3;">&#128101; 재활센터 인원현황 <span class="gf-sub">출근 인원 · 휴무자 · 부도 · 외래</span></span><span class="gf-hint">▾ 펼치기 / 접기</span></summary>
+<div class="gf-body">
+<p style="margin-top:0;">시간표와 EMR을 넣으면 출근 치료사 수 · 부도 환자 · 외래 명단을 통계표에 붙여넣을 수 있게 정리합니다.</p>
 <div class="s3-box" style="border-color:#b9d3ea;background:#f5f9fd;margin:8px 0 12px;">
   <div class="s12-head">
     <span class="s12-title" style="color:#2471a3;">👥 치료사 인원</span>
@@ -311,6 +313,8 @@ td.clickable:hover { opacity:0.75; }
   <div id="outpatientArea" style="display:none;margin-top:7px;"></div>
 </div>
 </div>
+</div>
+</details>
 <h2 class="result-header" style="border-color:#8e44ad;">&#128203; [8] 평가 실적 집계</h2>
 <p>※ EMR 엑셀 파일이 연동된 상태에서 아래 버튼을 누르면 평가 실적이 자동 집계됩니다.</p>
 <div class="action-area">
@@ -3166,7 +3170,8 @@ function parseLeaveCell(txt) {
             if (w === "반반차") put(last, 0.25, "반반차");
             else if (w === "반차") put(last, 0.5, "반차");
             else if (w === "휴무") put(last, 1, "휴무");
-            else put(last, half ? 0.5 : 1, half ? "반차" : "연차");   // 연차 · 공가 · 병가 (오후공가 = 반차)
+            else if (w === "공가" && !half) put(last, 1, "공가");       // 휴무자 명단의 "휴무" 줄은 공가만
+            else put(last, half ? 0.5 : 1, half ? "반차" : "연차");   // 연차 · 병가 (오후공가 = 반차)
             return;
         }
         var nm = tk.replace(/\(.*$/, "").match(/^[가-힣]{2,4}\d?$/);
@@ -3212,24 +3217,31 @@ function renderLeaveStatus() {
 }
 function leaveForToday() { return _leaveToday; }
 window.addEventListener("DOMContentLoaded", function(){ try { renderLeaveStatus(); } catch (e) {} });
-// 휴무자 명단 — 빨간 이름은 쉰 만큼(연차 1 · 반차 0.5 · 반반차 0.25),
-//   명단(PT · OT · ST)에 있는데 시간표에 이름이 아예 없는 사람은 휴무로 본다.
+// 휴무자 명단 — 빨간 이름은 쉰 만큼(연차 1 · 반차 0.5 · 반반차 0.25).
+//   "휴무" 줄에는 근무표에 공가로 적힌 사람만 적는다 (2026-10-31).
+//   시간표에 이름이 없을 뿐인 사람 · 이름(날짜) 휴무 · 교대 휴무는 휴무자 명단에 넣지 않는다.
 var _staffOffText = "";
 function staffOffList(sets) {
     var g = { "연차": [], "반차": [], "반반차": [], "휴무": [] };
+    function slot(cat) { return cat === "공가" ? "휴무" : cat; }   // 공가 → 휴무 줄
     function deptOf(n) { return (n in sets.PT) ? "PT" : (n in sets.OT) ? "OT" : (n in sets.ST) ? "ST" : ""; }
     var listed = {};
     Object.keys(sets.red).forEach(function(n) {
         var off = 1 - sets.red[n];
         var k = (sets.leaveCat && sets.leaveCat[n]) || (off >= 1 ? "연차" : off >= 0.5 ? "반차" : off > 0 ? "반반차" : "");
-        if (k && off > 0) { g[k].push(deptOf(n) + " " + n); listed[n] = 1; }
+        if (k === "휴무") return;                         // 공가가 아닌 휴무는 적지 않는다
+        k = slot(k);
+        if (k && g[k] && off > 0) { g[k].push(deptOf(n) + " " + n); listed[n] = 1; }
     });
     // 근무표 연차자인데 시간표에 이름이 아예 없는 사람 — 근무표 구분대로 적는다
     Object.keys(sets.leave || {}).forEach(function(n) {
         if (listed[n] || deptOf(n)) return;
         var d = rosterDeptOf(n); if (!d) return;
-        g[sets.leave[n].cat].push(d + " " + n); listed[n] = 1;
+        var k2 = sets.leave[n].cat;
+        if (k2 === "휴무") return;                        // 공가가 아닌 휴무는 적지 않는다
+        g[slot(k2)].push(d + " " + n); listed[n] = 1;
     });
+    if (false) {
     // 시간표에 나온 이름 (김수연1 → 김수연 처럼 번호 붙은 별칭도 같은 사람)
     var seen = {};
     ["PT","OT","ST"].forEach(function(d){ Object.keys(sets[d]).forEach(function(n){ seen[n] = 1; seen[n.replace(/\d+$/, "")] = 1; }); });
@@ -3242,6 +3254,7 @@ function staffOffList(sets) {
             g["휴무"].push(p[0] + " " + n);
         });
     });
+    }
     return ["연차","반차","반반차","휴무"].map(function(k){ return k + " : " + g[k].join(", "); }).join("\n");
 }
 function copyStaffOff() {

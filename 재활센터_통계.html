@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b170</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-10-31 b171</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -288,7 +288,7 @@ td.clickable:hover { opacity:0.75; }
   <details id="leaveRosterBox" style="margin-top:8px;font-size:12.5px;">
     <summary style="cursor:pointer;color:#2471a3;font-weight:700;">📅 당일 근무표 (연차자) 붙여넣기 — 선택 <span id="leaveRosterStatus" style="font-weight:400;color:#7f8c8d;"></span></summary>
     <div style="margin-top:5px;color:#7f8c8d;">전체 근무표에서 <b>오늘 날짜의 연차자 칸</b>만 복사해 붙여넣으세요 (아래 교대근무 칸까지 같이 복사해도 됩니다).
-      연차 · 반차 · 반반차 · 공가 · 이름(날짜)=휴무 를 시간표 빨간 이름과 함께 반영합니다.</div>
+      연차 · 반차 · 반반차 · 공가(이름(날짜)도 공가) 를 시간표 빨간 이름과 함께 반영합니다.</div>
     <textarea id="leaveRosterPaste" placeholder="당일 연차자 칸 붙여넣기 (예: 황보슬 연차, 서지원 오후반차, 강은서(7/19))" oninput="saveLeaveRoster()"
               style="width:100%;height:60px;box-sizing:border-box;margin-top:5px;padding:6px;font-size:12px;border:1px solid #b9d3ea;border-radius:6px;"></textarea>
     <button class="step-btn" onclick="clearLeaveRoster()" style="padding:2px 9px;font-size:12px;">지우기</button>
@@ -3163,7 +3163,7 @@ function parseLeaveCell(txt) {
         if (!out[n] || off > out[n].off) out[n] = { off: off, cat: cat };
     }
     toks.forEach(function(tk) {
-        if (/^\(\d{1,2}\/\d{1,2}\)$/.test(tk)) { put(last, 1, "휴무"); return; }
+        if (/^\(\d{1,2}\/\d{1,2}\)$/.test(tk)) { put(last, 1, "공가"); return; }   // 강은서(7/19) = 공가
         var ty = tk.match(/^(오전|오후)?(반반차|반차|공가|연차|휴무|병가)$/);
         if (ty) {
             var w = ty[2], half = !!ty[1];
@@ -3218,8 +3218,8 @@ function renderLeaveStatus() {
 function leaveForToday() { return _leaveToday; }
 window.addEventListener("DOMContentLoaded", function(){ try { renderLeaveStatus(); } catch (e) {} });
 // 휴무자 명단 — 빨간 이름은 쉰 만큼(연차 1 · 반차 0.5 · 반반차 0.25).
-//   "휴무" 줄에는 근무표에 공가로 적힌 사람만 적는다 (2026-10-31).
-//   시간표에 이름이 없을 뿐인 사람 · 이름(날짜) 휴무 · 교대 휴무는 휴무자 명단에 넣지 않는다.
+//   "휴무" 줄에는 근무표의 공가만 적는다 (2026-10-31) — "우광식 공가(7/26)" · "강은서(7/19)" 둘 다 공가.
+//   시간표에 이름이 없을 뿐인 사람 · 교대 휴무는 휴무자 명단에 넣지 않는다.
 var _staffOffText = "";
 function staffOffList(sets) {
     var g = { "연차": [], "반차": [], "반반차": [], "휴무": [] };

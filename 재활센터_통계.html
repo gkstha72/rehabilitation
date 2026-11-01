@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b185</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b186</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -286,13 +286,15 @@ td.clickable:hover { opacity:0.75; }
     <span class="s12-hint">시간표에 이름이 있는 치료사를 셉니다 · 빨간 이름은 11:55 · 17:30 빼고 — 종일 비면 연차 · 오전이나 오후 통째로 비면 반차 · 3타임 이상 비면 반반차 (부도 칸은 빈 칸으로 봄) · 전체 인원은 한 번 적어 두면 기억합니다</span>
   </div>
   <div id="staffCountArea" style="margin-top:6px;font-size:13px;"></div>
-  <details id="leaveRosterBox" style="margin-top:8px;font-size:12.5px;">
-    <summary style="cursor:pointer;color:#2471a3;font-weight:700;">📅 당일 근무표 (연차자) 붙여넣기 — 선택 <span id="leaveRosterStatus" style="font-weight:400;color:#7f8c8d;"></span></summary>
-    <div style="margin-top:5px;color:#7f8c8d;">전체 근무표에서 <b>오늘 날짜의 연차자 칸</b>만 복사해 붙여넣으세요 (아래 교대근무 칸까지 같이 복사해도 됩니다).
-      연차 · 반차 · 반반차 · 공가(이름(날짜)도 공가) 를 시간표 빨간 이름과 함께 반영합니다.</div>
-    <textarea id="leaveRosterPaste" placeholder="당일 연차자 칸 붙여넣기 (예: 황보슬 연차, 서지원 오후반차, 강은서(7/19))" oninput="saveLeaveRoster()"
+  <details id="leaveRosterBox" open style="margin-top:8px;font-size:12.5px;">
+    <summary style="cursor:pointer;color:#2471a3;font-weight:700;">📅 전체 근무표 붙여넣기 <span id="leaveRosterStatus" style="font-weight:400;color:#7f8c8d;"></span></summary>
+    <div style="margin-top:5px;color:#7f8c8d;">전체 근무표 시트를 <b>한 달 통째로</b> 복사해 붙여넣으세요 (날짜 줄 · 연차자 줄 · 교대근무 줄 그대로).
+      이 PC에 기억해 두고, 붙여넣은 시간표 날짜의 연차자를 골라 시간표 빨간 이름과 함께 반영합니다.
+      연차 · 반차 · 반반차 · 공가(이름(날짜)도 공가). 하루 칸만 붙여넣어도 됩니다.</div>
+    <textarea id="leaveRosterPaste" placeholder="전체 근무표 붙여넣기 (한 달 통째로 · 또는 당일 연차자 칸)" oninput="saveLeaveRoster()"
               style="width:100%;height:60px;box-sizing:border-box;margin-top:5px;padding:6px;font-size:12px;border:1px solid #b9d3ea;border-radius:6px;"></textarea>
     <button class="step-btn" onclick="clearLeaveRoster()" style="padding:2px 9px;font-size:12px;">지우기</button>
+    <div id="leaveRosterDays" style="margin-top:4px;font-size:11.5px;color:#7f8c8d;"></div>
   </details>
 </div>
 <!-- 부도 ns · 부도 os · 외래 명단을 한 줄에 3칸으로 -->
@@ -1480,6 +1482,7 @@ else { initOnLoad(); }
         // 날짜 — 신경계 우선
         schedDateText = wardDates.neuro || wardDates.msk || "";
         renderDateBanner();
+        try { renderLeaveStatus(); } catch (eL) {}   // 전체 근무표에서 이 날짜 연차자 고르기
         // 언어 · 전기 · 메디페인 칸은 신경계가 있을 때만 보인다
         setWardMode(wardBuffers.neuro || !wardBuffers.msk ? "neuro" : "msk");
         // 저장 확인 — 칸마다 따로
@@ -3252,42 +3255,72 @@ function parseLeaveCell(txt) {
     return out;
 }
 function parseLeaveRoster(text) {
+    // 전체 근무표 — 주마다 [날짜 줄 · 연차자 줄 · 교대근무 윗줄 · 아랫줄] 이 반복된다.
+    //   날짜 줄: 1~31 숫자가 왼쪽→오른쪽으로 하루씩 늘어나는 줄 (주 첫 줄은 1~2칸뿐일 수 있음)
+    //   연차자 줄: 날짜 줄 아래 5줄 안에서 "연차자" 라고 적힌 줄, 없으면 바로 아래 줄
     var m = parsePastedText(text) || [], byDay = {};
     for (var r = 0; r < m.length; r++) {
-        var row = m[r] || [], cols = {};
-        for (var c = 1; c < row.length; c++) {
-            var v = String(row[c] || "").trim();
-            if (/^\d{1,2}$/.test(v) && +v >= 1 && +v <= 31) cols[c] = +v;
+        var row = m[r] || [], cols = {}, nums = [], other = 0;
+        for (var c = 0; c < row.length; c++) {
+            var v = String(row[c] || "").replace(/\s+/g, " ").trim();
+            if (!v) continue;
+            var dm = v.match(/^(\d{1,2})(?:\s*일)?(?:\s.*)?$/);
+            if (dm && +dm[1] >= 1 && +dm[1] <= 31 && !/[가-힣]{2,}\s*(연차|반차|공가)/.test(v)) { cols[c] = +dm[1]; nums.push(+dm[1]); }
+            else if (!/^(날짜|일자|SUN|MON|TUE|WED|THU|FRI|SAT|[일월화수목금토](요일)?)$/i.test(v)) other++;
         }
-        if (Object.keys(cols).length < 3) continue;
+        if (!nums.length || other > 1) continue;
+        var consec = nums.every(function(x, i){ return i === 0 || x === nums[i - 1] + 1; });
+        if (!consec || (nums.length < 2 && nums[0] !== 1 && !/연차자/.test((m[r + 1] || []).join(" ")))) continue;
+        var lr = -1;
         for (var k = r + 1; k < Math.min(m.length, r + 6); k++) {
-            if (!/연차자/.test(String((m[k] || [])[0] || ""))) continue;
-            Object.keys(cols).forEach(function(c) {
-                var cell = String((m[k] || [])[c] || "");
-                byDay[cols[c]] = parseLeaveCell(cell);
-            });
-            break;
+            if (/연차자/.test((m[k] || []).join(" "))) { lr = k; break; }
         }
+        if (lr === -1) lr = r + 1;
+        Object.keys(cols).forEach(function(c) {
+            var cell = String((m[lr] || [])[c] || "");
+            byDay[cols[c]] = parseLeaveCell(cell);
+        });
+        r = lr;
     }
     return byDay;
 }
-// 당일 연차자 — 붙여넣은 칸 글자를 그대로 읽는다 (페이지를 새로 열면 비워짐)
-var _leaveToday = {};
+// 전체 근무표 — 한 달치를 날짜별로 읽어 이 PC에 기억해 두고, 시간표 날짜의 연차자를 쓴다.
+//   하루 칸만 붙여넣으면 그 글자를 그대로 당일 연차자로 쓴다.
+var _leaveToday = {}, _leaveByDay = null;
+(function(){ var st = staffLoad("leaveRoster_v2", null); if (st && st.byDay) _leaveByDay = st.byDay; })();
+function schedDayNum() {
+    var d = (typeof parseAnyDate === "function") ? parseAnyDate(typeof schedDateText === "string" ? schedDateText : "") : null;
+    return d ? d.d : 0;
+}
 function saveLeaveRoster() {
     var ta = document.getElementById("leaveRosterPaste");
-    _leaveToday = ta ? parseLeaveCell(ta.value) : {};
+    var txt = ta ? ta.value : "";
+    var byDay = txt.trim() ? parseLeaveRoster(txt) : {};
+    if (Object.keys(byDay).length >= 3) {
+        _leaveByDay = byDay; _leaveToday = {};
+        staffSave("leaveRoster_v2", { byDay: byDay, saved: new Date().toISOString() });
+    } else {
+        _leaveToday = txt.trim() ? parseLeaveCell(txt) : {};
+    }
     renderLeaveStatus(); renderStaffCount();
 }
 function clearLeaveRoster() {
     var ta = document.getElementById("leaveRosterPaste"); if (ta) ta.value = "";
-    _leaveToday = {}; renderLeaveStatus(); renderStaffCount();
+    _leaveToday = {}; _leaveByDay = null; staffSave("leaveRoster_v2", null);
+    renderLeaveStatus(); renderStaffCount();
+}
+function leaveForToday() {
+    if (Object.keys(_leaveToday).length) return _leaveToday;
+    var d = schedDayNum();
+    return (_leaveByDay && d && _leaveByDay[d]) ? _leaveByDay[d] : {};
 }
 function renderLeaveStatus() {
-    var el = document.getElementById("leaveRosterStatus"); if (!el) return;
-    var ks = Object.keys(_leaveToday);
-    el.innerText = ks.length ? "· " + ks.length + "명 반영 중 (" + ks.map(function(n){ return n + " " + _leaveToday[n].cat; }).join(", ") + ")" : "· 없음";
+    var el = document.getElementById("leaveRosterStatus"), dl = document.getElementById("leaveRosterDays");
+    var L = leaveForToday(), ks = Object.keys(L), d = schedDayNum();
+    var src = Object.keys(_leaveToday).length ? "당일 칸" : (_leaveByDay ? "전체 근무표 " + Object.keys(_leaveByDay).length + "일치 기억 중" : "");
+    if (el) el.innerText = src ? "· " + src + (d ? " · " + d + "일 연차자 " + ks.length + "명" : " · 시간표를 붙여넣으면 그 날짜를 고릅니다") : "· 없음";
+    if (dl) dl.innerHTML = ks.length ? (d ? d + "일 : " : "") + ks.map(function(n){ return n + " " + L[n].cat; }).join(", ") : "";
 }
-function leaveForToday() { return _leaveToday; }
 window.addEventListener("DOMContentLoaded", function(){ try { renderLeaveStatus(); } catch (e) {} });
 // 휴무자 명단 — 빨간 이름은 쉰 만큼(연차 1 · 반차 0.5 · 반반차 0.25).
 //   "휴무" 줄에는 근무표의 공가만 적는다 (2026-10-31) — "우광식 공가(7/26)" · "강은서(7/19)" 둘 다 공가.

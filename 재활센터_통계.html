@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b189</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b190</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3250,7 +3250,8 @@ function parseLeaveCell(txt) {
             var w = ty[2], half = !!ty[1];
             if (w === "반반차") put(last, 0.25, "반반차");
             else if (w === "반차") put(last, 0.5, "반차");
-            else if (w === "휴무") put(last, 1, "휴무");
+            // 근무표의 "휴무" 도 공가다 (강은서 휴무 → 휴무 줄) · "오전휴무" 는 오전 휴무 0.5
+            else if (w === "휴무") { if (half) put(last, 0.5, ty[1] + " 휴무"); else put(last, 1, "공가"); }
             else if (w === "공가" && !half) put(last, 1, "공가");       // 휴무자 명단의 "휴무" 줄은 공가만
             else if (w === "공가" && half) put(last, 0.5, ty[1] + " 휴무");   // 오후공가 → "오후 휴무" 줄 (0.5)
             else put(last, half ? 0.5 : 1, half ? "반차" : "연차");   // 연차 · 병가 (오후공가 = 반차)

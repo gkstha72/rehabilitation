@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b187</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b188</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3230,7 +3230,8 @@ function rosterDeptOf(n) {
 }
 function parseLeaveCell(txt) {
     var out = {};
-    var t = String(txt||"").replace(/\r?\n/g, ",")
+    // 근무표 칸을 복사하면 여러 줄 칸 앞뒤에 " 가 붙어 온다 — 지운다 ("김한솜 → 김한솜)
+    var t = String(txt||"").replace(/["“”]/g, " ").replace(/\r?\n/g, ",")
         // "박채원 오후(5/5 0.5)" 처럼 반차 글자 없이 오전 · 오후만 적은 것도 반차
         .replace(/(오전|오후)\s*(?=\()/g, "$1반차 ")
         .replace(/(오전|오후)?\s*(반반차|반차|공가|연차|휴무|병가)/g, " $1$2 ")
@@ -3254,6 +3255,7 @@ function parseLeaveCell(txt) {
             else if (w === "반차") put(last, 0.5, "반차");
             else if (w === "휴무") put(last, 1, "휴무");
             else if (w === "공가" && !half) put(last, 1, "공가");       // 휴무자 명단의 "휴무" 줄은 공가만
+            else if (w === "공가" && half) put(last, 0.5, ty[1] + " 휴무");   // 오후공가 → "오후 휴무" 줄 (0.5)
             else put(last, half ? 0.5 : 1, half ? "반차" : "연차");   // 연차 · 병가 (오후공가 = 반차)
             return;
         }
@@ -3335,7 +3337,7 @@ window.addEventListener("DOMContentLoaded", function(){ try { renderLeaveStatus(
 //   시간표에 이름이 없을 뿐인 사람 · 교대 휴무는 휴무자 명단에 넣지 않는다.
 var _staffOffText = "";
 function staffOffList(sets) {
-    var g = { "연차": [], "반차": [], "반반차": [], "휴무": [] };
+    var g = { "연차": [], "반차": [], "반반차": [], "휴무": [], "오전 휴무": [], "오후 휴무": [] };
     function slot(cat) { return cat === "공가" ? "휴무" : cat; }   // 공가 → 휴무 줄
     function deptOf(n) { return (n in sets.PT) ? "PT" : (n in sets.OT) ? "OT" : (n in sets.ST) ? "ST" : ""; }
     var listed = {};
@@ -3368,7 +3370,8 @@ function staffOffList(sets) {
         });
     });
     }
-    return ["연차","반차","반반차","휴무"].map(function(k){ return k + " : " + g[k].join(", "); }).join("\n");
+    return ["연차","반차","반반차","휴무","오후 휴무","오전 휴무"].filter(function(k){ return k !== "오전 휴무" || g[k].length; })
+        .map(function(k){ return k + " : " + g[k].join(", "); }).join("\n");
 }
 function copyStaffOff() {
     if (!_staffOffText) { alert("시간표를 먼저 붙여넣어 주세요."); return; }

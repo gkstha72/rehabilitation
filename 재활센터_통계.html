@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b195</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b196</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -326,7 +326,7 @@ td.clickable:hover { opacity:0.75; }
 <div class="sp-warn" id="staffWarnArea"></div>
 </div>
 </details>
-<h2 class="result-header" style="border-color:#c0392b;font-size:22px;">&#128203; [9] 오더 점검</h2>
+<h2 class="result-header" style="border-color:#c0392b;font-size:22px;">&#128203; [8] 오더 점검</h2>
 
 <style>
 .oc-list{margin:12px 0 4px;font-size:13.5px;line-height:1.95;}
@@ -382,7 +382,7 @@ ICT(15) + MI(5) = <b>20분</b> · ICT(15) + HP(15) = <b>30분</b> · ICT(15) + B
 </div>
 
 <div class="container">
-<h2 class="result-header" style="border-color:#8e44ad;font-size:22px;">&#127973; [10] 퇴원 환자 오더 점검</h2>
+<h2 class="result-header" style="border-color:#8e44ad;font-size:22px;">&#127973; [9] 퇴원 환자 오더 점검</h2>
 <p>퇴원 예정 환자는 아침에 하루치 오더를 한 번에 넘기므로, 그 환자만 따로 대조합니다.<br>
 이름을 넣으면 <b>시간표에 배정된 오더</b>와 <b>EMR 액팅</b>을 나란히 비교해 빠진 건과 더 넘긴 건을 보여줍니다.</p>
 <div class="s3-box" style="border-color:#c8b0dd;background:#faf7fd;">
@@ -399,7 +399,7 @@ ICT(15) + MI(5) = <b>20분</b> · ICT(15) + HP(15) = <b>30분</b> · ICT(15) + B
 </div>
 
 <div class="container">
-<h2 class="result-header" style="border-color:#16a085;font-size:22px;">&#128221; [11] 평가 점검</h2>
+<h2 class="result-header" style="border-color:#16a085;font-size:22px;">&#128221; [10] 평가 점검</h2>
 <p>시간표에 적어 둔 <b>평가 · 검사 메모</b>와 <b>EMR 평가 슬립</b>을 양방향으로 대조합니다.<br>
 시간표에만 있는 건 · EMR에만 있는 건 · 담당이 서로 다른 건을 찾아 줍니다.</p>
 <div class="action-area">
@@ -409,7 +409,7 @@ ICT(15) + MI(5) = <b>20분</b> · ICT(15) + HP(15) = <b>30분</b> · ICT(15) + B
 </div>
 
 <div class="container">
-<h2 class="result-header" style="border-color:#8e44ad;font-size:22px;">&#9200; [12] 치료점검 결과 시간 오류</h2>
+<h2 class="result-header" style="border-color:#8e44ad;font-size:22px;">&#9200; [11] 치료점검 결과 시간 오류</h2>
 <p>EMR에서 받은 <b>치료점검 결과 리스트</b> 엑셀을 넣으면 시간이 잘못 들어간 건을 찾아 줍니다.<br>
 종료 시간이 시작보다 빠르거나, 시·분이 잘못 찍혔거나, 길이가 비정상인 건을 걸러 냅니다.</p>
 <div class="action-area">
@@ -420,7 +420,7 @@ ICT(15) + MI(5) = <b>20분</b> · ICT(15) + HP(15) = <b>30분</b> · ICT(15) + B
 </div>
 
 <div class="container">
-<h2 class="result-header" style="border-color:#d35400;font-size:22px;">&#127942; [13] OT 인센티브 카운팅</h2>
+<h2 class="result-header" style="border-color:#d35400;font-size:22px;">&#127942; [12] OT 인센티브 카운팅</h2>
 <p>시간표(작업치료)의 <b>평가 메모</b>와 <b>MBI_SCIM 시행확인방</b> 대화를 읽어 인센티브 시트에 붙일 <b>날짜 · 이름 · 평가 구분</b> 목록을 만듭니다.<br>
 모든 건은 <b>인센 날짜</b>로 들어갑니다 (챗에 적힌 평가 날짜는 쓰지 않음). 비워 두면 시간표 날짜로 채웁니다.<br>
 OT평가·신환평가 1점 · 월재평가 0.5점 · 교차확인 0.25점 · 치매척도/MMSE 제외 · <b>(신환)</b> 챗은 작성자 신환평가 1점 + 교차확인 · 감점은 직접 확인</p>
@@ -4671,7 +4671,7 @@ function schedTokenTime(token) {
 }
 function resetSchedTimeIndex() { _schedTimeIdx = null; }
 
-// ── [9] tDCS / CR 오더 검증 ──────────────────────────────────────────────
+// ── [8] tDCS / CR 오더 검증 ──────────────────────────────────────────────
 // 작업치료 시간표 기입명에서 기대 액팅을 뽑아 EMR 실제 액팅과 대조합니다.
 //   CR4        → 메디 표기 시 MZ012B 만 확인
 //   H○○○+CR7  → 회복기 치료시간 내 (2026-11) · 메디 표기 시 MZ012A 만 확인
@@ -5625,7 +5625,7 @@ function analyzeDupNameLogic() {
     area.innerHTML = html;
 }
 
-// ── [10] 퇴원 환자 오더 점검 ─────────────────────────────────────────────
+// ── [9] 퇴원 환자 오더 점검 ─────────────────────────────────────────────
 // 퇴원 환자는 아침에 하루치 오더를 몰아 넘기므로 시간은 보지 않고
 // "시간표에 배정된 오더"와 "EMR 액팅"을 처방 단위로 1:1 대조한다
 function labelCodeMapAll() {
@@ -6103,7 +6103,7 @@ function copyOutpatientList() {
         .catch(function(){ alert("복사에 실패했습니다."); });
 }
 
-// ── [12] 치료점검 결과 리스트 시간 오류 ────────────────────────────────
+// ── [11] 치료점검 결과 리스트 시간 오류 ────────────────────────────────
 // EMR 치료점검 결과 엑셀에서 시간이 잘못 찍힌 건을 찾는다.
 var CHECK_SLOTS = ["09:00","09:35","10:10","10:45","11:20","11:55",
                    "13:30","14:05","14:40","15:15","15:50","16:25","17:00","17:30"];
@@ -7842,7 +7842,7 @@ function resetGrid(type) {
     }
 }
 
-// ── [11] 평가 점검 ──────────────────────────────────────────────────────
+// ── [10] 평가 점검 ──────────────────────────────────────────────────────
 // 시간표의 평가·검사 메모와 EMR 평가 슬립을 양방향으로 대조한다.
 // · 시간표에만 있는 건  → 평가 슬립을 안 넘긴 것
 // · EMR에만 있는 건     → 시간표에 표기가 빠진 것
@@ -8066,7 +8066,7 @@ function emrOutpatientNames() {
     return set;
 }
 
-// ── [13] OT 인센티브 카운팅 ────────────────────────────────────────────
+// ── [12] OT 인센티브 카운팅 ────────────────────────────────────────────
 //   OT평가 1 · 신환평가 1 · 월재평가 0.5 · 교차확인 0.25
 //   시간표(작업치료)의 평가 메모 → OT평가 · 신환평가
 //   MBI_SCIM 시행확인방 → 글쓴이 월재평가, "확인 - ○○○" 교차확인

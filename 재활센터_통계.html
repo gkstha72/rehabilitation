@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b190</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b191</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -279,23 +279,33 @@ td.clickable:hover { opacity:0.75; }
 <details class="grid-fold" id="secStaff" open style="border-color:#b9d3ea;">
 <summary><span class="gf-title" style="color:#2471a3;">&#128101; 재활센터 인원현황 <span class="gf-sub">출근 인원 · 휴무자 · 부도 · 외래</span></span><span class="gf-hint">▾ 펼치기 / 접기</span></summary>
 <div class="gf-body">
-<div class="s3-box" style="border-color:#b9d3ea;background:#f5f9fd;margin:0 0 12px;">
-  <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;">
-    <div style="flex:0 0 auto;">
-      <div class="s12-title" style="color:#2471a3;margin-bottom:5px;">👥 치료사 인원</div>
-      <div id="staffCountArea" style="font-size:13px;"></div>
-    </div>
-    <div id="leaveRosterBox" style="flex:1 1 240px;min-width:220px;font-size:12.5px;">
-      <div class="s12-title" style="color:#2471a3;margin-bottom:5px;">📅 전체 근무표 <span id="leaveRosterStatus" style="font-weight:400;font-size:12px;color:#7f8c8d;"></span></div>
-      <textarea id="leaveRosterPaste" placeholder="전체 근무표 (한 달) 붙여넣기" oninput="saveLeaveRoster()"
-                style="width:100%;height:150px;box-sizing:border-box;padding:6px;font-size:12px;border:1px solid #b9d3ea;border-radius:6px;"></textarea>
-      <button class="step-btn" onclick="clearLeaveRoster()" style="padding:2px 9px;font-size:12px;">지우기</button>
-      <div id="leaveRosterDays" style="margin-top:4px;font-size:11.5px;color:#7f8c8d;"></div>
-    </div>
-    <div id="staffOffArea" style="flex:1 1 240px;min-width:220px;font-size:12.5px;"></div>
+<style>
+.staff-grid{display:grid;grid-template-columns:auto minmax(260px,1fr) minmax(260px,1fr);gap:12px;align-items:stretch;margin:0 0 12px;}
+@media (max-width:1150px){.staff-grid{grid-template-columns:1fr;}}
+.sp{background:#fff;border:1px solid #d6e4f0;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;min-width:0;box-shadow:0 1px 2px rgba(20,60,100,.04);}
+.sp-h{display:flex;align-items:center;gap:8px;height:28px;margin-bottom:8px;font-weight:800;font-size:14px;color:#2471a3;}
+.sp-h .sp-sub{font-weight:500;font-size:12px;color:#7f8c8d;}
+.sp-h .sp-btn{margin-left:auto;padding:3px 10px;font-size:12px;border-radius:6px;}
+.sp-body{flex:1;display:flex;flex-direction:column;min-height:0;}
+.sp textarea,.sp pre{flex:1;min-height:180px;width:100%;box-sizing:border-box;margin:0;padding:8px 10px;font-size:12.5px;line-height:1.65;border-radius:8px;resize:vertical;}
+.sp textarea{border:1px solid #c9dbec;background:#fbfdff;font-family:inherit;}
+.sp pre{border:1px solid #f1c4bd;background:#fffafa;font-family:inherit;white-space:pre-wrap;}
+.sp-warn{margin:0 0 12px;padding:8px 12px;border:1px solid #f5c26b;border-radius:8px;background:#fff8e8;color:#8a5a00;font-size:12.5px;line-height:1.7;}
+.sp-warn:empty{display:none;}
+</style>
+<div class="staff-grid">
+  <div class="sp">
+    <div class="sp-h">👥 치료사 인원</div>
+    <div class="sp-body" id="staffCountArea" style="font-size:13px;"></div>
   </div>
-  <div id="staffWarnArea" style="font-size:12px;color:#b9770e;"></div>
+  <div class="sp" id="leaveRosterBox">
+    <div class="sp-h">📅 전체 근무표 <span class="sp-sub" id="leaveRosterStatus"></span>
+      <button class="step-btn sp-btn" onclick="clearLeaveRoster()">지우기</button></div>
+    <div class="sp-body"><textarea id="leaveRosterPaste" placeholder="전체 근무표 (한 달) 붙여넣기" oninput="saveLeaveRoster()"></textarea></div>
+  </div>
+  <div class="sp" id="staffOffArea"></div>
 </div>
+<div class="sp-warn" id="staffWarnArea"></div>
 <!-- 부도 ns · 부도 os · 외래 명단을 한 줄에 3칸으로 -->
 <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;margin:0 0 12px;">
 <div class="s3-box" style="border-color:#f0c040;background:#fffbea;margin:0;flex:2 1 460px;min-width:0;">
@@ -3294,8 +3304,27 @@ function parseLeaveRoster(text) {
 }
 // 전체 근무표 — 한 달치를 날짜별로 읽어 이 PC에 기억해 두고, 시간표 날짜의 연차자를 쓴다.
 //   하루 칸만 붙여넣으면 그 글자를 그대로 당일 연차자로 쓴다.
-var _leaveToday = {}, _leaveByDay = null;
-(function(){ var st = staffLoad("leaveRoster_v2", null); if (st && st.byDay) _leaveByDay = st.byDay; })();
+var _leaveToday = {}, _leaveByDay = null, _leaveMonth = 0;
+(function(){ var st = staffLoad("leaveRoster_v2", null); if (st && st.byDay) { _leaveByDay = st.byDay; _leaveMonth = st.month || 0; } })();
+// 통계 돌리는 날짜와 근무표 날짜가 다르면 경고
+//   전체 근무표: 근무표 달 ≠ 시간표 달, 또는 그날 칸이 없을 때
+//   하루 칸만 붙였을 때: 날짜가 없으니 근무표 연차자 · 시간표 빨간 이름이 대부분 어긋나면 다른 날 칸으로 본다
+function leaveDateWarning(sets) {
+    var sd = (typeof parseAnyDate === "function") ? parseAnyDate(typeof schedDateText === "string" ? schedDateText : "") : null;
+    if (Object.keys(_leaveToday).length) {
+        // 시간표에 이름이 있는데 빨간 이름이 아닌 근무표 연차자가 많으면 다른 날 칸이다
+        var inTT = Object.keys(_leaveToday).filter(function(n){ return (n in sets.PT) || (n in sets.OT) || (n in sets.ST); });
+        var notRed = (sets.conflicts || []).filter(function(x){ return /인데 시간표에 빨간 이름 아님/.test(x); });
+        if (inTT.length >= 3 && (notRed.length >= 3 || notRed.length / inTT.length > 0.4))
+            return "붙여넣은 근무표 칸이 시간표 날짜(" + (sd ? sd.mo + "월 " + sd.d + "일" : "?") + ")와 다른 날 칸 같습니다 — 근무표 연차자 " +
+                   notRed.length + "명이 시간표에선 빨간 이름이 아닙니다";
+        return "";
+    }
+    if (!_leaveByDay || !sd) return "";
+    if (_leaveMonth && _leaveMonth !== sd.mo) return "근무표는 " + _leaveMonth + "월인데 시간표는 " + sd.mo + "월 " + sd.d + "일입니다 — 근무표를 다시 붙여넣어 주세요";
+    if (!_leaveByDay[sd.d]) return "근무표에 " + sd.mo + "월 " + sd.d + "일 칸이 없습니다";
+    return "";
+}
 function schedDayNum() {
     var d = (typeof parseAnyDate === "function") ? parseAnyDate(typeof schedDateText === "string" ? schedDateText : "") : null;
     return d ? d.d : 0;
@@ -3306,7 +3335,9 @@ function saveLeaveRoster() {
     var byDay = txt.trim() ? parseLeaveRoster(txt) : {};
     if (Object.keys(byDay).length >= 3) {
         _leaveByDay = byDay; _leaveToday = {};
-        staffSave("leaveRoster_v2", { byDay: byDay, saved: new Date().toISOString() });
+        var mm = txt.match(/(\d{2,4})\s*년\s*(\d{1,2})\s*월/) || txt.match(/(\d{1,2})\s*월\s*계획표/);
+        _leaveMonth = mm ? +(mm[2] || mm[1]) : 0;
+        staffSave("leaveRoster_v2", { byDay: byDay, month: _leaveMonth, saved: new Date().toISOString() });
     } else {
         _leaveToday = txt.trim() ? parseLeaveCell(txt) : {};
     }
@@ -3314,20 +3345,22 @@ function saveLeaveRoster() {
 }
 function clearLeaveRoster() {
     var ta = document.getElementById("leaveRosterPaste"); if (ta) ta.value = "";
-    _leaveToday = {}; _leaveByDay = null; staffSave("leaveRoster_v2", null);
+    _leaveToday = {}; _leaveByDay = null; _leaveMonth = 0; staffSave("leaveRoster_v2", null);
     renderLeaveStatus(); renderStaffCount();
 }
 function leaveForToday() {
     if (Object.keys(_leaveToday).length) return _leaveToday;
+    var sd = (typeof parseAnyDate === "function") ? parseAnyDate(typeof schedDateText === "string" ? schedDateText : "") : null;
+    if (sd && _leaveMonth && _leaveMonth !== sd.mo) return {};   // 다른 달 근무표는 쓰지 않는다
     var d = schedDayNum();
     return (_leaveByDay && d && _leaveByDay[d]) ? _leaveByDay[d] : {};
 }
 function renderLeaveStatus() {
-    var el = document.getElementById("leaveRosterStatus"), dl = document.getElementById("leaveRosterDays");
+    var el = document.getElementById("leaveRosterStatus");
     var L = leaveForToday(), ks = Object.keys(L), d = schedDayNum();
     var src = Object.keys(_leaveToday).length ? "당일 칸" : (_leaveByDay ? Object.keys(_leaveByDay).length + "일치" : "");
     if (el) el.innerText = src ? "· " + src + (d ? " · " + d + "일 연차자 " + ks.length + "명" : "") : "· 없음";
-    if (dl) dl.innerHTML = ks.length ? (d ? d + "일 : " : "") + ks.map(function(n){ return n + " " + L[n].cat; }).join(", ") : "";
+
 }
 window.addEventListener("DOMContentLoaded", function(){ try { renderLeaveStatus(); } catch (e) {} });
 // 휴무자 명단 — 빨간 이름은 쉰 만큼(연차 1 · 반차 0.5 · 반반차 0.25).
@@ -3502,7 +3535,7 @@ function renderStaffCount(keepFocus) {
             "<tr style='color:#7d3c98;'>" + cell("<b>근골</b>") + cell(n(lvOs.PT)) + cell(n(lvOs.OT)) + cell(n(lvOs.ST)) + cell("", BLK) + cell(n(lvOs.PT + lvOs.OT + lvOs.ST)) + "</tr>" +
             "<tr style='color:#1e8449;'>" + cell("<b>방문</b>") + cell(n(lvVis.PT)) + cell(n(lvVis.OT)) + cell("", BLK) + cell("", BLK) + cell(n(lvVis.PT + lvVis.OT)) + "</tr>" +
             "</table>" +
-            "<div style='display:flex;gap:6px;margin-top:6px;'>" +
+            "<div style='display:flex;gap:6px;margin-top:8px;'>" +
             "<button class='step-btn' onclick='copyStaffCount(\"on\")' style='background:#2471a3;border-color:#2471a3;color:#fff;'>📋 출근 (ns · os · 방문) 복사</button>" +
             "<button class='step-btn' onclick='copyStaffCount(\"off\")' style='background:#c0392b;border-color:#c0392b;color:#fff;'>📋 연차자 (신경계 · 근골 · 방문) 복사</button></div>";
 
@@ -3516,7 +3549,7 @@ function renderStaffCount(keepFocus) {
         var v = (n in sets.PT) ? sets.PT[n] : (n in sets.OT) ? sets.OT[n] : (n in sets.ST) ? sets.ST[n] : 0;
         if (v > 0) remarks.push(STAFF_REMARK[n] + " " + fmtNum(v) + " - " + n);
     });
-    if (nOn && remarks.length) h += "<div style='margin-top:5px;font-size:12px;color:#555;'>비고: <span style='white-space:pre;'>" + remarks.join("\n") + "</span></div>";
+    if (nOn && remarks.length) h += "<div style='margin-top:8px;padding-top:6px;border-top:1px dashed #d6e4f0;font-size:12px;color:#555;line-height:1.6;'><b>비고</b> " + remarks.join(" · ") + "</div>";
     // 명단(PT · OT · ST)에 없는 이름 — 파트를 알 수 없어 PT 로 들어간다.
     //   주말엔 관리자(OT · ST 여도)가 PT 시간표 맨 앞 칸에 들어가므로, 새로 온 사람이면 명단에 넣어야 제 파트로 센다.
     var unknown = Object.keys(sets.PT).filter(function(n) {
@@ -3530,12 +3563,13 @@ function renderStaffCount(keepFocus) {
     _staffOffText = nOn ? staffOffList(sets) : "";
     if (nOn && sets.conflicts && sets.conflicts.length) warn.push("근무표 ↔ 시간표 확인 필요: " + sets.conflicts.join(" · "));
     var wa = document.getElementById("staffWarnArea");
-    if (wa) wa.innerHTML = warn.map(function(x){ return "<div style='margin-top:6px;'>⚠️ " + x + "</div>"; }).join("");
+    var dw = leaveDateWarning(sets);
+    if (dw) warn = warn.filter(function(x){ return x.indexOf("근무표 ↔ 시간표") !== 0; }), warn.unshift(dw);   // 날짜가 다르면 이름 대조는 의미 없음
+    if (wa) wa.innerHTML = warn.map(function(x){ return "<div>⚠️ " + x + "</div>"; }).join("");
     var oa = document.getElementById("staffOffArea");
-    if (oa) oa.innerHTML = "<div class='s12-title' style='color:#c0392b;margin-bottom:5px;'>휴무자" +
-        " <button class='step-btn' onclick='copyStaffOff()' style='margin-left:6px;padding:2px 9px;font-size:12px;background:#c0392b;border-color:#c0392b;color:#fff;'>📋 복사</button></div>" +
-        "<pre style='margin:0;padding:6px 10px;min-height:138px;box-sizing:border-box;background:#fff;border:1px solid #f1c4bd;border-radius:6px;font-family:inherit;font-size:12.5px;line-height:1.6;white-space:pre-wrap;'>" +
-        (_staffOffText || "") + "</pre>";
+    if (oa) oa.innerHTML = "<div class='sp-h' style='color:#c0392b;'>🗓 휴무자" +
+        "<button class='step-btn sp-btn' onclick='copyStaffOff()' style='background:#c0392b;border-color:#c0392b;color:#fff;'>📋 복사</button></div>" +
+        "<div class='sp-body'><pre>" + (_staffOffText || "") + "</pre></div>";
     area.innerHTML = h;
 }
 function copyStaffCount(which) {

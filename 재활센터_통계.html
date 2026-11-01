@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b184</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b185</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3629,7 +3629,7 @@ function totalsSheetBlocks() {
     if (!pain && isSectionActive("painGridTable")) miss.push("통증");
     if (!ev) miss.push("평가(EMR 미연동)");
     function v(map, k) { return map && map[k] !== undefined ? map[k] : 0; }
-    var stLabels = ["비회","H2","H3","평가"];
+    var stLabels = ["비회","H2","H3"];   // 통계표 언어 칸은 비회 · H2 · H3 세 줄뿐 — 평가 줄 없음 (2026-11-02)
     // 통계표 언어 "평가" 건수에는 웨스턴실어증검사를 넣지 않는다 (오른쪽 평가 칸에 따로 적음).
     if (st && st["평가"]) st = Object.assign({}, st, { "평가": Math.max(0, st["평가"] - stWabCount()) });
     var ns = [], os = [];

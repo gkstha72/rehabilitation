@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-01 b183</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b184</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3498,6 +3498,16 @@ function renderStaffCount(keepFocus) {
         h += "<details style='margin-top:6px;font-size:12px;'><summary style='cursor:pointer;color:#2471a3;font-weight:700;'>🔎 출근 명단 보기 (빨간 숫자 = 반차 0.5 · 반반차 0.75 · 연차 0 으로 센 사람)</summary>" +
              "<div style='margin-top:4px;padding:6px 10px;background:#fff;border:1px solid #cfdbe6;border-radius:6px;line-height:1.7;'>" + listH + "</div></details>";
     }
+    // 명단(PT · OT · ST)에 없는 이름 — 파트를 알 수 없어 PT 로 들어간다.
+    //   주말엔 관리자(OT · ST 여도)가 PT 시간표 맨 앞 칸에 들어가므로, 새로 온 사람이면 명단에 넣어야 제 파트로 센다.
+    var unknown = Object.keys(sets.PT).filter(function(n) {
+        var b = n.replace(/\d+$/, "");
+        return [STAFF_ROSTER_PT, STAFF_ROSTER_OT, STAFF_ROSTER_ST].every(function(L){ return L.indexOf(n) === -1 && L.indexOf(b) === -1; })
+               && !(n in STAFF_DEPT_FIX) && !(n in STAFF_VISIT_DEPT);
+    });
+    if (nOn && unknown.length)
+        h += "<div style='margin-top:5px;font-size:12px;color:#b9770e;'>⚠️ 인원 명단에 없는 이름 — PT 로 셌습니다: " + unknown.join(", ") +
+             " (OT · ST 관리자라면 알려 주세요 — 명단에 추가)</div>";
     // 휴무자 명단 — 연차 · 반차 · 반반차 · 휴무 (통계표에 붙이는 양식)
     _staffOffText = nOn ? staffOffList(sets) : "";
     if (nOn && sets.conflicts && sets.conflicts.length)

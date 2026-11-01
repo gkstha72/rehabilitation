@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b192</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b193</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -326,12 +326,6 @@ td.clickable:hover { opacity:0.75; }
 <div class="sp-warn" id="staffWarnArea"></div>
 </div>
 </details>
-<h2 class="result-header" style="border-color:#8e44ad;">&#128203; [8] 평가 실적 집계</h2>
-<p>※ EMR 엑셀 파일이 연동된 상태에서 아래 버튼을 누르면 평가 실적이 자동 집계됩니다.</p>
-<div class="action-area">
-<button class="btn-calc btn-eval" onclick="analyzeEvalLogic()">&#128203; 평가 교차 검증 집계</button>
-</div>
-<div id="evalArea"></div>
 <h2 class="result-header" style="border-color:#c0392b;font-size:22px;">&#128203; [9] 오더 점검</h2>
 
 <style>
@@ -3746,6 +3740,68 @@ function copyTotalsBlock(which) {
     if (which === "ns") copyText(rowsToTsv(B.ns), "✅ NS 표를 복사했습니다.\n통계표 B4 칸(NS 첫 처방명 NDT)을 누르고 Ctrl+Shift+V 로 붙여넣으세요.");
     else copyText(rowsToTsv(B.os), "✅ OS 표를 복사했습니다.\n통계표 B41 칸(OS 첫 처방명 NDT)을 누르고 Ctrl+Shift+V 로 붙여넣으세요.");
 }
+// ── 평가 실적 이미지 복사 (카톡 전송용) ─────────────────────────────────
+//   통계표 NS 의 평가 · 건수 · 치료사 부분만 그림으로 그려 클립보드에 넣는다.
+//   클립보드에 못 넣는 브라우저면 PNG 로 내려받는다.
+function copyEvalImage() {
+    var B = totalsSheetBlocks();
+    var rows = B.ns.filter(function(r){ return r[4] !== ""; });
+    var sd = (typeof parseAnyDate === "function") ? parseAnyDate(typeof schedDateText === "string" ? schedDateText : "") : null;
+    var total = rows.reduce(function(a, r){ return a + (+r[5] || 0); }, 0);
+    var title = (sd ? sd.mo + "월 " + sd.d + "일 " : "") + "평가 실적  (총 " + total + "건)";
+    var F = "'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif";
+    var W1 = 300, W2 = 70, W3 = 330, PAD = 14, LH = 18, W = PAD * 2 + W1 + W2 + W3;
+    var cv = document.createElement("canvas"), ctx = cv.getContext("2d");
+    ctx.font = "13px " + F;
+    function wrap(text, w) {
+        var out = [], line = "";
+        String(text || "").split(/(,\s*)/).forEach(function(tok) {
+            if (ctx.measureText(line + tok).width > w - 12 && line) { out.push(line.replace(/,\s*$/, ",")); line = tok.replace(/^,\s*/, ""); }
+            else line += tok;
+        });
+        if (line) out.push(line);
+        return out.length ? out : [""];
+    }
+    var lay = rows.map(function(r){ var L = wrap(r[6], W3); return { r: r, lines: L, h: Math.max(26, L.length * LH + 8) }; });
+    var H = PAD + 34 + 28 + lay.reduce(function(a, x){ return a + x.h; }, 0) + PAD;
+    var sc = 2; cv.width = W * sc; cv.height = H * sc; ctx.scale(sc, sc);
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#2c3e50"; ctx.font = "bold 17px " + F; ctx.textBaseline = "middle";
+    ctx.fillText(title, PAD, PAD + 14);
+    var y = PAD + 34, x0 = PAD, xs = [x0, x0 + W1, x0 + W1 + W2, x0 + W1 + W2 + W3];
+    function cellBox(x, w, h, bg) { ctx.fillStyle = bg; ctx.fillRect(x, y, w, h); ctx.strokeStyle = "#c3ccd5"; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, w, h); }
+    // 머리글
+    [["평가", W1], ["건수", W2], ["치료사", W3]].forEach(function(c, i) {
+        cellBox(xs[i], c[1], 28, "#d9d9d9");
+        ctx.fillStyle = "#222"; ctx.font = "bold 13px " + F; ctx.textAlign = "center"; ctx.fillText(c[0], xs[i] + c[1] / 2, y + 14);
+    });
+    y += 28;
+    lay.forEach(function(x) {
+        var n = +x.r[5] || 0, on = n > 0;
+        cellBox(xs[0], W1, x.h, on ? "#cfe2f3" : "#eef4fa");
+        cellBox(xs[1], W2, x.h, on ? "#fff7d6" : "#ffffff");
+        cellBox(xs[2], W3, x.h, "#ffffff");
+        ctx.font = (on ? "bold " : "") + "13px " + F; ctx.fillStyle = on ? "#1b2631" : "#8a96a3";
+        ctx.textAlign = "center"; ctx.fillText(x.r[4], xs[0] + W1 / 2, y + x.h / 2);
+        ctx.fillText(String(n), xs[1] + W2 / 2, y + x.h / 2);
+        ctx.textAlign = "left"; ctx.fillStyle = "#1b2631"; ctx.font = "13px " + F;
+        x.lines.forEach(function(t, i){ ctx.fillText(t, xs[2] + 8, y + x.h / 2 + (i - (x.lines.length - 1) / 2) * LH); });
+        y += x.h;
+    });
+    cv.toBlob(function(blob) {
+        function download() {
+            var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+            a.download = (sd ? sd.mo + "월" + sd.d + "일_" : "") + "평가실적.png"; document.body.appendChild(a); a.click(); a.remove();
+            alert("클립보드에 이미지를 넣지 못해 PNG 파일로 내려받았습니다.\n카톡에 파일로 보내 주세요.");
+        }
+        try {
+            if (!navigator.clipboard || !window.ClipboardItem) return download();
+            navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+                .then(function(){ alert("✅ 평가 실적 이미지를 복사했습니다.\n카톡 대화창에 Ctrl+V 로 붙여넣으세요."); })
+                .catch(download);
+        } catch (e) { download(); }
+    }, "image/png");
+}
 // ── 통계표 모양 그대로 NS · OS 표 보기 (2026-10-31) ─────────────────────
 var _totalsViewTimer = null;
 function scheduleTotalsSheetView() {
@@ -3788,7 +3844,8 @@ function renderTotalsSheetView() {
             "NS 는 통계표 <b>B4</b>, OS 는 <b>B41</b> 칸을 누르고 Ctrl+Shift+V 로 붙여넣으세요." +
             (B.miss.length ? " <span style='color:#c0392b;'>· 아직 집계 안 된 파트: " + B.miss.join(" · ") + " (0 으로 표시)</span>" : "") + "</div>" +
             "<div style='display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;'>" +
-            "<div><button " + btn + " onclick='copyTotalsBlock(\"ns\")'>&#128203; NS 복사 (B4)</button><div style='overflow-x:auto;'>" + table(B.ns, "ns") + "</div></div>" +
+            "<div><button " + btn + " onclick='copyTotalsBlock(\"ns\")'>&#128203; NS 복사 (B4)</button>" +
+            " <button class='btn-copy' title='평가 · 건수 · 치료사 표를 그림으로 복사 — 카톡 대화창에 Ctrl+V' style='margin:0 0 6px 6px;background:#8e44ad;' onclick='copyEvalImage()'>🖼 평가 이미지 복사</button><div style='overflow-x:auto;'>" + table(B.ns, "ns") + "</div></div>" +
             "<div><button " + btn + " onclick='copyTotalsBlock(\"os\")'>&#128203; OS 복사 (B41)</button><div style='overflow-x:auto;'>" + table(B.os, "os") + "</div></div>" +
             "</div></div>";
     area.innerHTML = h;

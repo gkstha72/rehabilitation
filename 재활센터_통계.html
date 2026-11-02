@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b196</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b197</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -4404,6 +4404,11 @@ function computeDetailDiff(therapist, label, room) {
         if (label === "COMPLEX") {
             var cpmT = tokens.filter(function(t){ return /^C[가-힣]/i.test(t) && !/\(F\)/i.test(t); });
             return cpmT.length > 0 ? cpmT : [cellText];
+        }
+        // 경두개직류는 "(경두개직류자극술)" 메모 줄에 환자 이름이 없다 — 그 칸 첫 토큰(H정대식+TDCS)을 쓴다
+        if (label === "경두개직류" && cellText.indexOf("경두개") !== -1) {
+            var firstTok = tokens.filter(function(t){ return /[가-힣]{2,}/.test(t) && t.indexOf("경두개") === -1 && t[0] !== "("; })[0];
+            if (firstTok) return [firstTok];
         }
         var matched = tokens.filter(function(t) { return getTokenLabel(t) === label; });
         return matched.length > 0 ? matched : [cellText];

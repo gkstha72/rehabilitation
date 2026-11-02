@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b199</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b200</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3717,7 +3717,7 @@ function totalsSheetBlocks() {
     var ptOs = ptOrder.slice(); ptOs.splice(ptOs.indexOf("COMPLEX") + 1, 0, "CPM");
     var painOs = painOrder.filter(function(k){ return k !== "COMPLEX"; });
     for (var j = 0; j < ptOs.length; j++) {
-        var q = ["","","","","","",""];
+        var q = ["","","","","",""];   // OS 는 B~G 여섯 칸 — 오른쪽 H 칸은 건드리지 않는다
         q[0] = ptOs[j]; q[1] = ptOs[j] === "CPM" ? v(pain, "COMPLEX") : v(pt && pt.os, ptOs[j]);
         if (j < otOrder.length) { q[2] = otOrder[j]; q[3] = v(ot && ot.os, otOrder[j]); }
         if (j < painOs.length) { q[4] = painOs[j]; q[5] = v(pain, painOs[j]); }
@@ -3741,7 +3741,7 @@ function copyTotalsSheet() {
     if (B.miss.length && !confirm("아직 집계되지 않은 파트가 있습니다: " + B.miss.join(" · ") +
             "\n빈 파트는 0으로 채워 복사할까요?")) return;
     var blank = ["","","","","","",""];
-    var rows = B.ns.concat([blank, blank, blank, ["처방명","합계","처방명","합계","처방명","합계",""]], B.os);
+    var rows = B.ns.concat([blank, blank, blank, ["처방명","합계","처방명","합계","처방명","합계"]], B.os);
     copyText(rowsToTsv(rows), "✅ 통계표 양식으로 복사했습니다.\n통계표 B4 칸(NS 첫 처방명 NDT)을 누르고 Ctrl+Shift+V 로 붙여넣으세요.\nNS · OS 블록과 평가 치료사까지 한 번에 들어갑니다.");
 }
 function copyTotalsBlock(which) {

@@ -1260,7 +1260,7 @@ function importBackup(ev){
 
 // ===== 병실현황 날짜 기록 =====
 // 병실현황 파일 이름·시트 이름의 '20261029' 같은 날짜를 병동별로 기억해 두었다가,
-// 검증할 때 오늘 날짜와 다르면(어제 병실현황을 그대로 쓴 경우) 알려준다.
+// 검증할 때 시간표 날짜의 전날과 다르면(이동반은 전날 만듦) 알려준다.
 function recordRosterDate(fileName, sheetName, rows){
   try{
     const m = String(sheetName||'').match(/(20\d{2})[.\-_]?(\d{2})[.\-_]?(\d{2})/)
@@ -1280,23 +1280,35 @@ function recordRosterDate(fileName, sheetName, rows){
 function checkRosterDates(){
   const out = { checks: [], issues: [] };
   const rd = state.rosterDates || {};
-  const today = getTodayStr();
+  // 기준: 시간표 날짜(주말은 첫날)의 '전날'. 이동반은 보통 전날 만들기 때문.
+  //   시간표 날짜가 아직 없으면 오늘 날짜로 비교한다.
+  const ymd = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  const schedDate = (state.dayList && state.dayList.length && state.dayList[0].date) || state.date || '';
+  let today, baseLabel;
+  if(schedDate){
+    const [y,m,d] = schedDate.split('-').map(Number);
+    today = ymd(new Date(y, m-1, d-1));
+    baseLabel = `시간표(${formatDateKorean(schedDate)}) 전날`;
+  }else{
+    today = ymd(new Date());
+    baseLabel = '오늘';
+  }
   [['4','4병동'],['5','5병동']].forEach(([w, label])=>{
     const x = rd[w];
     const hasNames = ALL_ROOMS.some(r=>String(r)[0]===w && state.rooms[r].patients.some(p=>p.name));
     if(!x){
       if(hasNames) out.checks.push(`${label} 병실현황 날짜 — 이번에 불러온 기록이 없어 확인 못 함 (병실현황을 다시 불러오면 확인됩니다)`);
-      else out.issues.push({ kind:'병실현황', msg:`${label} 병실현황을 불러오지 않았습니다.`, fix:`'📂 병실현황' 버튼으로 오늘 날짜 ${label} 병실현황을 불러주세요.` });
+      else out.issues.push({ kind:'병실현황', msg:`${label} 병실현황을 불러오지 않았습니다.`, fix:`'📂 병실현황' 버튼으로 ${label} 병실현황을 불러주세요.` });
       return;
     }
     if(!x.date){
       out.checks.push(`${label} 병실현황 날짜 — 파일·시트 이름에서 날짜를 찾지 못함 (${x.file})`);
     }else if(x.date !== today){
       out.issues.push({ kind:'병실현황',
-        msg:`${label} 병실현황 날짜(${formatDateKorean(x.date)})가 오늘(${formatDateKorean(today)})이 아닙니다.`,
-        fix:`오늘 뽑은 ${label} 병실현황을 다시 불러오세요. 지난 병실현황이면 입·퇴원·전실 환자가 빠지거나 다른 자리에 들어갈 수 있습니다.` });
+        msg:`${label} 병실현황 날짜(${formatDateKorean(x.date)})가 ${baseLabel}(${formatDateKorean(today)})과 다릅니다.`,
+        fix:`${formatDateKorean(today)} 병실현황을 다시 불러오세요. 지난 병실현황이면 입·퇴원·전실 환자가 빠지거나 다른 자리에 들어갈 수 있습니다.` });
     }else{
-      out.checks.push(`${label} 병실현황 날짜 확인 — ${formatDateKorean(x.date)} (오늘)`);
+      out.checks.push(`${label} 병실현황 날짜 확인 — ${formatDateKorean(x.date)} (${baseLabel})`);
     }
   });
   return out;

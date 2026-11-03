@@ -1148,6 +1148,7 @@ function clearRosterOnly(){
   ALL_ROOMS.forEach(r=>{
     state.rooms[r].patients = Array.from({length:PATIENTS_PER_ROOM},()=>({name:''}));
   });
+  state.rosterDates = {};
   state.loadCounts.roster = 0;
   homonymAssignLog = {};
   renderHomonymSummary();
@@ -1182,6 +1183,7 @@ function clearCells(){
     state.rooms[r].cells = {};
     state.rooms[r].patients = Array.from({length:PATIENTS_PER_ROOM},()=>({name:''}));
   });
+  state.rosterDates = {};
   state.cellSource = {};
   state.importDates = {};
   state.fillLog = {neuro:{}, muscle:{}};
@@ -1256,6 +1258,50 @@ function importBackup(ev){
   ev.target.value = '';
 }
 
+// ===== 병실현황 날짜 기록 =====
+// 병실현황 파일 이름·시트 이름의 '20261029' 같은 날짜를 병동별로 기억해 두었다가,
+// 검증할 때 오늘 날짜와 다르면(어제 병실현황을 그대로 쓴 경우) 알려준다.
+function recordRosterDate(fileName, sheetName, rows){
+  try{
+    const m = String(sheetName||'').match(/(20\d{2})[.\-_]?(\d{2})[.\-_]?(\d{2})/)
+           || String(fileName||'').match(/(20\d{2})[.\-_]?(\d{2})[.\-_]?(\d{2})/);
+    let n4 = 0, n5 = 0;
+    rows.forEach(r=>r.forEach(c=>{
+      const t = String(c||'').trim();
+      if(/^4(0[1-9]|1[0-5])호?$/.test(t)) n4++;
+      else if(/^5(0[1-9]|1[0-5])호?$/.test(t)) n5++;
+    }));
+    const ward = n4 > n5 ? '4' : (n5 > 0 ? '5' : '?');
+    if(!state.rosterDates) state.rosterDates = {};
+    state.rosterDates[ward] = { date: m ? `${m[1]}-${m[2]}-${m[3]}` : '', file: fileName || '' };
+  }catch(e){ console.warn('병실현황 날짜 기록 실패:', e); }
+}
+// 검증용: 병실현황 날짜 점검 → {checks:[], issues:[]}
+function checkRosterDates(){
+  const out = { checks: [], issues: [] };
+  const rd = state.rosterDates || {};
+  const today = getTodayStr();
+  [['4','4병동'],['5','5병동']].forEach(([w, label])=>{
+    const x = rd[w];
+    const hasNames = ALL_ROOMS.some(r=>String(r)[0]===w && state.rooms[r].patients.some(p=>p.name));
+    if(!x){
+      if(hasNames) out.checks.push(`${label} 병실현황 날짜 — 이번에 불러온 기록이 없어 확인 못 함 (병실현황을 다시 불러오면 확인됩니다)`);
+      else out.issues.push({ kind:'병실현황', msg:`${label} 병실현황을 불러오지 않았습니다.`, fix:`'📂 병실현황' 버튼으로 오늘 날짜 ${label} 병실현황을 불러주세요.` });
+      return;
+    }
+    if(!x.date){
+      out.checks.push(`${label} 병실현황 날짜 — 파일·시트 이름에서 날짜를 찾지 못함 (${x.file})`);
+    }else if(x.date !== today){
+      out.issues.push({ kind:'병실현황',
+        msg:`${label} 병실현황 날짜(${formatDateKorean(x.date)})가 오늘(${formatDateKorean(today)})이 아닙니다.`,
+        fix:`오늘 뽑은 ${label} 병실현황을 다시 불러오세요. 지난 병실현황이면 입·퇴원·전실 환자가 빠지거나 다른 자리에 들어갈 수 있습니다.` });
+    }else{
+      out.checks.push(`${label} 병실현황 날짜 확인 — ${formatDateKorean(x.date)} (오늘)`);
+    }
+  });
+  return out;
+}
+
 function importBackupXLSX(file){
   const reader = new FileReader();
   reader.onload = e=>{
@@ -1288,6 +1334,8 @@ function importBackupXLSX(file){
                      || wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
       const rows = readSheetAsRows(ws);
+
+      recordRosterDate(file.name, sheetName, rows);
 
       if(rows.length < 2){
         alert('빈 파일이거나 형식이 맞지 않아요');
@@ -3399,6 +3447,10 @@ function runVerification(){
   if(_hm.length) fileChecks.push(`동명이인 판정 ${_hm.length}건 확인 (번호 일치 ${_hm.filter(x=>x.kind==='exact').length} · 번호없는 분 ${_hm.filter(x=>x.kind==='plain').length} · 번호 불일치 ${_hm.filter(x=>x.kind==='numMismatch').length} · 제외 ${_hm.filter(x=>x.kind==='skip').length})`);
 
   const setupIssues = [];   // (파일 누락·날짜 불일치는 파일 점검에서 이미 잡음)
+  // 병실현황이 오늘 날짜인지
+  const rosterChk = checkRosterDates();
+  fileChecks.unshift(...rosterChk.checks);
+  rosterChk.issues.forEach(x=>setupIssues.push(x));
 
   // ── 초기화 없이 이어서 작업한 흔적 찾기 ──────────────
   //   이전 날짜 값이 남은 채로 병실현황만 새로 불러오면 이름과 값이 어긋난다.

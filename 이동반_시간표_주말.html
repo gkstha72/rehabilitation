@@ -1952,7 +1952,9 @@ const SKIP_SECTION = /(갯수|개수|합계|총계|통계|집계|비고|메모|�
 const MEMO_WORDS_RE = /(미용|외출|귀원|외박|면회|퇴원|귀가|조퇴|정리했|정리 했|확인바|부탁드|취소됨)/;
 function isMemoCell(txt){
   if(!txt) return false;
-  const t = String(txt);
+  // 시간 변경 표시('14:05->11:20')는 메모가 아니라 '이 시간으로 옮김' 표시 → 시각 개수에서 뺀다.
+  //   예) "A정현정\n14:05->11:20\n502" (11:20 줄에 적힘) → 환자 칸으로 읽어 11:20에 채움
+  const t = String(txt).replace(/\d{1,2}:\d{2}\s*(?:-+>|→|=>|~>)\s*\d{1,2}:\d{2}/g, ' ');
   const times = t.match(/\d{1,2}:\d{2}/g);
   if(times && times.length >= 2) return true;      // 시각이 여러 개 = 인수인계 메모
   if(MEMO_WORDS_RE.test(t)) return true;           // 미용·외출·귀원 등 메모

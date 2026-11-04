@@ -2850,7 +2850,9 @@ const FLOOR3_EQUIP_RE = /\+\s*(코끼리|코로|코|런닝|워킹|아크|경사|
 const FLOOR_TAG_RE = /\((?:3층|1층|병동|침상|HOLD|외래|음악치료실)\)|치료실\s*[→\->]+\s*병동|병동\s*[→\->]+\s*치료실/;
 function isMemoCell(txt){
   if(!txt) return false;
-  const t = String(txt);
+  // 시간 변경 표시('14:05->11:20')는 메모가 아니라 '이 시간으로 옮김' 표시 → 시각 개수에서 뺀다.
+  //   예) "A정현정\n14:05->11:20\n502" (11:20 줄에 적힘) → 환자 칸으로 읽어 11:20에 채움
+  const t = String(txt).replace(/\d{1,2}:\d{2}\s*(?:-+>|→|=>|~>)\s*\d{1,2}:\d{2}/g, ' ');
   const times = t.match(/\d{1,2}:\d{2}/g);
   if(times && times.length >= 2) return true;      // 시각이 여러 개 = 인수인계 메모
   if(MEMO_WORDS_RE.test(t)) return true;           // 미용·외출·귀원 등 메모

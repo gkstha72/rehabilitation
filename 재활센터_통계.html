@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-04 b201</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-04 b202</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -1021,6 +1021,13 @@ function tdDecoration(td) {
         if (tag === "BR") { push(); return; }
         var stl = (node.getAttribute && node.getAttribute("style")) || "";
         var cd = classDecoOf(node);
+        // 구글 시트(드라이브 엑셀 포함)는 칸(td)에 첫 글자의 취소선을 걸고, 나머지 글자 조각(span)에
+        //   text-decoration:none 등으로 따로 적는다 → 조각에 적힌 값이 있으면 그 값이 칸 값을 덮는다
+        var dm = stl.match(/text-decoration(?:-line)?\s*:\s*([^;]*)/i);
+        if (dm && tag !== "TD" && tag !== "TH") {
+            u = /underline/i.test(dm[1]);
+            st = /line-through/i.test(dm[1]);
+        }
         if (/text-decoration[^;]*underline/i.test(stl) || cd.u || tag === "U" || tag === "INS") u = true;
         if (/text-decoration[^;]*line-through/i.test(stl) || cd.s || tag === "S" || tag === "STRIKE" || tag === "DEL") st = true;
         // 블록 요소는 줄이 바뀐 것으로 본다

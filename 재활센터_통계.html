@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-02 b200</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-04 b201</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -985,12 +985,24 @@ function tdDecoration(td) {
     var lines = [], cur = { text:"", u:false, s:false, nameSeen:false };
     function push() {
         var t = cur.text.replace(/\u00a0/g, " ").trim();
+        // 성함이 없는 이어지는 줄("+CR4+메디+TDCS", "(인모션)")은 윗줄 환자의 선을 따른다
+        if (t && !cur.nameSeen && lines.length) { cur.u = lines[lines.length - 1].u; cur.s = lines[lines.length - 1].s; }
         if (t) lines.push({ text:t, u:cur.u, s:cur.s });
         cur = { text:"", u:false, s:false, nameSeen:false };
     }
     function walk(node, u, st) {
         if (!node) return;
         if (node.nodeType === 3) {          // 글자
+            // 구글 시트는 칸 안 줄바꿈을 <br> 이 아니라 글자 속 줄바꿈(\n)으로 보낸다 —
+            //   "G김대선+동적(취소선)\nM성은태+어댑핏" 이 한 줄로 합쳐져 김대선 취소선이 칸 전체에 걸리던 문제
+            var parts = String(node.nodeValue || "").split(/\r?\n/);
+            if (parts.length > 1) {
+                parts.forEach(function(pt, pi) {
+                    if (pi > 0) push();
+                    walk({ nodeType: 3, nodeValue: pt }, u, st);
+                });
+                return;
+            }
             var t = node.nodeValue || "";
             // 선이 "성함" 에 그어져야 그 사람 배정이 취소·확정된 것이다.
             //   "D차광철+V"     → V 에만 선 → 비타루스팀만 취소, 차광철 배정은 살아 있음

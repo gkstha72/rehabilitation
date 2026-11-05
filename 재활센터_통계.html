@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-04 b202</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-05 b203</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -456,6 +456,7 @@ var globalEmrTimeIdx    = -1;   // 세부치료시작 열
 var globalEmrQtyIdx     = -1;   // 수량 열
 var globalEmrDcIdx      = -1;   // D/C 열
 var globalEmrVisitIdx   = -1;   // 외래/입원 열
+var globalEmrDoctorIdx  = -1;   // 담당의 열 (환자 기준 NS/OS — 강지영 = 근골)
 var globalEmrTherapistIdx = -1; // 세부치료사 열
 var globalEmrChartIdx = -1;     // 차트번호 열 (동명이인 구분의 기준)
 var globalEmrRoomIdx  = -1;     // 병실 열
@@ -1777,6 +1778,7 @@ window.addEventListener("DOMContentLoaded", function() {
                     globalEmrQtyIdx  = row.findIndex(function(c){ return String(c).trim() === "수량"; });
                     globalEmrDcIdx   = row.findIndex(function(c){ return String(c).trim() === "D/C"; });
                     globalEmrVisitIdx = row.findIndex(function(c){ return String(c).includes("외래/입원"); });
+                    globalEmrDoctorIdx = row.findIndex(function(c){ return String(c).trim() === "담당의"; });
                     globalEmrTherapistIdx = row.findIndex(function(c){ return String(c).includes("세부치료사"); });
                     globalEmrHeaderRow = row;
                     if (globalEmrDurIdx === -1) globalEmrDurIdx = row.findIndex(function(c){ return String(c).includes("슬립소요시간"); });
@@ -2105,6 +2107,121 @@ function calculateEmrStatsLogic(members, orderList, codeMap) {
     return emrStats;
 }
 
+// ── 환자 기준 NS / OS ────────────────────────────────────────────────
+//   통계표 NS · OS 를 치료사 소속(신경계/근골 시간표)이 아니라 환자 담당의로 나눈다.
+//   담당의가 강지영이면 근골(os), 나머지는 신경계(ns).
+//   시간표 집계는 그대로 두고, 한 건이 늘 때마다 그 칸(또는 그 글자 조각)의 환자로 ns/os 를 따로 적어 둔다.
+//   EMR 에서 환자를 못 찾은 건은 치료사 소속으로 넣는다.
+var OS_DOCTORS = ["강지영"];
+var _pwCtx = null, _pwSplit = {}, _pwMapRows = null, _pwMap = {};
+function pwWardMap() {
+    if (_pwMapRows === globalEmrRows) return _pwMap;
+    _pwMapRows = globalEmrRows; _pwMap = {};
+    if (!globalEmrRows || globalEmrPatientIdx === -1 || globalEmrDoctorIdx === -1) return _pwMap;
+    resetDupLabelCache();
+    var votes = {};
+    globalEmrRows.forEach(function(row) {
+        if (!row) return;
+        var nm = String(row[globalEmrPatientIdx]||"").trim();
+        var doc = String(row[globalEmrDoctorIdx]||"").trim();
+        if (!nm || !doc) return;
+        var key = dupLabelOf(row) || nm;
+        var w = OS_DOCTORS.some(function(d){ return doc.indexOf(d) !== -1; }) ? "os" : "ns";
+        if (!votes[key]) votes[key] = { ns:0, os:0 };
+        votes[key][w]++;
+    });
+    Object.keys(votes).forEach(function(k){ _pwMap[k] = votes[k].os > votes[k].ns ? "os" : "ns"; });
+    return _pwMap;
+}
+// 글자 조각 하나("G김대선(3층)+동적", "도수고민식", "H김옥자2") → 그 환자의 ns/os (모르면 null)
+function pwWardOfToken(tok) {
+    var M = pwWardMap();
+    var t = String(tok||"").replace(/\([^)]*\)/g, "").replace(/\[[^\]]*\]/g, "");
+    var runs = t.match(/[가-힣]+\d?/g);
+    if (!runs) return null;
+    for (var i = 0; i < runs.length; i++) {
+        var r = runs[i];
+        var cands = [r, r.replace(/\d+$/, "")];
+        try { var rr = resolveEmrPatientName(r); if (rr) cands.splice(1, 0, rr); } catch (e) {}
+        for (var j = 0; j < cands.length; j++) if (M[cands[j]]) return M[cands[j]];
+        // "도수고민식" 처럼 앞에 다른 말이 붙은 경우 — 긴 이름부터 찾는다
+        var base = r.replace(/\d+$/, "");
+        for (var L = Math.min(4, base.length - 1); L >= 2; L--)
+            for (var s0 = base.length - L; s0 >= 0; s0--) {
+                var sub = base.substr(s0, L);
+                if (M[sub]) return M[sub];
+            }
+    }
+    return null;
+}
+// 한 칸의 환자 목록과 처방별 환자 순서(q)
+function pwMakeCtx(tokens, labelsOf) {
+    var c = { wards: [], q: {}, qth: {}, tok: null, rr: 0 };
+    (tokens || []).forEach(function(t) {
+        var w = pwWardOfToken(t);
+        if (!w) return;
+        c.wards.push(w);
+        (labelsOf ? labelsOf(t) : []).forEach(function(lb){ (c.q[lb] = c.q[lb] || []).push(w); });
+    });
+    return c;
+}
+function pwSimpleCtx(text) {
+    return pwMakeCtx(String(text||"").replace(/\r?\n|\r/g, " ").split(/[\s,]+/).filter(Boolean));
+}
+function pwBegin(key, timeStats) {
+    var S = _pwSplit[key] = { ns:{}, os:{}, unk:{}, mixed:0, unkN:0, unkList:[] };
+    Object.keys(timeStats).forEach(function(th) {
+        var obj = timeStats[th];
+        if (typeof Proxy === "undefined") return;
+        timeStats[th] = new Proxy(obj, { set: function(t, k, v) {
+            var d = (+v || 0) - (+t[k] || 0);
+            t[k] = v;
+            if (d > 0) pwAttr(S, th, k, d);
+            return true;
+        }});
+    });
+    _pwCtx = null;
+}
+function pwAttr(S, th, k, d) {
+    var c = _pwCtx;
+    for (var i = 0; i < d; i++) {
+        var w = null;
+        if (c) {
+            if (c.tok) w = c.tok;
+            else {
+                if (!c.qth[th]) { c.qth[th] = {}; Object.keys(c.q).forEach(function(x){ c.qth[th][x] = c.q[x].slice(); }); }
+                var qq = c.qth[th][k];
+                if (qq && qq.length) w = qq.shift();
+                else if (c.wards.length) {
+                    var allSame = c.wards.every(function(x){ return x === c.wards[0]; });
+                    if (allSame) w = c.wards[0];
+                    else { w = c.wards[c.rr++ % c.wards.length]; S.mixed++; }
+                }
+            }
+        }
+        if (w) S[w][k] = (S[w][k] || 0) + 1;
+        else { S.unk[th] = S.unk[th] || {}; S.unk[th][k] = (S.unk[th][k] || 0) + 1; S.unkN++; }
+    }
+}
+// 환자 기준 ns/os 합계 — 환자를 못 찾은 건은 치료사 소속으로
+function pwTotalsOf(key, order, osSet) {
+    var S = _pwSplit[key];
+    if (!S) return null;
+    var ns = {}, os = {};
+    order.forEach(function(k){ ns[k] = S.ns[k] || 0; os[k] = S.os[k] || 0; });
+    Object.keys(S.unk).forEach(function(th) {
+        var isOs = !!(osSet[th] || osSet[String(th).replace(/\d+$/, "")]);
+        order.forEach(function(k){ var v = S.unk[th][k] || 0; if (isOs) os[k] += v; else ns[k] += v; });
+    });
+    return { ns: ns, os: os };
+}
+var _totalsBasis = (function(){ try { return localStorage.getItem("totalsBasis") || "therapist"; } catch (e) { return "therapist"; } })();
+function setTotalsBasis(b) {
+    _totalsBasis = b === "patient" ? "patient" : "therapist";
+    try { localStorage.setItem("totalsBasis", _totalsBasis); } catch (e) {}
+    renderTotalsSheetView();
+}
+
 function analyzePtEtMtCombinedMasterLogic() {
     // 개인 시간표 ↔ 전기 시간표 중복 제거용
     var personalSeenDup = {}, ptRowSlotForDup = buildRowSlotMap("ptGridTable");
@@ -2124,6 +2241,7 @@ function analyzePtEtMtCombinedMasterLogic() {
     if (members.length === 0) return notify("⚠️ 물리치료 또는 전기치료 — 시간표에서 명단을 추출하지 못했습니다.");
     var timeStats = {};
     members.forEach(function(m){ timeStats[m] = {}; ptOrder.forEach(function(p){ timeStats[m][p] = 0; }); });
+    pwBegin("pt", timeStats);
 
     for (var r = 1; r < ROW_COUNT; r++) {
         Object.keys(colMapping).forEach(function(colIdx) {
@@ -2135,6 +2253,14 @@ function analyzePtEtMtCombinedMasterLogic() {
             var tokens = cellText.replace(/\r?\n|\r/g," ").replace(/(도수)\s+(?=[가-힣])/g, "$1")
                                  .split(/[\s,]+/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>0; });
             var classified = tokens.map(function(t){ return { token:t, type:classifyPtToken(t) }; });
+            // 환자 기준 NS/OS — 처방 종류별로 어느 환자 몫인지
+            var _ptTypeOf = {}; classified.forEach(function(x){ _ptTypeOf[x.token] = x.type; });
+            _pwCtx = pwMakeCtx(tokens, function(t) {
+                var ty = _ptTypeOf[t];
+                if (ty === "H") return ["H2","H3"];
+                if (ty === "GR") return ["AR+MW+RBOT"];
+                return ty ? [ty] : [];
+            });
             var hItems  = classified.filter(function(x){ return x.type === "H"; });
             var grItems = classified.filter(function(x){ return x.type === "GR"; });
             var matchedHNames = {};
@@ -2214,6 +2340,7 @@ function analyzePtEtMtCombinedMasterLogic() {
             var etNm = String(ct).replace(/\([^)]*\)/g,"").match(/[가-힣]{2,4}\d?/);
             if (etSlotNow && etNm && personalSeenDup[etTherapist + "|" + etNm[0] + "|" + etSlotNow]) continue;
             var cu = ct.toUpperCase();
+            _pwCtx = pwSimpleCtx(ct);
             if (cu.includes("H2") || cu.startsWith("H")) {
                 timeStats[etTherapist]["H2"] += 1;
                 var kk=etTherapist+"||H2"; if(!debugLog[kk])debugLog[kk]=[]; debugLog[kk].push(ct);
@@ -2231,11 +2358,13 @@ function analyzePtEtMtCombinedMasterLogic() {
             splitMedipainCell(ct).forEach(function(one) {
                 if (!isMedipainEntry(one)) return;
                 var mpLabel = classifyMedipainCell(one);
+                _pwCtx = pwSimpleCtx(one);
                 timeStats[etTherapist][mpLabel] += 1;
                 var kkmt=etTherapist+"||"+mpLabel; if(!debugLog[kkmt])debugLog[kkmt]=[]; debugLog[kkmt].push(one);
             });
         }
     }
+    _pwCtx = null;
     var emrStats = calculateEmrStatsLogic(members, ptOrder, ptMap);
     // 복합운동치료(COMPLEX)는 통증 시간표에 적히기도 하므로 그 칸도 함께 센다
     countComplexFromPainGrid(members, timeStats, debugLog);
@@ -2250,6 +2379,7 @@ function analyzeOtMasterLogic() {
     var timeStats = {};
     debugLogs.ot = {}; debugLog = debugLogs.ot; // 작업치료 로그
     members.forEach(function(m){ timeStats[m] = {}; otOrder.forEach(function(o){ timeStats[m][o] = 0; }); });
+    pwBegin("ot", timeStats);
     for (var r = 1; r < ROW_COUNT; r++) {
         Object.keys(colMapping).forEach(function(colIdx) {
             var therapists = ownersAt("otGridTable", r, colIdx, colMapping);
@@ -2260,6 +2390,8 @@ function analyzeOtMasterLogic() {
             var recInCR = isRecoveryInTimeCR(cellText);   // H○○○+CR7+메디+TDCS — 회Ⅲ로 셈
             var items = cellText.replace(/\r?\n|\r/g," ").trim().split(/[\s,]+/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>0; });
             var localHCount = 0;
+            // 환자 기준 NS/OS — 글자 조각마다 그 환자 몫, 칸 끝의 회Ⅲ/회Ⅱ 는 H 환자 순서대로
+            _pwCtx = pwMakeCtx(items, function(t){ return /^H(?!1[가-힣])(?!2)/i.test(t) ? ["H3","H2"] : []; });
             // 건수 기록 헬퍼: 치료사별 처방별로 셀 내용 저장
             function logCell(th, label) {
                 var key = th + "||" + label;
@@ -2267,6 +2399,7 @@ function analyzeOtMasterLogic() {
                 debugLog[key].push(cellText);
             }
             items.forEach(function(item) {
+                if (_pwCtx) _pwCtx.tok = pwWardOfToken(item);
                 var u = item.toUpperCase();
                 var fc = item[0]; var isKorean = fc >= "가" && fc <= "힣";
                 if (u === "V") return;
@@ -2322,6 +2455,7 @@ function analyzeOtMasterLogic() {
                 if (/^H1[가-힣]/.test(u)) return;      // H1 은 회Ⅲ 이 아니다 (통증 H1)
                 if (u.startsWith("H"))  { localHCount += 1; }
             });
+            if (_pwCtx) _pwCtx.tok = null;
             therapists.forEach(function(therapist) {
                 var cu = cellText.toUpperCase();
                 var hasCRF = cu.includes("CR6(F)") || cu.includes("CR7(F)") || cu.includes("CR6(필") || cu.includes("CR7(필");
@@ -2343,6 +2477,7 @@ function analyzeOtMasterLogic() {
             });
         });
     }
+    _pwCtx = null;
     var emrStats = calculateEmrStatsLogic(members, otOrder, otMap);
     renderMasterParallelTable("otTripleArea", members, otOrder, timeStats, emrStats, "작업치료", "ot");
     notify("작업치료 교차 검증 통계 리포트가 도출되었습니다!");
@@ -3710,6 +3845,17 @@ function totalsSheetBlocks() {
     var pt = wardTotalsOf("ptTripleArea", ptOrder, osSet), ot = wardTotalsOf("otTripleArea", otOrder, osSet),
         st = summaryTotalsOf("stTripleArea"), pain = summaryTotalsOf("painTripleArea"),
         ev = evalTotalsFromEmr(), evNames = evalNamesFromEmr();
+    var basisNote = null;
+    if (_totalsBasis === "patient") {
+        var noDoc = !globalEmrRows || globalEmrDoctorIdx === -1;
+        if (noDoc) basisNote = { err: "EMR 슬립에 '담당의' 열이 없어 치료사 기준으로 냈습니다." };
+        else {
+            if (pt) pt = pwTotalsOf("pt", ptOrder, osSet) || pt;
+            if (ot) ot = pwTotalsOf("ot", otOrder, osSet) || ot;
+            var sp = _pwSplit.pt || {}, so = _pwSplit.ot || {};
+            basisNote = { unk: (sp.unkN || 0) + (so.unkN || 0), mixed: (sp.mixed || 0) + (so.mixed || 0) };
+        }
+    }
     var miss = [];
     if (!pt) miss.push("물리"); if (!ot) miss.push("작업");
     if (!st && isSectionActive("stGridTable")) miss.push("언어");
@@ -3742,7 +3888,7 @@ function totalsSheetBlocks() {
         if (j < painOs.length) { q[4] = painOs[j]; q[5] = v(pain, painOs[j]); }
         os.push(q);
     }
-    return { ns: ns, os: os, miss: miss };
+    return { ns: ns, os: os, miss: miss, basisNote: basisNote };
 }
 function rowsToTsv(rows) {
     return rows.map(function(r){ return r.map(function(x){ x = String(x); return /[\t\n"]/.test(x) ? '"' + x.replace(/"/g,'""') + '"' : x; }).join("\t"); }).join("\n");
@@ -3876,6 +4022,17 @@ function renderTotalsSheetView() {
             "<div style='font-size:12.5px;color:#7f8c8d;margin-bottom:8px;'>통계표(일일업무보고서)와 같은 모양입니다. " +
             "NS 는 통계표 <b>B4</b>, OS 는 <b>B41</b> 칸을 누르고 Ctrl+Shift+V 로 붙여넣으세요." +
             (B.miss.length ? " <span style='color:#c0392b;'>· 아직 집계 안 된 파트: " + B.miss.join(" · ") + " (0 으로 표시)</span>" : "") + "</div>" +
+            "<div style='font-size:12.5px;margin-bottom:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;'><b>물리·작업 나누는 기준</b>" +
+            ["therapist","patient"].map(function(b) {
+                var on = _totalsBasis === b, lab = b === "patient" ? "환자 기준 (담당의)" : "치료사 기준";
+                return "<button onclick='setTotalsBasis(\"" + b + "\")' style='padding:3px 10px;border-radius:12px;cursor:pointer;font-size:12px;" +
+                       "border:1px solid #2c3e50;" + (on ? "background:#2c3e50;color:#fff;font-weight:700;" : "background:#fff;color:#2c3e50;") + "'>" + lab + "</button>";
+            }).join("") +
+            (B.basisNote ? (B.basisNote.err ? " <span style='color:#c0392b;'>⚠️ " + B.basisNote.err + "</span>"
+                : " <span style='color:#7f8c8d;'>담당의 " + OS_DOCTORS.join("·") + " 환자 → OS, 그 외 → NS" +
+                  (B.basisNote.unk ? " · <span style='color:#c0392b;'>EMR에서 환자를 못 찾은 " + B.basisNote.unk + "건은 치료사 기준</span>" : "") +
+                  (B.basisNote.mixed ? " · <span style='color:#c0392b;'>한 칸에 NS·OS 환자가 섞인 " + B.basisNote.mixed + "건 확인</span>" : "") + "</span>") : "") +
+            "</div>" +
             "<div style='display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;'>" +
             "<div><button " + btn + " onclick='copyTotalsBlock(\"ns\")'>&#128203; NS 복사 (B4)</button>" +
             " <button class='btn-copy' title='평가 · 건수 · 치료사 표를 그림으로 복사 — 카톡 대화창에 Ctrl+V' style='margin:0 0 6px 6px;background:#8e44ad;' onclick='copyEvalImage()'>🖼 평가 이미지 복사</button><div style='overflow-x:auto;'>" + table(B.ns, "ns") + "</div></div>" +
@@ -6277,7 +6434,7 @@ function resetEmrFile() {
     globalEmrRows = [];
     globalEmrCodeIdx = -1; globalEmrNameIdx = -1; globalEmrSlipNameIdx = -1;
     globalEmrPatientIdx = -1; globalEmrDurIdx = -1; globalEmrTimeIdx = -1;
-    globalEmrQtyIdx = -1; globalEmrDcIdx = -1; globalEmrVisitIdx = -1; globalEmrTherapistIdx = -1;
+    globalEmrQtyIdx = -1; globalEmrDcIdx = -1; globalEmrVisitIdx = -1; globalEmrDoctorIdx = -1; globalEmrTherapistIdx = -1;
     globalEmrChartIdx = -1; globalEmrRoomIdx = -1;
     resetEmrTherapistAlias();
     globalEmrHeaderRow = null; globalEmrPatientNames = null;

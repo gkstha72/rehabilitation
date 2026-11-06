@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-06 b205</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-06 b206</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -1149,12 +1149,30 @@ function initGrid(tableId, pasteHandler) {
             input.setAttribute("data-col", c);
             if (r===0 && c===0) input.placeholder = "클릭 후 붙여넣기";
             input.addEventListener("paste", pasteHandler);
+            input.addEventListener("input", onGridCellTyped);
+            input.addEventListener("change", onGridCellTyped);
             td.appendChild(input); tr.appendChild(td);
         }
         grid.appendChild(tr);
     }
 }
 
+// 칸에 직접 써 넣은 경우
+//  ① 붙여넣을 때 저장해 둔 밑줄·취소선 정보는 더 이상 맞지 않으니 지운다
+//     (안 지우면 집계가 예전 글자를 읽어 새로 쓴 환자가 빠진다)
+//  ② "H박천희(3층)+기립H김영만(3층)+바로" 처럼 붙여 쓴 환자는 줄을 나눠 따로 센다 (칸을 떠날 때)
+function splitGluedPatients(v) {
+    return String(v || "").replace(/([가-힣)\]])(?=[A-Z]\d?[가-힣]{2})/g, "$1\n");
+}
+function onGridCellTyped(ev) {
+    var el = ev.target; if (!el || !el.id) return;
+    var m = el.id.match(/^(.+)-cell-(\d+)-(\d+)$/); if (!m) return;
+    if (gridCellFmt[m[1]]) delete gridCellFmt[m[1]][m[2] + "-" + m[3]];
+    if (ev.type === "change") {
+        var nv = splitGluedPatients(el.value);
+        if (nv !== el.value) el.value = nv;
+    }
+}
 function forceRenderAllInputGrids() {
     initGrid("ptGridTable", handlePtPaste); initGrid("otGridTable", handleOtPaste);
     initGrid("stGridTable", handleStPaste); initGrid("etGridTable", handleEtPaste);

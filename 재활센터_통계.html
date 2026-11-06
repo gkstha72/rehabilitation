@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-06 b206</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-06 b207</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -810,10 +810,10 @@ function cellFmt(gid, r, c) {
 // 취소선이 그어진 줄을 뺀 글자. 액팅이 안 나가는 자리라 EMR 과 대조할 실적이 아니다.
 function liveCellText(gid, r, c, txt) {
     var f = cellFmt(gid, r, c);
-    if (!f.s) return txt;                       // 선이 없으면 그대로
+    if (!f.s) return splitGluedPatients(txt);   // 선이 없으면 그대로 (붙여 쓴 환자만 나눔)
     if (!f.lines || !f.lines.length) return ""; // 칸 전체가 취소선
     var keep = f.lines.filter(function(ln){ return !ln.s; }).map(function(ln){ return ln.text; });
-    return keep.join(" ");
+    return splitGluedPatients(keep.join(" "));
 }
 function cellLines(gid, r, c, txt) {
     var f = cellFmt(gid, r, c);

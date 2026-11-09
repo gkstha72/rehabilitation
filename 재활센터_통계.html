@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-09 b210</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-09 b212</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -191,6 +191,7 @@ td.clickable:hover { opacity:0.75; }
       <label>🦴 근골 통합 파일 <input type="file" id="batchMskInput" accept=".xlsx" onclick="this.value='';" onchange="onBatchTimetableFiles(this,'msk')"></label>
       <label>EMR 슬립 (여러 날짜) <input type="file" id="batchEmrInput" accept=".xlsx,.xls" onclick="this.value='';" onchange="onBatchEmrFile(this)"></label>
       <button class="step-btn" style="background:#1b5e8a;color:#fff;" onclick="runBatchStats()">▶ 날짜별 집계</button>
+      <button class="step-btn" style="background:#fff;color:#c0392b;border:1px solid #e3a49c;" onclick="resetBatchAll()">🗑 전체 집계 초기화</button>
     </div>
     <div id="batchStatus" style="margin-top:5px;font-size:12.5px;color:#555;"></div>
     <div id="batchResultArea" style="overflow-x:auto;"></div>
@@ -1679,6 +1680,20 @@ else { initOnLoad(); }
                         if (!inVisit) continue;
                         var n = cleanTherapistName(hv);
                         if (!n) continue;
+                        // 인원현황 방문 줄 — 방문재활 구역은 시간 열이 "09:30~10:30" 식이라 구역으로 안 잡힐 때가 있어 여기서 센다
+                        if (!extraStaff[n]) {
+                            var _red2 = !!(fmtMatrix && (fmtMatrix[hr] || [])[c] && fmtMatrix[hr][c].r);
+                            var _fill2 = [], _mins2 = [];
+                            for (var r3 = fr; r3 <= rowEnd; r3++) {
+                                var _tm2 = String((matrix[r3] || [])[tcol] || "").trim().match(/^(\d{1,2}):(\d{2})/);
+                                if (!_tm2) continue;
+                                var _h2 = +_tm2[1]; if (_h2 < 8) _h2 += 12;
+                                var _f2 = fmtMatrix && (fmtMatrix[r3] || [])[c];
+                                _fill2.push(!cellValIsBlankOrInvalid(String((matrix[r3] || [])[c] || "").trim()) && !(_f2 && _f2.b));
+                                _mins2.push(_h2 * 60 + (+_tm2[2]));
+                            }
+                            extraStaff[n] = { v: _red2 ? staffFraction(_fill2, _mins2) : 1, red: _red2, visit: true, elec: false };
+                        } else extraStaff[n].visit = true;
                         var hasPatient = false;
                         for (var r = fr; r <= rowEnd && !hasPatient; r++) {
                             String((matrix[r] || [])[c] || "").split(/\r?\n/).forEach(function(ln) {
@@ -6511,6 +6526,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
 function resetEmrFile() {
     if (!confirm("EMR 엑셀 연동을 해제하시겠습니까?\n(시간표 입력 내용은 그대로 유지됩니다)")) return;
+    doResetEmrFile();
+    alert("EMR 엑셀 연동이 해제되었습니다.");
+}
+function doResetEmrFile() {
     var inp = document.getElementById("emrInput");
     if (inp) inp.value = "";
     globalEmrRows = [];
@@ -6526,7 +6545,18 @@ function resetEmrFile() {
     ["ptTripleArea","otTripleArea","stTripleArea","painTripleArea","evalArea",
      "crPairArea","qtyCheckArea","robotGaitArea","overlapArea","slipDetailArea","orderIssueArea"]
      .forEach(function(id){ var el = document.getElementById(id); if (el) el.innerHTML = ""; });
-    alert("EMR 엑셀 연동이 해제되었습니다.");
+}
+// 여러 날짜 집계까지 포함해 시간표 · EMR · 결과를 모두 비운다
+function resetBatchAll() {
+    if (!confirm("시간표 · EMR · 여러 날짜 집계 결과를 모두 지우시겠습니까?")) return;
+    _batch = { books: [], emrAll: null, emrDateIdx: -1, results: [], loading: 0 };
+    ["batchNeuroInput","batchMskInput","batchEmrInput"].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ""; });
+    var ra = document.getElementById("batchResultArea"); if (ra) ra.innerHTML = "";
+    batchStatus("");
+    doResetBulkPaste();
+    doResetEmrFile();
+    try { updateErrorCount(); } catch (e) {}
+    alert("모두 초기화되었습니다.");
 }
 // ── 신경계 / 근골 화면 전환 ────────────────────────────────────────────
 // 그리드 내용은 그대로 두고 보이는 입력창만 바꿉니다.
@@ -6547,6 +6577,7 @@ function resetBulkPaste() {
     alert("시간표 입력이 모두 초기화되었습니다.");
 }
 function doResetBulkPaste() {
+    window._staffExtraPT = {};
     ["bulkPasteNeuro","bulkPasteMsk"].forEach(function(id){ var ta = document.getElementById(id); if (ta) ta.value = ""; });
     var st = document.getElementById("bulkPasteStatus");
     if (st) st.innerHTML = "";

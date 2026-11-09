@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-06 b207</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-09 b208</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -184,6 +184,16 @@ td.clickable:hover { opacity:0.75; }
     </div>
   </div>
   <div id="bulkPasteStatus"></div>
+  <details class="batch-box" style="margin-top:8px;border:1px dashed #b8c7d6;border-radius:8px;padding:6px 10px;background:#fbfdff;">
+    <summary style="cursor:pointer;font-weight:800;color:#1b5e8a;font-size:13.5px;">📅 여러 날짜 한꺼번에 집계</summary>
+    <div style="margin-top:7px;font-size:12.5px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      <label>시간표 월 파일 (신경계 · 근골) <input type="file" id="batchTimetableInput" accept=".xlsx" multiple onclick="this.value='';" onchange="onBatchTimetableFiles(this)"></label>
+      <label>EMR 슬립 (여러 날짜) <input type="file" id="batchEmrInput" accept=".xlsx,.xls" onclick="this.value='';" onchange="onBatchEmrFile(this)"></label>
+      <button class="step-btn" style="background:#1b5e8a;color:#fff;" onclick="runBatchStats()">▶ 날짜별 집계</button>
+    </div>
+    <div id="batchStatus" style="margin-top:5px;font-size:12.5px;color:#555;"></div>
+    <div id="batchResultArea" style="overflow-x:auto;"></div>
+  </details>
 </div>
 
 <div class="s3-box">
@@ -502,7 +512,7 @@ var otOrder  = ["COMPLEX","SPECIAL","ADL","DYSPHAGIA","VITAL STIM","경두개직
 var stOrder  = ["비회","H2","H3","평가"];
 var painOrder = ["표층열치료(HP)","표층열치료(IR)","표층열치료(심층열동시-HP)","표층열치료(심층열동시-IR)","심층열치료(microwave)","심층열치료(ultra sound)","심층열치료(sonor)","심층열치료[1일당]","한냉치료(ICE)","경피적전기신경자극치료[TENS]","전기자극치료[EST]","간섭파전류치료[ICT]","저주파자극치료[SSP]","레이저치료[1일당]","한냉치료(콜드팩)","비침습적 무통증 신호요법(2ch/30분)","압박치료[1일당]","H1","이온도입기(ION)","운동치료-단순운동치료[간단]","COMPLEX"];
 var evalOrder = ["후글-마이어-평가","수지기능검사(MFT)","수지기능검사(젭슨)","일상생활동작검사","간이정신진단검사","[F]간이정신진단검사","MMSE&GDS","치매척도검사","신경인지기능검사(전체)","신경인지기능검사 유형1,2","신경인지기능검사-무시증후군 총집","신경행동학적 인지기능검사","섭식장애평가","MMT&ROM","버그균형검사","[F]버그 균형검사","경직진자검사","동적족저압측정[단순]","동적족저압측정[복잡]","동적체평형검사[단순]","동적체평형검사[복잡]","동작분석 역동적 근전도[단순]","동작분석 역동적 근전도[복잡]","동작분석(생역학검사)[단순]","동작분석(생역학검사)[복잡]","기립성혈압검사[단순]","기립성혈압검사[복잡]","[비]언어평가","웨스턴실어증검사"];
-var ignoreHeaders = ["NDT","MAT","로봇PT","전기","통증","ST","OT","로봇OT","TIME","시간",""];
+var ignoreHeaders = ["NDT","MAT","로봇PT","전기","통증","ST","OT","로봇OT","TIME","시간","방문PT","방문OT",""];
 
 var ptDataCodes = {
     "NDT":["MM105","MM1051"],"MAT":["MM3011","MM3012"],"GAIT":["MM3021","MM3022"],
@@ -1637,6 +1647,56 @@ else { initOnLoad(); }
                 if (rm && /^(pt|ot|st)GridTable$/.test(rm.id || "")) therapistHdrRows[sg.firstRow - 1] = true;
             });
 
+            // 방문재활 · 재택/방문 · 재택교육 치료사 — 칸에 "H이다혜" 처럼 정규 시간표 식으로 적힌 사람만
+            //   물리/작업 시간표로 가져온다 ("방문" · "재택교육" 만 적힌 칸은 그대로 뺀다).
+            //   방문 칸의 시간 열은 "09:30~10:30" 식이라, 같은 제목행 정규 시간표의 시간 열을 쓴다.
+            function pullVisitColumns() {
+                Object.keys(therapistHdrRows).forEach(function(hrS) {
+                    var hr = +hrS, hrow = matrix[hr] || [];
+                    var main = null;
+                    for (var k = 0; k < sections.length; k++) {
+                        var o = sections[k];
+                        if (o.firstRow - 1 !== hr) continue;
+                        var orm = identifyRoom(matrix, o.col, o.firstRow);
+                        if (orm && /^(pt|ot)GridTable$/.test(orm.id || "")) { main = o; break; }
+                    }
+                    if (!main) return;
+                    var tcol = main.col, fr = main.firstRow, rowEnd = fr;
+                    for (var r2 = fr, gap = 0; r2 < matrix.length && gap < 3; r2++) {
+                        var tv0 = String((matrix[r2] || [])[tcol] || "").trim();
+                        if (/^\d{1,2}:\d{2}/.test(tv0)) { rowEnd = r2; gap = 0; } else gap++;
+                    }
+                    var inVisit = false;
+                    for (var c = 0; c < hrow.length; c++) {
+                        var hv = String(hrow[c] || "").split(/[\n\r]/)[0].trim();
+                        if (!hv) continue;
+                        if (/^(방문|재택)/.test(hv)) { inVisit = true; continue; }
+                        if (/^열전기/.test(hv) || (identifyRoom(matrix, c, hr + 1) || {}).id) { inVisit = false; continue; }
+                        if (!inVisit) continue;
+                        var n = cleanTherapistName(hv);
+                        if (!n) continue;
+                        var hasPatient = false;
+                        for (var r = fr; r <= rowEnd && !hasPatient; r++) {
+                            String((matrix[r] || [])[c] || "").split(/\r?\n/).forEach(function(ln) {
+                                if (/^[A-Z]{1,2}\d?[가-힣]{2,4}/.test(ln.trim())) hasPatient = true;
+                            });
+                        }
+                        if (!hasPatient) continue;
+                        var dept = STAFF_VISIT_DEPT[n] || (STAFF_ROSTER_OT.indexOf(n) !== -1 ? "OT" : "PT");
+                        var gid = dept === "OT" ? "otGridTable" : "ptGridTable";
+                        if (!gridBuffers[gid]) gridBuffers[gid] = { name: dept === "OT" ? "작업치료" : "물리치료", cols: [], fmts: [] };
+                        var subRows = [], subFmt = [];
+                        for (var r = hr; r <= rowEnd; r++) {
+                            var tv = r === hr ? (dept === "OT" ? "방문OT" : "방문PT") : ((matrix[r] || [])[tcol] || "");
+                            subRows.push([tv, (matrix[r] || [])[c] !== undefined ? matrix[r][c] : ""]);
+                            subFmt.push([null, fmtMatrix ? ((fmtMatrix[r] || [])[c] || null) : null]);
+                        }
+                        gridBuffers[gid].cols.push(subRows);
+                        gridBuffers[gid].fmts.push(subFmt);
+                    }
+                });
+            }
+
             // ② 각 섹션 처리
             sections.forEach(function(seg, idx) {
                 var sc = seg.col;
@@ -1722,6 +1782,8 @@ else { initOnLoad(); }
                 gridBuffers[gid].fmts.push(subFmt);
             });
 
+            pullVisitColumns();
+
             // ③ 메디페인 별도 탐지
             var mpSeg = findMedipainRegion(matrix, sections, totalCols);
             if (mpSeg) {
@@ -1772,6 +1834,39 @@ else { initOnLoad(); }
 })();
 // ─────────────────────────────────────────────────────────────────────────
 
+// EMR 슬립 행 읽기 — 머리글 행을 찾아 열 위치를 잡고 행을 담는다 (하루치 · 여러 날짜 공용)
+function loadEmrRows(rows) {
+    globalEmrCodeIdx = -1; globalEmrNameIdx = -1;
+    for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        if (row && row.some(function(c){ return String(c).includes("슬립코드"); }) && row.some(function(c){ return String(c).includes("완료자"); })) {
+            globalEmrCodeIdx = row.findIndex(function(c){ return String(c).includes("슬립코드"); });
+            globalEmrNameIdx = row.findIndex(function(c){ return String(c).includes("완료자"); });
+            globalEmrSlipNameIdx = row.findIndex(function(c){ return String(c).includes("슬립명칭"); });
+            globalEmrPatientIdx  = row.findIndex(function(c){ return String(c).includes("수진자명"); });
+            globalEmrChartIdx    = row.findIndex(function(c){ return String(c).includes("차트번호"); });
+            globalEmrRoomIdx     = row.findIndex(function(c){ return String(c).trim() === "병실"; });
+            globalEmrDurIdx = row.findIndex(function(c){ return String(c).includes("세부치료소요시간"); });
+            globalEmrTimeIdx = row.findIndex(function(c){ return String(c).includes("세부치료시작"); });
+            globalEmrQtyIdx  = row.findIndex(function(c){ return String(c).trim() === "수량"; });
+            globalEmrDcIdx   = row.findIndex(function(c){ return String(c).trim() === "D/C"; });
+            globalEmrVisitIdx = row.findIndex(function(c){ return String(c).includes("외래/입원"); });
+            globalEmrDoctorIdx = row.findIndex(function(c){ return String(c).trim() === "담당의"; });
+            globalEmrTherapistIdx = row.findIndex(function(c){ return String(c).includes("세부치료사"); });
+            globalEmrHeaderRow = row;
+            if (globalEmrDurIdx === -1) globalEmrDurIdx = row.findIndex(function(c){ return String(c).includes("슬립소요시간"); });
+            globalEmrRows = rows.slice(i+1); resetEmrTherapistAlias(); break;
+        }
+    }
+    emrDateText = "";
+    for (var di = 0; di < Math.min(rows.length, 12); di++) {
+        var dline = (rows[di]||[]).join(" ");
+        if (/조회기간|처방일자|일자/.test(dline) && parseAnyDate(dline)) { emrDateText = dline; break; }
+        if (!emrDateText && parseAnyDate(dline)) emrDateText = dline;
+    }
+    return globalEmrCodeIdx !== -1;
+}
+
 window.addEventListener("DOMContentLoaded", function() {
     var emrFileInput = document.getElementById("emrInput");
     if (!emrFileInput) return;
@@ -1781,34 +1876,8 @@ window.addEventListener("DOMContentLoaded", function() {
         reader.onload = function(e) {
             var workbook = XLSX.read(new Uint8Array(e.target.result), { type:"array" });
             var rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header:1 });
-            globalEmrCodeIdx = -1; globalEmrNameIdx = -1;
-            for (var i = 0; i < rows.length; i++) {
-                var row = rows[i];
-                if (row && row.some(function(c){ return String(c).includes("슬립코드"); }) && row.some(function(c){ return String(c).includes("완료자"); })) {
-                    globalEmrCodeIdx = row.findIndex(function(c){ return String(c).includes("슬립코드"); });
-                    globalEmrNameIdx = row.findIndex(function(c){ return String(c).includes("완료자"); });
-                    globalEmrSlipNameIdx = row.findIndex(function(c){ return String(c).includes("슬립명칭"); });
-                    globalEmrPatientIdx  = row.findIndex(function(c){ return String(c).includes("수진자명"); });
-                    globalEmrChartIdx    = row.findIndex(function(c){ return String(c).includes("차트번호"); });
-                    globalEmrRoomIdx     = row.findIndex(function(c){ return String(c).trim() === "병실"; });
-                    globalEmrDurIdx = row.findIndex(function(c){ return String(c).includes("세부치료소요시간"); });
-                    globalEmrTimeIdx = row.findIndex(function(c){ return String(c).includes("세부치료시작"); });
-                    globalEmrQtyIdx  = row.findIndex(function(c){ return String(c).trim() === "수량"; });
-                    globalEmrDcIdx   = row.findIndex(function(c){ return String(c).trim() === "D/C"; });
-                    globalEmrVisitIdx = row.findIndex(function(c){ return String(c).includes("외래/입원"); });
-                    globalEmrDoctorIdx = row.findIndex(function(c){ return String(c).trim() === "담당의"; });
-                    globalEmrTherapistIdx = row.findIndex(function(c){ return String(c).includes("세부치료사"); });
-                    globalEmrHeaderRow = row;
-                    if (globalEmrDurIdx === -1) globalEmrDurIdx = row.findIndex(function(c){ return String(c).includes("슬립소요시간"); });
-                    globalEmrRows = rows.slice(i+1); resetEmrTherapistAlias(); break;
-                }
-            }
-            emrDateText = "";
-            for (var di = 0; di < Math.min(rows.length, 12); di++) {
-                var dline = (rows[di]||[]).join(" ");
-                if (/조회기간|처방일자|일자/.test(dline) && parseAnyDate(dline)) { emrDateText = dline; break; }
-                if (!emrDateText && parseAnyDate(dline)) emrDateText = dline;
-            }
+            loadEmrRows(rows);
+            _batch.emrAll = null;   // 하루치 EMR 을 새로 넣으면 여러 날짜 모드는 끝
             renderDateBanner();
             clearResultAreas();
             var span = document.getElementById("emrStatus");
@@ -6470,6 +6539,10 @@ function setWardMode(mode) {
 
 function resetBulkPaste() {
     if (!confirm("붙여넣은 시간표를 모두 지우시겠습니까?\n(EMR 엑셀 연동은 그대로 유지됩니다)")) return;
+    doResetBulkPaste();
+    alert("시간표 입력이 모두 초기화되었습니다.");
+}
+function doResetBulkPaste() {
     ["bulkPasteNeuro","bulkPasteMsk"].forEach(function(id){ var ta = document.getElementById(id); if (ta) ta.value = ""; });
     var st = document.getElementById("bulkPasteStatus");
     if (st) st.innerHTML = "";
@@ -6495,7 +6568,6 @@ function resetBulkPaste() {
     ["ptTripleArea","otTripleArea","stTripleArea","painTripleArea","evalArea",
      "crPairArea","qtyCheckArea","robotGaitArea","overlapArea","slipDetailArea","orderIssueArea"]
      .forEach(function(id){ var el = document.getElementById(id); if (el) el.innerHTML = ""; });
-    alert("시간표 입력이 모두 초기화되었습니다.");
 }
 
 function analyzeOrderCheckAll() {
@@ -7820,6 +7892,265 @@ function undoExclude() {
     renderExcludedList();
     document.getElementById("excludeResultArea").innerHTML =
         "<p style='margin:0 0 8px;color:#27ae60;font-weight:bold;font-size:13px;'>↺ " + n + "칸 되돌림 — 다시 집계를 실행해 주세요.</p>";
+}
+
+// ── 여러 날짜 한꺼번에 ─────────────────────────────────────────────────────
+//   월 시간표 엑셀(신경계 · 근골, 날짜별 시트)과 여러 날짜가 든 EMR 슬립 엑셀을 넣으면
+//   날짜마다 시간표를 붙여넣은 것처럼 채우고 EMR 을 그날 것만 남겨 전체 집계를 돌린다.
+//   시트 서식(취소선 · 밑줄 · 칸 색)은 ExcelJS 로 읽어 구글 시트 복사 형태로 바꿔 넣는다.
+var _batch = { books: [], emrAll: null, emrDateIdx: -1, results: [] };
+function batchLoadExcelJS() {
+    return new Promise(function(res, rej) {
+        if (window.ExcelJS) return res();
+        var s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+        s.onload = function(){ res(); }; s.onerror = function(){ rej(new Error("ExcelJS 를 불러오지 못했습니다 (인터넷 연결 확인)")); };
+        document.head.appendChild(s);
+    });
+}
+function batchStatus(html) { var el = document.getElementById("batchStatus"); if (el) el.innerHTML = html; }
+function batchCellText(v) {
+    if (v === null || v === undefined) return "";
+    if (v instanceof Date) {
+        if (v.getUTCFullYear() < 1901) {
+            var m = Math.round((v.getUTCHours() * 3600 + v.getUTCMinutes() * 60 + v.getUTCSeconds() + v.getUTCMilliseconds() / 1000) / 60);
+            return ("0" + Math.floor(m / 60) % 24).slice(-2) + ":" + ("0" + m % 60).slice(-2);
+        }
+        return v.getUTCFullYear() + "-" + ("0" + (v.getUTCMonth() + 1)).slice(-2) + "-" + ("0" + v.getUTCDate()).slice(-2);
+    }
+    if (typeof v === "object") {
+        if (v.richText) return v.richText.map(function(x){ return x.text || ""; }).join("");
+        if ("result" in v) return batchCellText(v.result);
+        if ("text" in v) return String(v.text);
+        if (v.error) return "";
+        return "";
+    }
+    if (typeof v === "number") return String(Math.round(v * 1e6) / 1e6);
+    return String(v);
+}
+function batchArgb(c) {
+    if (!c || !c.argb || String(c.argb).length !== 8) return "";
+    return "#" + String(c.argb).slice(2);
+}
+function batchEsc(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function batchFontDeco(f) {
+    if (!f) return "";
+    var d = [];
+    if (f.underline) d.push("underline");
+    if (f.strike) d.push("line-through");
+    var st = "text-decoration:" + (d.length ? d.join(" ") : "none") + ";";
+    var col = batchArgb(f.color); if (col) st += "color:" + col + ";";
+    return st;
+}
+// 시트 하나 → { tsv, html } (구글 시트에서 복사한 모양)
+function batchSheetToClip(ws) {
+    var rowsT = [], rowsH = [];
+    var nr = ws.rowCount, nc = ws.columnCount;
+    for (var r = 1; r <= nr; r++) {
+        var t = [], h = [];
+        for (var c = 1; c <= nc; c++) {
+            var cell = ws.getCell(r, c);
+            var slave = cell.isMerged && cell.master && cell.master !== cell;
+            var v = slave ? "" : batchCellText(cell.value);
+            t.push(v);
+            var st = "";
+            var fl = cell.fill;
+            if (fl && fl.type === "pattern" && fl.pattern === "solid") {
+                var bg = batchArgb(fl.fgColor);
+                if (bg && !/^#(ffffff|000000)$/i.test(bg)) st += "background-color:" + bg + ";";
+            }
+            var f = cell.font;
+            if (f && (f.strike || f.underline)) st += "text-decoration:" + [f.underline ? "underline" : "", f.strike ? "line-through" : ""].join(" ").trim() + ";";
+            var inner;
+            if (!slave && cell.value && cell.value.richText) {
+                inner = cell.value.richText.map(function(run) {
+                    return "<span style='" + (run.font ? batchFontDeco(run.font) : "") + "'>" + batchEsc(run.text || "") + "</span>";
+                }).join("");
+            } else inner = batchEsc(v);
+            h.push("<td style='white-space:pre-wrap;" + st + "'>" + inner + "</td>");
+        }
+        rowsT.push(t); rowsH.push("<tr>" + h.join("") + "</tr>");
+    }
+    var q = function(x){ return /[\n\t"]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
+    return {
+        tsv: rowsT.map(function(r){ return r.map(q).join("\t"); }).join("\n"),
+        html: "<google-sheets-html-origin><table>" + rowsH.join("") + "</table>"
+    };
+}
+// 시트 이름 → "MM-DD" ("11_05목", "11_10 화욜이에요", "11.5")
+function batchSheetMd(name) {
+    var m = String(name || "").match(/(\d{1,2})\s*[_.\-\/월]\s*(\d{1,2})/);
+    if (!m) return "";
+    var mo = +m[1], d = +m[2];
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return "";
+    return ("0" + mo).slice(-2) + "-" + ("0" + d).slice(-2);
+}
+// 근골 시간표인지 — 파일 이름 또는 첫 시트의 구역 제목으로
+function batchWardOf(fileName, wb) {
+    if (/근골/.test(fileName)) return "msk";
+    if (/신경계/.test(fileName)) return "neuro";
+    var ws = wb.worksheets[0], hit = "neuro";
+    if (ws) for (var r = 1; r <= Math.min(5, ws.rowCount); r++) {
+        var a = batchCellText(ws.getCell(r, 1).value).replace(/\s/g, "");
+        if (/^근골격계/.test(a)) { hit = "msk"; break; }
+        if (/^NDT/i.test(a)) break;
+    }
+    return hit;
+}
+function onBatchTimetableFiles(input) {
+    var files = Array.prototype.slice.call(input.files || []);
+    if (!files.length) return;
+    _batch.books = [];
+    batchStatus("시간표 파일 읽는 중…");
+    batchLoadExcelJS().then(function() {
+        return Promise.all(files.map(function(f) {
+            return f.arrayBuffer().then(function(buf) {
+                var wb = new ExcelJS.Workbook();
+                return wb.xlsx.load(buf).then(function() {
+                    var ward = batchWardOf(f.name, wb), sheets = {};
+                    wb.worksheets.forEach(function(ws) { var md = batchSheetMd(ws.name); if (md && !sheets[md]) sheets[md] = ws; });
+                    _batch.books.push({ name: f.name, ward: ward, sheets: sheets });
+                });
+            });
+        }));
+    }).then(function() {
+        batchStatus(batchSummaryText());
+    }).catch(function(err) { batchStatus("<span style='color:#c0392b;'>⚠️ " + batchEsc(err.message || err) + "</span>"); });
+}
+function onBatchEmrFile(input) {
+    var f = input.files && input.files[0]; if (!f) return;
+    f.arrayBuffer().then(function(buf) {
+        var wb = XLSX.read(new Uint8Array(buf), { type: "array" });
+        var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+        if (!loadEmrRows(rows)) { batchStatus("<span style='color:#c0392b;'>⚠️ 슬립코드/완료자 열을 못 찾았습니다</span>"); return; }
+        _batch.emrAll = globalEmrRows;
+        _batch.emrDateIdx = (globalEmrHeaderRow || []).findIndex(function(c){ return String(c).trim() === "처방일자"; });
+        var span = document.getElementById("emrStatus"); if (span) span.innerText = "✓ EMR 연동 (여러 날짜)";
+        batchStatus(batchSummaryText());
+    });
+}
+function batchRowDate(row) {
+    var v = row && row[_batch.emrDateIdx];
+    var d = parseAnyDate(String(v || ""));
+    return d ? d : null;
+}
+function batchEmrDates() {
+    var seen = {};
+    if (!_batch.emrAll || _batch.emrDateIdx === -1) return seen;
+    _batch.emrAll.forEach(function(row) {
+        var d = batchRowDate(row); if (!d) return;
+        var md = ("0" + d.mo).slice(-2) + "-" + ("0" + d.d).slice(-2);
+        seen[md] = d;
+    });
+    return seen;
+}
+function batchDates() {
+    var emr = batchEmrDates(), out = [];
+    Object.keys(emr).sort().forEach(function(md) {
+        var w = { neuro: null, msk: null };
+        _batch.books.forEach(function(b) { if (b.sheets[md] && !w[b.ward]) w[b.ward] = b.sheets[md]; });
+        if (w.neuro || w.msk) out.push({ md: md, date: emr[md], neuro: w.neuro, msk: w.msk });
+    });
+    return out;
+}
+function batchSummaryText() {
+    var bk = _batch.books.map(function(b){ return (b.ward === "msk" ? "🦴 근골 " : "🧠 신경계 ") + Object.keys(b.sheets).length + "일"; }).join(" · ");
+    var emr = Object.keys(batchEmrDates()).length;
+    var ds = batchDates().map(function(x){ return +x.md.slice(0, 2) + "/" + +x.md.slice(3); });
+    return (bk ? "시간표 " + bk : "시간표 없음") + " · EMR " + (emr ? emr + "일" : "없음") +
+           (ds.length ? " → <b>" + ds.length + "일 집계 가능</b> (" + ds.join(", ") + ")" : "");
+}
+function batchDispatchPaste(id, clip) {
+    var el = document.getElementById(id); if (!el) return;
+    var ev = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, "clipboardData", { value: { getData: function(t){ return /html/i.test(t) ? clip.html : clip.tsv; } } });
+    el.dispatchEvent(ev);
+}
+// 한 날짜를 화면에 올리고 집계까지 돌린다
+function batchLoadDay(day) {
+    doResetBulkPaste();
+    var md = day.md;
+    if (day.neuro) batchDispatchPaste("bulkPasteNeuro", batchSheetToClip(day.neuro));
+    if (day.msk)   batchDispatchPaste("bulkPasteMsk", batchSheetToClip(day.msk));
+    globalEmrRows = _batch.emrAll.filter(function(row) {
+        var d = batchRowDate(row);
+        return d && ("0" + d.mo).slice(-2) + "-" + ("0" + d.d).slice(-2) === md;
+    });
+    emrDateText = day.date.y + "-" + md;
+    resetEmrTherapistAlias(); resetDupLabelCache(); buildEmrPatientNames();
+    clearResultAreas(); renderDateBanner();
+    ptPartStats = {}; ptPartMembers = []; etPartStats = {}; etPartMembers = []; mtPartStats = {}; mtPartMembers = [];
+    debugLogs = { pt:{}, et:{}, mt:{}, ot:{}, st:{}, pain:{} };
+    batchMode = true; batchMsgs = [];
+    var _alert = window.alert, _confirm = window.confirm;
+    window.alert = function(){}; window.confirm = function(){ return true; };
+    try {
+        analyzePtEtMtCombinedMasterLogic();
+        analyzeOtMasterLogic();
+        if (isSectionActive("stGridTable")) analyzeStMasterLogic();
+        analyzePainMasterLogic();
+    } finally { batchMode = false; window.alert = _alert; window.confirm = _confirm; }
+    try { updateErrorCount(); } catch (e) {}
+}
+function batchSumCol(rows, ci) { return (rows || []).reduce(function(a, r){ return a + (typeof r[ci] === "number" ? r[ci] : 0); }, 0); }
+function runBatchStats() {
+    if (!_batch.emrAll) { alert("여러 날짜가 든 EMR 슬립 엑셀을 먼저 넣어 주세요."); return; }
+    if (!_batch.books.length) { alert("월 시간표 엑셀(신경계 · 근골)을 먼저 넣어 주세요."); return; }
+    var days = batchDates();
+    if (!days.length) { alert("시간표 시트 날짜와 EMR 날짜가 겹치는 날이 없습니다."); return; }
+    _batch.results = [];
+    var i = 0;
+    (function next() {
+        if (i >= days.length) { renderBatchResults(); batchStatus(batchSummaryText() + " · ✅ 집계 끝 — 마지막 날(" + +days[days.length-1].md.slice(3) + "일)이 화면에 올라가 있습니다"); return; }
+        var day = days[i];
+        batchStatus("⏳ " + (i + 1) + " / " + days.length + " · " + +day.md.slice(0, 2) + "/" + +day.md.slice(3) + " 집계 중…");
+        setTimeout(function() {
+            var res = { md: day.md, neuro: !!day.neuro, msk: !!day.msk, err: "" };
+            try {
+                batchLoadDay(day);
+                var mm = countMismatches(), by = {};
+                mm.details.forEach(function(d){ by[d.roomLabel] = (by[d.roomLabel] || 0) + 1; });
+                res.total = mm.total; res.by = by;
+                var B = totalsSheetBlocks();
+                res.nsPT = batchSumCol(B.ns, 1); res.osPT = batchSumCol(B.os, 1);
+                res.nsOT = batchSumCol(B.ns, 3); res.osOT = batchSumCol(B.os, 3);
+            } catch (e) { res.err = String(e && e.message || e); }
+            _batch.results.push(res);
+            renderBatchResults();
+            i++; next();
+        }, 30);
+    })();
+}
+function openBatchDay(md) {
+    var day = batchDates().filter(function(x){ return x.md === md; })[0];
+    if (!day) return;
+    batchStatus("⏳ " + +md.slice(0, 2) + "/" + +md.slice(3) + " 불러오는 중…");
+    setTimeout(function() {
+        batchLoadDay(day);
+        batchStatus(batchSummaryText() + " · 📌 지금 화면: <b>" + +md.slice(0, 2) + "/" + +md.slice(3) + "</b>");
+        var a = document.getElementById("errorCountBadge"); if (a && a.scrollIntoView) a.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 30);
+}
+function renderBatchResults() {
+    var el = document.getElementById("batchResultArea"); if (!el) return;
+    var R = _batch.results;
+    if (!R.length) { el.innerHTML = ""; return; }
+    var rooms = [["물리+전기+메디페인","물리"],["작업치료","작업"],["언어치료","언어"],["통증치료","통증"]];
+    var th = "padding:4px 7px;border:1px solid #d5dde5;background:#eef3f8;font-size:12px;white-space:nowrap;height:auto;line-height:1.3;";
+    var td = "padding:3px 7px;border:1px solid #e3e9ee;font-size:12px;text-align:center;height:auto;line-height:1.3;white-space:nowrap;";
+    var h = "<table style='border-collapse:collapse;margin-top:8px;'><tr><th style='" + th + "'>날짜</th><th style='" + th + "'>시간표</th>" +
+        rooms.map(function(x){ return "<th style='" + th + "'>" + x[1] + " 오류</th>"; }).join("") +
+        "<th style='" + th + "'>오류 합계</th><th style='" + th + "'>NS 물리</th><th style='" + th + "'>OS 물리</th><th style='" + th + "'>NS 작업</th><th style='" + th + "'>OS 작업</th><th style='" + th + "'></th></tr>";
+    R.forEach(function(r) {
+        var d = +r.md.slice(0, 2) + "/" + +r.md.slice(3);
+        if (r.err) { h += "<tr><td style='" + td + "'>" + d + "</td><td colspan='10' style='" + td + "color:#c0392b;'>⚠️ " + batchEsc(r.err) + "</td></tr>"; return; }
+        h += "<tr><td style='" + td + "font-weight:700;'>" + d + "</td><td style='" + td + "'>" + [r.neuro ? "신경계" : "", r.msk ? "근골" : ""].filter(Boolean).join("·") + "</td>" +
+            rooms.map(function(x){ var n = r.by[x[0]] || 0; return "<td style='" + td + (n ? "color:#c0392b;font-weight:700;" : "color:#aaa;") + "'>" + n + "</td>"; }).join("") +
+            "<td style='" + td + "font-weight:800;" + (r.total ? "color:#c0392b;" : "color:#27ae60;") + "'>" + r.total + "</td>" +
+            "<td style='" + td + "'>" + r.nsPT + "</td><td style='" + td + "'>" + r.osPT + "</td><td style='" + td + "'>" + r.nsOT + "</td><td style='" + td + "'>" + r.osOT + "</td>" +
+            "<td style='" + td + "'><button class='step-btn' style='padding:3px 10px;font-size:12px;' onclick=\"openBatchDay('" + r.md + "')\">이 날 열기</button></td></tr>";
+    });
+    el.innerHTML = h + "</table>";
 }
 
 function analyzeAllInOne() {

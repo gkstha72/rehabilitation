@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-10 b213</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-10 b214</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3394,7 +3394,18 @@ function staffDeptSets(wardFilter) {
                 Object.keys(names).forEach(function(n) {
                     if (!per[n]) per[n] = { red: false, rows: {}, gray: {} };
                     if (isRed) per[n].red = true;
-                    if (isOs) osName[n] = 1;
+                    // 근골(연하늘색) 칸이라도 하루 종일 "3층"만 적혀 있으면 신경계(3층)에서 일한 것 — 신경계로 센다 (11/7 정철현)
+                    if (isOs) {
+                        var n3 = 0, nOther = 0;
+                        for (var r0 = hr + 1; r0 < hrEnd; r0++) {
+                            if (!slot[r0]) continue;
+                            var e0 = document.getElementById(gid + "-cell-" + r0 + "-" + c);
+                            var v0 = e0 ? e0.value.trim() : "";
+                            if (!v0 || cellValIsBlankOrInvalid(v0)) continue;
+                            if (/^\(?\s*3\s*층\s*\)?$/.test(v0)) n3++; else nOther++;
+                        }
+                        if (!(n3 > 0 && nOther === 0)) osName[n] = 1;
+                    }
                     for (var r = hr + 1; r < hrEnd; r++) {
                         if (!slot[r]) continue;
                         var ce = document.getElementById(gid + "-cell-" + r + "-" + c);

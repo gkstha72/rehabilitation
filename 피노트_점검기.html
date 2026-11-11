@@ -943,9 +943,15 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       var inf = dInfo[key] || ['', '', ''];
       es.forEach(function (e, j) {
         if (used(key, j)) return;
+        // 이미 청구와 짝지어진 기록과 제목.시간.작성자가 같으면 '청구없음'이 아니라 중복 작성이다
+        var dup = false;
+        for (var j2 = 0; j2 < es.length; j2++) {
+          if (j2 === j || !used(key, j2)) continue;
+          if (es[j2].a === e.a && es[j2].s === e.s && es[j2].e === e.e && es[j2].n === e.n) { dup = true; break; }
+        }
         orph.push({
           date: parts[0], chart: parts[1], name: inf[0], ward: inf[1], room: inf[2],
-          title: oneLine(e.t), st: e.s, et: e.e, ther: e.a
+          title: oneLine(e.t), st: e.s, et: e.e, ther: e.a, dup: dup
         });
       });
     });
@@ -971,6 +977,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       }
     }
     orph.forEach(function (o3) {
+      if (o3.dup) return;
       var gnm2 = normName(o3.title), gh3 = hoeOf(o3.title);
       if (!gnm2 || !gh3) return;
       var gk3 = gkey(o3.date, o3.chart, gnm2, gh3);
@@ -1022,7 +1029,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       '시간불일치': '2_기록시간확인', 'PN시간미기재': '2_기록시간확인',
       '명칭확인필요': '3_기록내용확인', '치료사불일치': '3_기록내용확인',
       '회차표기누락': '3_기록내용확인', '시간·명칭불일치': '3_기록내용확인',
-      '청구없음': '4_청구누락', '수량불일치': '5_수량확인', '수량없음': '5_수량확인',
+      '청구없음': '4_청구누락', '중복작성': '3_기록내용확인',
+      '수량불일치': '5_수량확인', '수량없음': '5_수량확인',
       '슬립정보없음': '6_슬립확인', '회차불일치': '7_회차확인', '가산체크확인': '7_회차확인'
     };
 
@@ -1071,11 +1079,14 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     }
     orph.forEach(function (o5) {
       todo.push({
-        type: '청구없음', act: '액팅 누락 여부 확인', cat: CAT['청구없음'],
+        type: o5.dup ? '중복작성' : '청구없음',
+        act: o5.dup ? '중복 기록 확인' : '액팅 누락 여부 확인',
+        cat: CAT[o5.dup ? '중복작성' : '청구없음'],
         date: o5.date, chart: o5.chart, ward: o5.ward, room: o5.room,
         name: o5.name, ther: o5.ther, billed: '', time: '',
         pnTitle: o5.title, pnBy: o5.ther + ' / ' + o5.st + '-' + o5.et,
-        note: 'PN기록만 있고 청구가 없음', rank: 10
+        note: o5.dup ? '같은 내용의 PN기록이 2건 있음' : 'PN기록만 있고 청구가 없음',
+        rank: o5.dup ? 7 : 10
       });
     });
     todo.sort(function (a, b) {
@@ -1139,11 +1150,19 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       }
     }
     orph.forEach(function (o7) {
-      notice.push({
-        date: o7.date, name: o7.name, ther: o7.ther,
-        billed: '(청구 없음) ' + cut(o7.title, 30) + ' (' + o7.st + '-' + o7.et + ')',
-        type: '청구없음', msg: 'PN 기록만 있고 청구가 없습니다.', rank: 5
-      });
+      if (o7.dup) {
+        notice.push({
+          date: o7.date, name: o7.name, ther: o7.ther,
+          billed: cut(o7.title, 30) + ' (' + o7.st + '-' + o7.et + ')',
+          type: '중복작성', msg: '같은 내용의 PN 기록이 2건 있습니다.', rank: 3
+        });
+      } else {
+        notice.push({
+          date: o7.date, name: o7.name, ther: o7.ther,
+          billed: '(청구 없음) ' + cut(o7.title, 30) + ' (' + o7.st + '-' + o7.et + ')',
+          type: '청구없음', msg: 'PN 기록만 있고 청구가 없습니다.', rank: 5
+        });
+      }
     });
     notice.sort(function (a, b) {
       if (a.ther !== b.ther) return a.ther < b.ther ? -1 : 1;
@@ -1181,8 +1200,9 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     });
     codeTable.sort(function (a, b) { return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; });
 
+    var cDup = orph.filter(function (o) { return o.dup; }).length;
     return {
-      rows: R, n: n, cnt: cnt, cntQ: cntQ, orph: orph, todo: todo, notice: notice,
+      rows: R, n: n, cnt: cnt, cntQ: cntQ, orph: orph, todo: todo, notice: notice, cDup: cDup,
       grp: grp, cover: cover, codeTable: codeTable,
       cHoeCode: cHoeCode, cNoPN: cNoPN,
       hasPNCol: C['PN'] >= 0, hasCodeCol: hasCode,
@@ -1326,7 +1346,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       { k: '확인 필요', v: S.todo.length.toLocaleString(), tone: S.todo.length ? 'warn' : 'ok' },
       { k: '기록없음', v: ((c['기록없음'] || 0) + (c['PN기록없음'] || 0)).toLocaleString(), tone: 'bad' },
       { k: '가산체크확인', v: S.cHoeCode.toLocaleString(), tone: S.cHoeCode ? 'warn' : '' },
-      { k: '청구없음', v: S.orph.length.toLocaleString(), tone: S.orph.length ? 'warn' : '' },
+      { k: '청구없음', v: (S.orph.length - (S.cDup || 0)).toLocaleString(), tone: (S.orph.length - (S.cDup || 0)) ? 'warn' : '' },
+      { k: '중복작성', v: (S.cDup || 0).toLocaleString(), tone: (S.cDup || 0) ? 'warn' : '' },
       { k: '빠진 날짜', v: miss.toLocaleString(), tone: miss ? 'bad' : 'ok' }
     ];
     $('#cards').innerHTML = items.map(function (i) {
@@ -1483,7 +1504,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   function tagOf(t) {
     if (t === '기록없음' || t === 'PN기록없음') return '1';
     if (t === '청구없음') return '2';
-    if (t === '가산체크확인' || t === '회차불일치' || t === '회차표기누락') return '3';
+    if (t === '가산체크확인' || t === '회차불일치' || t === '회차표기누락' || t === '중복작성') return '3';
     if (t === '수량불일치' || t === '수량없음') return '4';
     return '5';
   }
@@ -1822,7 +1843,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       (S.hasPNCol ? '<h3>EMR [PN] 표시</h3><table class="t"><tr><td>PN 표시 비어있음</td><td class="num">' + S.cNoPN +
         '</td><td>EMR에서도 기록이 없는 것으로 표시된 청구</td></tr></table>' : '') +
       '<h3>청구 / 기록</h3><table class="t">' +
-      '<tr><td>PN에만 있고 청구 없음</td><td class="num">' + S.orph.length + '</td><td></td></tr>' +
+      '<tr><td>PN에만 있고 청구 없음</td><td class="num">' + (S.orph.length - (S.cDup || 0)) + '</td><td></td></tr>' +
+      '<tr><td>중복 작성</td><td class="num">' + (S.cDup || 0) + '</td><td>이미 청구와 짝지어진 기록과 제목·시간·작성자가 같음</td></tr>' +
       '<tr><td>확인 필요 전체</td><td class="num">' + S.todo.length + '</td><td></td></tr>' +
       '</table></div></div>' +
       '<h3>일자별 검사 현황' + (missing.length ? ' <span class="bad">— 빠진 날짜 ' + missing.length + '일</span>' : '') + '</h3>' +

@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-11 b217</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-12 b218</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -8476,13 +8476,12 @@ function baseEvalText(n) {
 var EVAL_TOKENS = [
     // "간이치매" 처럼 붙여 쓰거나, 간이와 치매가 한 칸에 같이 있으면 묶음 오더로 본다
     { re: /간이[가-힣\s,，·및\+]{0,8}치매|MMSE\s*&?\s*GDS/i, label: "MMSE&GDS" },
-    { re: /신경인지\s*검사|신경인지\s*전체|인지\s*평가|총집합|LOTCA\s*\+/i,  label: "신경인지기능검사(전체)" },
+    // 2026-11-12 기입명: 전체 = "신경인지" · 유형1,2 = "유형1" / "유형2" · 신경행동학적 = "신경행동"
+    //   "신경인지" 뒤에 유형 · 무시가 붙으면 전체가 아니다 (그쪽은 아래 줄에서 잡는다)
+    { re: /신경\s*인지(?![^,，\/\n]*?(유형|무시|개별))(?:\s*기능)?(?:\s*검사)?(?:\s*[-(（]?\s*전체\s*[)）]?)?|인지\s*평가|총집합|LOTCA\s*\+/i, label: "신경인지기능검사(전체)" },
     { re: /무시\s*(증후군)?\s*총집|무시|NEGLECT/i,                            label: "신경인지기능검사-무시증후군 총집" },
-    { re: /유형\s*[1１ⅠI]\s*[,，·]?\s*[2２ⅡI]|유형\s*12|시지각|MVPT|인식력|LOTCA/i, label: "신경인지기능검사 유형1,2" },
-    // "신경인지기능검사" 라고만 적으면 전체 · 유형1,2 · 무시 중 하나 — EMR 오더와 맞춰 본다
-    //   (뒤에 전체 · 유형 · 무시가 붙은 건 위에서 이미 잡힌다)
-    { re: /신경인지\s*기능\s*검사(?!\s*[-(（]?\s*(전체|유형|무시|개별))/,          label: "신경인지기능검사" },
-    { re: /NCSE/i,                                                            label: "신경행동학적 인지기능검사" },
+    { re: /유형\s*[1１ⅠI]\s*[,，·\/]?\s*[2２Ⅱ]|유형\s*12|유형\s*[1-2１２ⅠⅡ]|시지각|MVPT|인식력|LOTCA/i, label: "신경인지기능검사 유형1,2" },
+    { re: /신경\s*행동|NCSE/i,                                                label: "신경행동학적 인지기능검사" },
     { re: /간이\s*인지|MMSE/i,                 label: "간이정신진단검사" },
     { re: /치매\s*척도|GDS/i,                  label: "치매척도검사" },
     { re: /척수\s*척도|SCIM/i,                 label: "일상생활동작검사" },
@@ -9058,16 +9057,7 @@ function analyzeEvalCheck(silent) {
                 var pats   = evalPatientsIn(vv);
                 var who    = dischargeWhoOf(gid, r, c, cols) || "";
                 var slot   = slotMap[r] || "";
-                // "신경인지" 라고만 적으면 어떤 검사인지 알 수 없다.
-                // 조용히 엉뚱한 코드로 보내지 않고 오류로 띄운다.
-                //   신경인지검사(FB000) · 무시(FB004030) · 유형1,2(FB001) · NCSE(FX704)
-                //   같은 칸의 다른 검사(수지 · 후글 …)는 그대로 대조한다.
-                if (/신경인지/.test(vv) &&
-                    !/신경인지\s*(기능\s*)?검사|무시|유형|NCSE/i.test(vv)) {
-                    ambigList.push({ patient: (pats[0] ? pats[0].name : "-"),
-                                     who: who, slot: slot, raw: v });
-                    if (!groups.length) continue;
-                }
+                // (2026-11-12) "신경인지" 라고만 적으면 신경인지기능검사(전체) FB000 — 더는 "확인 필요" 로 띄우지 않는다
                 if (!groups.length && !isNew) {
                     // 평가·검사 표기가 전혀 없는 칸은 평가가 아니다 (예: "고민식" 만 적힌 시행 칸)
                     if (!/평가|검사/.test(vv)) continue;

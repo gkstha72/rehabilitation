@@ -18,11 +18,20 @@
   .sub{color:var(--muted);margin:0 0 14px;font-size:13px}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
   .field{display:grid;gap:4px;margin-bottom:10px}
-  .field label{font-size:12px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
-  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  input,select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--fg);width:100%}
+  .field label{font-size:12px;color:var(--muted);font-weight:600}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+  input,select{font:inherit;height:36px;padding:0 9px;line-height:normal;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--fg);width:100%}
   input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
-  .wd{font-size:12px;color:var(--accent);font-weight:700}
+  .datepick{display:flex;gap:6px}
+  .datepick input{flex:1;min-width:0}
+  .datepick button{height:36px;padding:0 12px;flex:none}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 12px}
+  .chip{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 4px 0 10px;border-radius:14px;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+  .chip button{border:0;background:transparent;color:var(--accent);width:22px;height:22px;padding:0;border-radius:50%;font-size:15px;line-height:1}
+  .chip button:hover{background:#cfe3de}
+  .chips .none{font-size:12px;color:var(--warn);height:28px;display:flex;align-items:center}
+  .s-info dd.long{font-size:14pt;line-height:1.15;word-break:keep-all}
+  .wd{margin-left:4px;font-size:12px;color:var(--accent);font-weight:700}
   table.slots{width:100%;border-collapse:collapse;margin-top:6px}
   table.slots th{font-size:12px;color:var(--muted);text-align:left;padding:4px;border-bottom:1px solid var(--line)}
   table.slots td{padding:3px 4px}
@@ -84,8 +93,11 @@
     <div class="panel">
       <div class="row2">
         <div class="field">
-          <label for="date">휴무 날짜 <span class="wd" id="wdLabel"></span></label>
-          <input type="date" id="date">
+          <label for="date">휴무 날짜</label>
+          <div class="datepick">
+            <input type="date" id="date">
+            <button type="button" id="addDate">추가</button>
+          </div>
         </div>
         <div class="field">
           <label for="role">직종</label>
@@ -94,6 +106,7 @@
           </select>
         </div>
       </div>
+      <div class="chips" id="chips"></div>
       <div class="field">
         <label for="name">치료사 이름</label>
         <input id="name" placeholder="예: 홍길동">
@@ -136,16 +149,48 @@ TIMES.forEach((t,i)=>{
 });
 
 // 엔터로 다음 칸 이동
-const order=["date","role","name"];TIMES.forEach((_,i)=>order.push("r"+i,"p"+i));
+let dates=[];
+const order=["role","name"];TIMES.forEach((_,i)=>order.push("r"+i,"p"+i));
 order.forEach((id,k)=>{
   $(id).addEventListener("keydown",e=>{
     if(e.key==="Enter"){e.preventDefault();const n=$(order[k+1]);if(n){n.focus();n.select&&n.select();}}
   });
 });
 
+const ymd=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const toDate=v=>{const [y,m,d]=v.split("-").map(Number);return new Date(y,m-1,d);};
+const TODAY=ymd(new Date());
 // 기본 날짜: 내일
-(function(){const d=new Date();d.setDate(d.getDate()+1);
-  $("date").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");})();
+(function(){const d=new Date();d.setDate(d.getDate()+1);$("date").value=ymd(d);})();
+
+function addDate(){
+  const v=$("date").value; if(!v) return;
+  if(!dates.includes(v)){dates.push(v);dates.sort();}
+  // 다음 날로 넘겨 두면 연속 휴무 입력이 빠름
+  const n=toDate(v);n.setDate(n.getDate()+1);$("date").value=ymd(n);
+  render();
+}
+$("addDate").onclick=addDate;
+$("date").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addDate();}});
+$("chips").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-d]"); if(!b) return;
+  dates=dates.filter(x=>x!==b.dataset.d); render();
+});
+
+// 날짜 묶음 표시: 연속된 날은 ~ 로, 떨어진 날은 , 로
+function fmtDates(list){
+  if(!list.length) return "";
+  const ds=list.map(toDate);
+  if(ds.length===1){const d=ds[0];return `${d.getMonth()+1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일`;}
+  const runs=[];let cur=[ds[0]];
+  for(let i=1;i<ds.length;i++){
+    if((ds[i]-ds[i-1])/86400000===1) cur.push(ds[i]); else {runs.push(cur);cur=[ds[i]];}
+  }
+  runs.push(cur);
+  let lastM=null;
+  const one=d=>{const m=d.getMonth()+1;const s=(m===lastM?"":m+"월 ")+`${d.getDate()}일(${WD[d.getDay()]})`;lastM=m;return s;};
+  return runs.map(r=>r.length===1?one(r[0]):r.length===2?one(r[0])+", "+one(r[1]):one(r[0])+" ~ "+one(r[r.length-1])).join(", ");
+}
 
 // 저장된 값 불러오기
 try{
@@ -153,7 +198,8 @@ try{
   if(s){
     if(s.role) $("role").value=s.role;
     if(s.name) $("name").value=s.name;
-    if(s.date) $("date").value=s.date;
+    let sd=Array.isArray(s.dates)?s.dates:(s.date?[s.date]:[]);
+    dates=sd.filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)&&x>=TODAY).sort();
     (s.slots||[]).forEach((x,i)=>{if($("r"+i)){$("r"+i).value=x.r||"";$("p"+i).value=x.p||"";}});
     if(typeof s.merge==="boolean") $("merge").checked=s.merge;
   }
@@ -162,7 +208,7 @@ try{
 function save(){
   try{
     localStorage.setItem(KEY,JSON.stringify({
-      role:$("role").value,name:$("name").value,date:$("date").value,
+      role:$("role").value,name:$("name").value,dates,
       merge:$("merge").checked,
       slots:TIMES.map((_,i)=>({r:$("r"+i).value,p:$("p"+i).value}))
     }));
@@ -177,11 +223,10 @@ function roomText(r){
 }
 
 function render(){
-  const dv=$("date").value;
-  let dateStr="", wd="";
-  if(dv){const [y,m,d]=dv.split("-").map(Number);const dt=new Date(y,m-1,d);
-    wd=WD[dt.getDay()]+"요일";dateStr=`${m}월 ${d}일 ${wd}`;}
-  $("wdLabel").textContent=wd;
+  $("chips").innerHTML=dates.length
+    ? dates.map(v=>{const d=toDate(v);return `<span class="chip">${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]})<button type="button" data-d="${v}" aria-label="${v} 삭제">×</button></span>`;}).join("")
+    : `<span class="none">날짜를 고르고 [추가]를 누르세요</span>`;
+  const dateStr=fmtDates(dates);
 
   const role=$("role").value.trim(), name=$("name").value.trim();
 
@@ -215,7 +260,7 @@ function render(){
         <div class="s-left">
           <div class="s-who">${who}</div>
           <dl class="s-info">
-            <div><dt>날짜</dt><dd>${esc(dateStr)}</dd></div>
+            <div><dt>날짜</dt><dd${dateStr.length>15?' class="long"':""}>${esc(dateStr).replace(/((?:\d+월 )?\d+일\([^)]\))/g,'<span style="white-space:nowrap">$1</span>')}</dd></div>
             <div><dt>담당</dt><dd>${esc(role)} ${esc(name)}</dd></div>
             <div class="hl"><dt>치료 시간</dt><dd>${t}</dd></div>
           </dl>
@@ -235,7 +280,7 @@ function render(){
   }
   pv.innerHTML=html;
   $("count").innerHTML=`알림지 <b>${items.length}장</b> · A4 <b>${Math.ceil(items.length/2)}매</b> 인쇄`
-    +(!name?` · <span style="color:var(--warn)">치료사 이름을 입력하세요</span>`:"");
+    +(!dates.length?` · <span style="color:var(--warn)">휴무 날짜를 추가하세요</span>`:"")+(!name?` · <span style="color:var(--warn)">치료사 이름을 입력하세요</span>`:"");
   save();
 }
 

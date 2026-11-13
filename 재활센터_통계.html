@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-12 b218</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-13 b219</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -6585,7 +6585,7 @@ function doResetEmrFile() {
 // 여러 날짜 집계까지 포함해 시간표 · EMR · 결과를 모두 비운다
 function resetBatchAll() {
     if (!confirm("시간표 · EMR · 여러 날짜 집계 결과를 모두 지우시겠습니까?")) return;
-    _batch = { books: [], emrAll: null, emrDateIdx: -1, results: [], loading: 0 };
+    _batch = { books: [], emrAll: null, emrDateIdx: -1, results: [], loading: 0, err: {} };
     ["batchNeuroInput","batchMskInput","batchEmrInput"].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ""; });
     var ra = document.getElementById("batchResultArea"); if (ra) ra.innerHTML = "";
     batchStatus("");
@@ -8068,6 +8068,39 @@ function batchWardOf(fileName, wb) {
     }
     return hit;
 }
+// 엑셀 읽기 — ExcelJS 가 수식(공유 수식 등) 때문에 못 읽으면 수식을 빼고(값은 그대로) 한 번 더 읽는다
+function batchLoadJSZip() {
+    return new Promise(function(res, rej) {
+        if (window.JSZip) return res();
+        var s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+        s.onload = function(){ res(); }; s.onerror = function(){ rej(new Error("JSZip 을 불러오지 못했습니다")); };
+        document.head.appendChild(s);
+    });
+}
+function batchLoadWorkbook(buf) {
+    var wb = new ExcelJS.Workbook();
+    return wb.xlsx.load(buf).then(function(){ return wb; }).catch(function(err1) {
+        console.warn("ExcelJS 1차 실패 — 수식 빼고 다시:", err1);
+        return batchLoadJSZip().then(function() { return JSZip.loadAsync(buf); }).then(function(zip) {
+            var jobs = [];
+            zip.forEach(function(path, entry) {
+                if (!/^xl\/worksheets\/[^\/]+\.xml$/.test(path)) return;
+                jobs.push(entry.async("string").then(function(xml) {
+                    xml = xml.replace(/<f\b[^>]*\/>/g, "").replace(/<f\b[^>]*>[\s\S]*?<\/f>/g, "");
+                    zip.file(path, xml);
+                }));
+            });
+            ["xl/calcChain.xml"].forEach(function(p){ if (zip.file(p)) zip.remove(p); });
+            return Promise.all(jobs).then(function(){ return zip.generateAsync({ type: "arraybuffer" }); });
+        }).then(function(buf2) {
+            var wb2 = new ExcelJS.Workbook();
+            return wb2.xlsx.load(buf2).then(function(){ return wb2; });
+        }).catch(function(err2) {
+            throw new Error("엑셀을 읽지 못했어요 (" + (err1 && err1.message || err1) + ")");
+        });
+    });
+}
 function onBatchTimetableFiles(input, wardFixed) {
     var files = Array.prototype.slice.call(input.files || []);
     if (!files.length) return;
@@ -8075,11 +8108,12 @@ function onBatchTimetableFiles(input, wardFixed) {
     _batch.books = _batch.books.filter(function(b){ return b.ward !== wardFixed; });
     _batch.loading = (_batch.loading || 0) + 1;
     batchStatus("시간표 파일 읽는 중…");
+    _batch.err = _batch.err || {};
+    if (wardFixed) _batch.err[wardFixed] = "";
     batchLoadExcelJS().then(function() {
         return Promise.all(files.map(function(f) {
             return f.arrayBuffer().then(function(buf) {
-                var wb = new ExcelJS.Workbook();
-                return wb.xlsx.load(buf).then(function() {
+                return batchLoadWorkbook(buf).then(function(wb) {
                     var ward = wardFixed || batchWardOf(f.name, wb), sheets = {};
                     wb.worksheets.forEach(function(ws) { var md = batchSheetMd(ws.name); if (md && !sheets[md]) sheets[md] = ws; });
                     _batch.books.push({ name: f.name, ward: ward, sheets: sheets });
@@ -8089,7 +8123,12 @@ function onBatchTimetableFiles(input, wardFixed) {
     }).then(function() {
         _batch.loading--;
         batchStatus(batchSummaryText());
-    }).catch(function(err) { _batch.loading--; batchStatus("<span style='color:#c0392b;'>⚠️ " + batchEsc(err.message || err) + "</span>"); });
+    }).catch(function(err) {
+        _batch.loading--;
+        if (wardFixed) _batch.err[wardFixed] = String(err && err.message || err);
+        console.error("시간표 파일 읽기 오류:", err);
+        batchStatus(batchSummaryText());
+    });
 }
 function onBatchEmrFile(input) {
     var f = input.files && input.files[0]; if (!f) return;
@@ -8129,9 +8168,18 @@ function batchDates() {
 }
 function batchSummaryText() {
     var bk = _batch.books.map(function(b){ return (b.ward === "msk" ? "🦴 근골 " : "🧠 신경계 ") + Object.keys(b.sheets).length + "일"; }).join(" · ");
+    var errs = Object.keys(_batch.err || {}).filter(function(w){ return _batch.err[w]; }).map(function(w) {
+        return "<div style='color:#c0392b;font-weight:700;'>⚠️ " + (w === "msk" ? "🦴 근골" : "🧠 신경계") + " 통합 파일을 못 읽었어요 — " + batchEsc(_batch.err[w]) + "</div>";
+    }).join("");
+    if (errs) return errs + batchSummaryText0(bk);
+    return batchSummaryText0(bk);
+}
+function batchSummaryText0(bk) {
+    var hasN = _batch.books.some(function(b){ return b.ward === "neuro"; }), hasM = _batch.books.some(function(b){ return b.ward === "msk"; });
+    var miss = (_batch.books.length && (!hasN || !hasM)) ? " <span style='color:#c0392b;'>(" + (!hasN ? "신경계" : "근골") + " 파일 없음 — 그쪽은 집계 안 됨)</span>" : "";
     var emr = Object.keys(batchEmrDates()).length;
     var ds = batchDates().map(function(x){ return +x.md.slice(0, 2) + "/" + +x.md.slice(3); });
-    return (bk ? "시간표 " + bk : "시간표 없음") + " · EMR " + (emr ? emr + "일" : "없음") +
+    return (bk ? "시간표 " + bk : "시간표 없음") + miss + " · EMR " + (emr ? emr + "일" : "없음") +
            (ds.length ? " → <b>" + ds.length + "일 집계 가능</b> (" + ds.join(", ") + ")" : "");
 }
 function batchDispatchPaste(id, clip) {

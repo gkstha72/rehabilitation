@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-13 b219</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-13 b220</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -7385,6 +7385,8 @@ function isEvalMemoCell(text) {
     // 시간 표기는 떼고 본다.
     body = body.replace(/\d{1,2}\s*:\s*\d{2}(\s*[-–—>~→]+\s*\d{1,2}\s*:\s*\d{2})?/g, " ")
                .replace(/[-–—>~→]+/g, " ").replace(/\s+/g, " ").trim();
+    // "마정욱S (3층) 514 09:00->11:20" 처럼 병실 번호만 따로 적힌 줄도 떼고 본다
+    body = body.replace(/(^|\s)\d{2,4}\s*호?(?=\s|$)/g, " ").replace(/\s+/g, " ").trim();
     if (body === "") return true;                                  // "(성기용 기립성 혈압검사-단순)"
     if (/[+＋]/.test(body)) return false;                          // "H김태식+알봇"
     // F 는 전기 자리 표기다 (F윤샛별). 빠져 있으면 그 칸이 평가 메모로 잘못 분류된다.

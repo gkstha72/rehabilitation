@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-13 b220</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-13 b221</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -8565,7 +8565,7 @@ var EVAL_TOKENS = [
     { re: /후글|푸글/,                         label: "후글-마이어-평가" },
     { re: /섭식|GUSS/i,                        label: "섭식장애평가" },
     { re: /경직\s*진자/,                       label: "경직진자검사" },
-    { re: /버그|균형/,                         label: "버그균형검사" },
+    { re: /버그\s*균형(?:\s*검사)?|버그|균형/,  label: "버그균형검사" },
     { re: /동적\s*체평형/,                     label: "동적체평형검사" },
     { re: /동적\s*족저압/,                     label: "동적족저압측정" },
     { re: /동작\s*분석/,                       label: "동작분석(생역학검사)" },
@@ -8663,6 +8663,10 @@ function expandEvalLabel(label, free) {
     if (free) {
         var fl = all.filter(function(lb){ return /^\[F\]/.test(lb); });
         if (fl.length) return fl;
+    } else if (/버그/.test(label)) {
+        // 버그균형 기입 규칙 (2026-11-13): "이름 버그균형" = 일반(E6613) · "(프리) 이름 버그균형" = [F](E6613A)
+        var nf = all.filter(function(lb){ return !/^\[F\]/.test(lb); });
+        if (nf.length) return nf;
     }
     return all;
 }

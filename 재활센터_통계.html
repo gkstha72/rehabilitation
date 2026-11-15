@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-15 b227</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-15 b228</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3525,16 +3525,41 @@ function staffDeptSets(wardFilter) {
             if (Math.abs(ttOff - L.off) < 1e-9) { if (n in red) leaveCat[n] = L.cat; return; }
             conflicts.push(n + " — 시간표 " + (n in red ? offLabel(ttOff) + "(빨간 이름)" : "출근(빨간 이름 아님)") +
                            " / 근무표 " + L.cat + "(" + L.off + ")");
-            conflictRows.push({ n: n, d: d, tt: (n in red ? offLabel(ttOff) : "출근"), ttV: ttOff, rs: (L.cat === "공가" ? "휴무(공가)" : L.cat), rsV: L.off });
+            conflictRows.push({ n: n, d: d, tt: (n in red ? offLabel(ttOff) : "출근"), ttV: ttOff, rs: (L.cat === "공가" ? "휴무(공가)" : L.cat), rsV: L.off, rsCat: L.cat });
         });
     });
     if (Object.keys(leave).length) Object.keys(red).forEach(function(n) {
         if (!(n in leave) && red[n] < 1) { conflicts.push(n + " — 시간표 " + offLabel(Math.max(0, 1 - red[n])) + "(빨간 이름) / 근무표에 없음");
-          conflictRows.push({ n: n, d: (n in dep.PT) ? "PT" : (n in dep.OT) ? "OT" : (n in dep.ST) ? "ST" : "", tt: offLabel(Math.max(0, 1 - red[n])), ttV: Math.max(0, 1 - red[n]), rs: "없음", rsV: 0 }); }
+          conflictRows.push({ n: n, d: (n in dep.PT) ? "PT" : (n in dep.OT) ? "OT" : (n in dep.ST) ? "ST" : "", tt: offLabel(Math.max(0, 1 - red[n])), ttV: Math.max(0, 1 - red[n]), rs: "없음", rsV: 0, rsCat: "" }); }
+    });
+    // 다른 사람마다 "맞는 쪽"을 고르면 그 값으로 센다 (기본 = 시간표) — 2026-11-15
+    conflictRows.forEach(function(c) {
+        c.pick = staffConflictPick(c.n);
+        if (c.pick !== "rs" || !c.d || !(c.n in dep[c.d])) return;
+        var onV = Math.max(0, 1 - c.rsV);
+        dep[c.d][c.n] = onV;
+        if (c.rsV > 0) { red[c.n] = onV; if (c.rsCat) leaveCat[c.n] = c.rsCat; }
+        else { delete red[c.n]; delete leaveCat[c.n]; }
     });
     return { PT: dep.PT, OT: dep.OT, ST: dep.ST, red: red, os: osName, visit: visit, elec: elec, leaveCat: leaveCat, leave: leave, conflicts: conflicts, conflictRows: conflictRows };
 }
 function fmtNum(x) { return String(Math.round(x * 100) / 100); }
+// 근무표 ≠ 시간표 일 때 고른 쪽 — 날짜별로 이 브라우저에 기억 ("tt" 시간표 · "rs" 근무표)
+var _staffPick = null;
+function staffPickKey() { return "staffConflictPick_v1"; }
+function staffPickDay() { return String(typeof schedDateText === "string" ? schedDateText : "").trim() || "?"; }
+function staffConflictPick(n) {
+    if (!_staffPick) { try { _staffPick = JSON.parse(localStorage.getItem(staffPickKey()) || "{}") || {}; } catch (e) { _staffPick = {}; } }
+    return (_staffPick[staffPickDay()] || {})[n] || "tt";
+}
+function setStaffConflictPick(n, v) {
+    staffConflictPick(n);
+    var day = staffPickDay();
+    _staffPick[day] = _staffPick[day] || {};
+    _staffPick[day][n] = v;
+    try { localStorage.setItem(staffPickKey(), JSON.stringify(_staffPick)); } catch (e) {}
+    renderStaffCount();
+}
 // ── 전체 근무표 연차자 ─────────────────────────────────────────────
 //   근무표 시트: 날짜 줄(11 12 13 …) 아래 "연차자" 줄에 그날 쉬는 사람이 적혀 있다.
 //   "황보슬 연차" · "정형우연차" · "서지원 오후반차" · "우광식 공가(7/26)" · "강은서(7/19)"(= 휴무) · "한혜수 반차/휴무"
@@ -3886,22 +3911,31 @@ function renderStaffCount(keepFocus) {
         var fmtV = function(v){ return v >= 1 ? "1" : String(v); };
         var cth = "padding:3px 8px;border:1px solid #f1b5ad;background:#fdecea;color:#922b21;font-size:12px;white-space:nowrap;";
         var ctd = "padding:3px 8px;border:1px solid #f5cfc9;font-size:12.5px;white-space:nowrap;background:#fff;color:#2c3e50;font-weight:400;";
-        warn.push("❌ 근무표와 시간표가 다른 사람 " + sets.conflictRows.length + "명 — 인원은 시간표대로 셌어요. 둘 중 틀린 쪽을 고쳐 주세요." +
+        var nPick = sets.conflictRows.filter(function(c){ return c.pick === "rs"; }).length;
+        warn.push("❌ 근무표와 시간표가 다른 사람 " + sets.conflictRows.length + "명 — 맞는 쪽을 누르면 그 값으로 바로 셉니다 (기본은 시간표)." +
             "<table style='border-collapse:collapse;margin-top:5px;'><tr><th style='" + cth + "'>이름</th><th style='" + cth + "'>시간표</th><th style='" + cth + "'>근무표</th><th style='" + cth + "'>지금 인원에 들어간 숫자</th></tr>" +
             sets.conflictRows.map(function(c) {
-                // 툴은 시간표대로 센다 — 출근 (1 − 시간표 휴무) · 연차자 (시간표 휴무)
                 var d = c.d || "PT";
                 var ward = (osSets[d] && c.n in osSets[d]) ? "os" : (visitSets[d] && c.n in visitSets[d]) ? "방문" : "ns";
                 var lvWard = ward === "os" ? "근골" : ward === "방문" ? "방문" : "신경계";
-                var on = Math.max(0, 1 - (c.ttV || 0)), off = c.ttV || 0;
+                var useV = c.pick === "rs" ? (c.rsV || 0) : (c.ttV || 0);
+                var on = Math.max(0, 1 - useV), off = useV;
                 var cnt = [];
                 if (on > 0) cnt.push("출근 " + ward + " " + d + " " + fmtNum(on));
                 if (off > 0) cnt.push("연차자 " + lvWard + " " + d + " " + fmtNum(off));
+                var nm = String(c.n).replace(/'/g, "\\'");
+                function pickCell(kind, label, sub) {
+                    var on2 = c.pick === kind;
+                    return "<td onclick=\"setStaffConflictPick('" + nm + "','" + kind + "')\" title='이쪽이 맞으면 누르세요' style='" + ctd +
+                           "cursor:pointer;" + (on2 ? "background:#d5f5e3;outline:2px solid #1e8449;outline-offset:-2px;font-weight:700;color:#145a32;" : "color:#999;") + "'>" +
+                           (on2 ? "● " : "○ ") + label + (sub ? " <span style='color:#888;font-weight:400;'>(" + sub + ")</span>" : "") + "</td>";
+                }
                 return "<tr><td style='" + ctd + "font-weight:700;'>" + (c.d ? c.d + " " : "") + c.n + "</td>" +
-                       "<td style='" + ctd + "'>" + c.tt + (c.tt !== "출근" ? " <span style='color:#888;'>(" + fmtV(c.ttV) + ")</span>" : "") + "</td>" +
-                       "<td style='" + ctd + "color:#c0392b;font-weight:700;'>" + c.rs + (c.rsV ? " <span style='color:#888;font-weight:400;'>(" + fmtV(c.rsV) + ")</span>" : "") + "</td>" +
+                       pickCell("tt", c.tt, c.tt !== "출근" ? fmtV(c.ttV) : "") +
+                       pickCell("rs", c.rs, c.rsV ? fmtV(c.rsV) : "") +
                        "<td style='" + ctd + "color:#1e8449;'>✔ " + cnt.join(" + ") + "</td></tr>";
-            }).join("") + "</table>");
+            }).join("") + "</table>" +
+            (nPick ? "<div style='font-size:12px;color:#1e8449;font-weight:400;margin-top:3px;'>근무표 기준으로 고른 사람 " + nPick + "명 — 위 숫자 · 복사 · 휴무자 명단에 반영됐어요.</div>" : ""));
     }
     var wa = document.getElementById("staffWarnArea");
     var dw = leaveDateWarning(sets);

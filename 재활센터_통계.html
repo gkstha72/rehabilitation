@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-13 b221</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-15 b222</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3381,13 +3381,21 @@ function staffDeptSets(wardFilter) {
         var per = {};   // 이름 → { red, rows:{r:filled} }
         hdrs.forEach(function(hr, hi) {
             var hrEnd = hi + 1 < hdrs.length ? hdrs[hi + 1] : ROW_COUNT;
+            // 주말 근골(os) 판정: ① 머리글 색(연하늘색)으로 먼저 가르고
+            //   ② 아래쪽 1층 시간표("PT(토) 이예인 … OT(토) 김남준 …" 머리글)에 이름이 있으면 근골로 본다.
+            //   1층 시간표 머리글은 붙여넣으면 같은 머리글 줄 오른쪽에 "PT(토)" 표시와 함께 붙는다 (11/14 머리글 주황색이어도).
+            var osFrom = COL_COUNT;
+            for (var c1 = 1; c1 < COL_COUNT; c1++) {
+                var e1 = document.getElementById(gid + "-cell-" + hr + "-" + c1);
+                if (e1 && /^(PT|OT)\s*\(\s*(토|일)\s*\)$/.test(e1.value.trim())) { osFrom = c1; break; }
+            }
             for (var c = 1; c < COL_COUNT; c++) {
                 var el = document.getElementById(gid + "-cell-" + hr + "-" + c);
                 var v = el ? el.value.trim() : "";
                 if (!v || ignoreHeaders.indexOf(v) !== -1) continue;
                 if (!inWard(gid, c)) continue;
                 var isRed = !!cellFmt(gid, hr, c).r;
-                var isOs = !!cellFmt(gid, hr, c).o;
+                var isOs = !!cellFmt(gid, hr, c).o || c > osFrom;
                 var names = {};
                 v.replace(/\([^)]*\)/g, " ").replace(STAFF_HDR_NOISE, " ").split(/[\s\/,\-]+/).forEach(function(p) {
                     var n = cleanTherapistName(p);

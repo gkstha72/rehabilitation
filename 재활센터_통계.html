@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-15 b225</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-15 b226</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3887,11 +3887,20 @@ function renderStaffCount(keepFocus) {
         var cth = "padding:3px 8px;border:1px solid #f1b5ad;background:#fdecea;color:#922b21;font-size:12px;white-space:nowrap;";
         var ctd = "padding:3px 8px;border:1px solid #f5cfc9;font-size:12.5px;white-space:nowrap;background:#fff;color:#2c3e50;font-weight:400;";
         warn.push("❌ 근무표와 시간표가 다른 사람 " + sets.conflictRows.length + "명 — 인원은 시간표대로 셌어요. 둘 중 틀린 쪽을 고쳐 주세요." +
-            "<table style='border-collapse:collapse;margin-top:5px;'><tr><th style='" + cth + "'>이름</th><th style='" + cth + "'>시간표</th><th style='" + cth + "'>근무표</th></tr>" +
+            "<table style='border-collapse:collapse;margin-top:5px;'><tr><th style='" + cth + "'>이름</th><th style='" + cth + "'>시간표</th><th style='" + cth + "'>근무표</th><th style='" + cth + "'>지금 인원에 들어간 숫자</th></tr>" +
             sets.conflictRows.map(function(c) {
+                // 툴은 시간표대로 센다 — 출근 (1 − 시간표 휴무) · 연차자 (시간표 휴무)
+                var d = c.d || "PT";
+                var ward = (osSets[d] && c.n in osSets[d]) ? "os" : (visitSets[d] && c.n in visitSets[d]) ? "방문" : "ns";
+                var lvWard = ward === "os" ? "근골" : ward === "방문" ? "방문" : "신경계";
+                var on = Math.max(0, 1 - (c.ttV || 0)), off = c.ttV || 0;
+                var cnt = [];
+                if (on > 0) cnt.push("출근 " + ward + " " + d + " " + fmtNum(on));
+                if (off > 0) cnt.push("연차자 " + lvWard + " " + d + " " + fmtNum(off));
                 return "<tr><td style='" + ctd + "font-weight:700;'>" + (c.d ? c.d + " " : "") + c.n + "</td>" +
                        "<td style='" + ctd + "'>" + c.tt + (c.tt !== "출근" ? " <span style='color:#888;'>(" + fmtV(c.ttV) + ")</span>" : "") + "</td>" +
-                       "<td style='" + ctd + "color:#c0392b;font-weight:700;'>" + c.rs + (c.rsV ? " <span style='color:#888;font-weight:400;'>(" + fmtV(c.rsV) + ")</span>" : "") + "</td></tr>";
+                       "<td style='" + ctd + "color:#c0392b;font-weight:700;'>" + c.rs + (c.rsV ? " <span style='color:#888;font-weight:400;'>(" + fmtV(c.rsV) + ")</span>" : "") + "</td>" +
+                       "<td style='" + ctd + "color:#1e8449;'>✔ " + cnt.join(" + ") + "</td></tr>";
             }).join("") + "</table>");
     }
     var wa = document.getElementById("staffWarnArea");

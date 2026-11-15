@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-15 b222</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-15 b223</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -1673,17 +1673,22 @@ else { initOnLoad(); }
                         var tv0 = String((matrix[r2] || [])[tcol] || "").trim();
                         if (/^\d{1,2}:\d{2}/.test(tv0)) { rowEnd = r2; gap = 0; } else gap++;
                     }
-                    var inVisit = false;
+                    var inVisit = false, inElec = false;
                     for (var c = 0; c < hrow.length; c++) {
                         var hv = String(hrow[c] || "").split(/[\n\r]/)[0].trim();
                         if (!hv) continue;
-                        if (/^(방문|재택)/.test(hv)) { inVisit = true; continue; }
-                        if (/^열전기/.test(hv) || (identifyRoom(matrix, c, hr + 1) || {}).id) { inVisit = false; continue; }
+                        if (/^(방문|재택)/.test(hv)) { inVisit = true; inElec = false; continue; }
+                        // 열전기 담당(김나연 · 서연아)이 자기 칸에 적은 환자(H · M · G …)도 건수로 센다 (2026-11-15)
+                        //   ns · os 는 다른 칸과 똑같이 환자(담당의) 기준으로 나뉜다. 인원은 그대로 열전기 칸.
+                        if (/^열전기/.test(hv)) { inVisit = true; inElec = true; continue; }
+                        if ((identifyRoom(matrix, c, hr + 1) || {}).id) { inVisit = false; inElec = false; continue; }
                         if (!inVisit) continue;
                         var n = cleanTherapistName(hv);
                         if (!n) continue;
                         // 인원현황 방문 줄 — 방문재활 구역은 시간 열이 "09:30~10:30" 식이라 구역으로 안 잡힐 때가 있어 여기서 센다
-                        if (!extraStaff[n]) {
+                        if (inElec) {
+                            if (!extraStaff[n]) extraStaff[n] = { v: 1, red: false, visit: false, elec: true };
+                        } else if (!extraStaff[n]) {
                             var _red2 = !!(fmtMatrix && (fmtMatrix[hr] || [])[c] && fmtMatrix[hr][c].r);
                             var _fill2 = [], _mins2 = [];
                             for (var r3 = fr; r3 <= rowEnd; r3++) {
@@ -1703,13 +1708,16 @@ else { initOnLoad(); }
                             });
                         }
                         if (!hasPatient) continue;
-                        var dept = STAFF_VISIT_DEPT[n] || (STAFF_ROSTER_OT.indexOf(n) !== -1 ? "OT" : "PT");
+                        var dept = inElec ? "PT" : (STAFF_VISIT_DEPT[n] || (STAFF_ROSTER_OT.indexOf(n) !== -1 ? "OT" : "PT"));
                         var gid = dept === "OT" ? "otGridTable" : "ptGridTable";
                         if (!gridBuffers[gid]) gridBuffers[gid] = { name: dept === "OT" ? "작업치료" : "물리치료", cols: [], fmts: [] };
                         var subRows = [], subFmt = [];
                         for (var r = hr; r <= rowEnd; r++) {
                             var tv = r === hr ? (dept === "OT" ? "방문OT" : "방문PT") : ((matrix[r] || [])[tcol] || "");
-                            subRows.push([tv, (matrix[r] || [])[c] !== undefined ? matrix[r][c] : ""]);
+                            var cv = (matrix[r] || [])[c] !== undefined ? matrix[r][c] : "";
+                            // 열전기 칸의 "열전기치료" 글자는 환자가 아니다
+                            if (inElec && r > hr && /열전기/.test(String(cv))) cv = String(cv).split(/\r?\n/).filter(function(l){ return !/^\s*열전기/.test(l); }).join("\n");
+                            subRows.push([tv, cv]);
                             subFmt.push([null, fmtMatrix ? ((fmtMatrix[r] || [])[c] || null) : null]);
                         }
                         gridBuffers[gid].cols.push(subRows);

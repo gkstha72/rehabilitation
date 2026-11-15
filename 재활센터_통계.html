@@ -2146,6 +2146,18 @@ function ownersAt(tableId, r, c, cols) {
     return nm.length ? nm : ((cols && cols[c]) ? cols[c] : []);
 }
 
+// 열전기 담당(김나연 · 서연아)의 열전기 실적(H1 압박 · SSP 등)은 통증 대조표에서 맞춘다 —
+//   물리 대조표에는 그 사람 칸에 적은 환자(H · M · G …) 실적만 비교한다.
+function elecStaffSkipPainLabels(emrStats, timeStats) {
+    var ex = window._staffExtraPT || {}, elec = {};
+    Object.keys(ex).forEach(function(w){ Object.keys(ex[w] || {}).forEach(function(n){ if (ex[w][n] && ex[w][n].elec && !ex[w][n].visit) elec[n] = 1; }); });
+    Object.keys(elec).forEach(function(n) {
+        if (!emrStats[n]) return;
+        ["H1", "SSP"].forEach(function(lb) {
+            if (lb in emrStats[n]) emrStats[n][lb] = (timeStats[n] && timeStats[n][lb]) || 0;
+        });
+    });
+}
 function extractMembers(tableId) {
     var colMapping = {}; var members = [];
     for (var c = 1; c < COL_COUNT; c++) {
@@ -2478,6 +2490,7 @@ function analyzePtEtMtCombinedMasterLogic() {
     }
     _pwCtx = null;
     var emrStats = calculateEmrStatsLogic(members, ptOrder, ptMap);
+    elecStaffSkipPainLabels(emrStats, timeStats);
     // 복합운동치료(COMPLEX)는 통증 시간표에 적히기도 하므로 그 칸도 함께 센다
     countComplexFromPainGrid(members, timeStats, debugLog);
     renderMasterParallelTable("ptTripleArea", members, ptOrder, timeStats, emrStats, "물리치료 + 전기 + 메디페인 통합", "pt");
@@ -4243,6 +4256,7 @@ function renderCombinedPtStats(labelText) {
     });
 
     var emrStats = calculateEmrStatsLogic(allMembers, ptOrder, ptMap);
+    elecStaffSkipPainLabels(emrStats, combinedStats);
     countComplexFromPainGrid(allMembers, combinedStats, debugLog);
     renderMasterParallelTable("ptTripleArea", allMembers, ptOrder, combinedStats, emrStats, labelText, "pt");
 }

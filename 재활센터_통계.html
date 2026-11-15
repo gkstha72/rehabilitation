@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-15 b224</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-15 b225</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3856,7 +3856,7 @@ function renderStaffCount(keepFocus) {
             "<tr style='color:#1e8449;'>" + cell("<b>방문</b>") + cell(n(lvVis.PT)) + cell(n(lvVis.OT)) + cell("", BLK) + cell("", BLK) + cell(n(lvVis.PT + lvVis.OT)) + "</tr>" +
             "</table>" +
             "<div style='display:flex;gap:6px;margin-top:8px;'>" +
-            "<button class='step-btn' onclick='copyStaffCount(\"on\")' style='background:#2471a3;border-color:#2471a3;color:#fff;'>📋 출근 (ns · os · 방문) 복사</button>" +
+            "<button class='step-btn' onclick='copyStaffCount(\"on\")' style='background:#2471a3;border-color:#2471a3;color:#fff;'>📋 출근 (ns · os · 방문 · 총 인원) 복사</button>" +
             "<button class='step-btn' onclick='copyStaffCount(\"off\")' style='background:#c0392b;border-color:#c0392b;color:#fff;'>📋 연차자 (신경계 · 근골 · 방문) 복사</button></div>";
 
     var osNames = []; ["PT","OT","ST"].forEach(function(d){ Object.keys(osSets[d]).forEach(function(n){ osNames.push(n); }); });
@@ -3908,7 +3908,8 @@ function copyStaffCount(which) {
     renderStaffCount();
     var c = _staffCnt;
     if (!c) { alert("시간표를 먼저 붙여넣어 주세요."); return; }
-    // 세 줄 × 네 칸(PT · OT · ST/열전기 · 코디). 총 인원 칸은 수식이라 붙이지 않는다. 검은 칸은 비운다.
+    // 출근: 네 줄(ns · os · 방문 · 총 인원) × 네 칸(PT · OT · ST/열전기 · 코디). 연차자: 세 줄. 검은 칸은 비운다.
+    //   총 인원 줄은 통계표에서 수식이 지워지고 숫자(예: 60 · 54)로 남은 날이 있어 같이 붙인다 (2026-11-15).
     function f(x){ return fmtNum(x); }
     var tsv, msg;
     if (which === "off") {
@@ -3919,8 +3920,9 @@ function copyStaffCount(which) {
     } else {
         tsv = [f(c.ns.PT), f(c.ns.OT), f(c.ns.ST), f(c.co)].join("\t") + "\n" +
               [f(c.os.PT), f(c.os.OT), f(c.os.ST), ""].join("\t") + "\n" +
-              [f(c.vis.PT), f(c.vis.OT), "", ""].join("\t");
-        msg = "✅ 출근 인원 복사 완료\n통계표 인원현황 「ns」 줄의 PT 칸에 붙여넣으세요.\n(아래로 os · 방문 줄까지 들어갑니다)";
+              [f(c.vis.PT), f(c.vis.OT), "", ""].join("\t") + "\n" +
+              [f(c.ns.PT + c.os.PT + c.vis.PT), f(c.ns.OT + c.os.OT + c.vis.OT), f(c.ns.ST + c.os.ST), f(c.co)].join("\t");
+        msg = "✅ 출근 인원 복사 완료\n통계표 인원현황 「ns」 줄의 PT 칸에 붙여넣으세요.\n(아래로 os · 방문 · 총 인원 줄까지 들어갑니다)";
     }
     var ta = document.createElement("textarea");
     ta.value = tsv; ta.style.position = "fixed"; ta.style.opacity = "0";

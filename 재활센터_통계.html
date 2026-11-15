@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-15 b226</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-15 b227</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -5192,10 +5192,11 @@ function analyzeSlipDetailLogic() {
 }
 
 // ── ⑤ 같은 환자 · 같은 시간에 치료가 겹쳤는지 ───────────────────────────
-// 1:1 주 치료가 같은 시간에 서로 다른 치료사에게 두 건 이상 잡히면 겹친 것으로 봅니다.
-// 아래는 같은 시간에 함께 나가는 것이 정상이라 겹침으로 보지 않습니다.
-//   메디페인(MZ012*) · 경두개(DF003B) · FES · 로봇(MM304 · MM999) ·
-//   비급여 CR(EX022*) · 평가 · 통증 슬립 · 사회복지사 업무
+// 같은 환자 · 같은 시작 시간에 오더가 두 건 이상이면 겹침 — 치료사가 같아도 (2026-11-15 규칙)
+// 겹침이 아닌 것 (2026-11-15 이다혜 확정):
+//   메디페인(MZ012*) · 로봇 MM304 + 보행치료(MM302 · IM302) 짝 · 사회복지사 업무
+//   통증 처방끼리 · 평가끼리 · 비급여 CR(EX022*) + 특수작업치료 · 경두개 tDCS(DF003*) + 다른 치료
+//   (FES 는 이제 겹침으로 본다 — 11/14 오은자 16:25 특수작업(이지현) + FES(강동희))
 function isParallelOk(code) {
     if (/^MZ012/.test(code)) return true;
     if (code === "DF003B" || code === "DF003A") return true;
@@ -5222,7 +5223,7 @@ function analyzeOverlapLogic() {
         var code = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
         var slip = globalEmrSlipNameIdx !== -1 ? String(row[globalEmrSlipNameIdx]||"").trim() : "";
         if (isNonTherapySlip(code, slip)) return;
-        if (isParallelOk(code)) return;
+        if (/^MZ012/.test(code)) return;                       // 메디페인
         var who = globalEmrTherapistIdx !== -1 ? String(row[globalEmrTherapistIdx]||"").trim()
                                                : String(row[globalEmrNameIdx]||"").trim();
         var k = emrChartOf(row) + "||" + tm;   // 동명이인이 한 사람으로 합쳐지지 않게 차트번호로 묶는다
@@ -5230,18 +5231,43 @@ function analyzeOverlapLogic() {
         groups[k].items.push({ code: code, slip: slip, who: who });
     });
 
+    function ovKind(c) {
+        if (isPainCode(c)) return "pain";
+        if (evalCodeMap[c]) return "eval";
+        if (/^EX022/.test(c)) return "cr";
+        if (/^DF003/.test(c)) return "tdcs";
+        if (/^(MM|IM)113/.test(c)) return "ot";
+        return "x";
+    }
+    function pairOk(a, b) {
+        var ka = ovKind(a), kb = ovKind(b);
+        if (ka === "tdcs" || kb === "tdcs") return true;            // tDCS + 치료
+        if (ka === "pain" && kb === "pain") return true;            // 통증끼리
+        if (ka === "eval" && kb === "eval") return true;            // 평가끼리
+        if ((ka === "cr" && kb === "ot") || (ka === "ot" && kb === "cr")) return true;   // CR + 특수작업
+        return false;
+    }
     var rows = [];
     Object.keys(groups).forEach(function(k) {
         var g = groups[k];
-        var whos = g.items.map(function(x){ return x.who; })
-                          .filter(function(v,i,a){ return a.indexOf(v) === i; });
-        if (whos.length < 2) return;
+        var items = g.items;
+        // 로봇 MM304 는 같은 시간 보행치료와 짝으로 나가는 게 정상
+        if (items.some(function(x){ return /^(MM|IM)302/.test(x.code); }))
+            items = items.filter(function(x){ return x.code !== "MM304"; });
+        if (items.length < 2) return;
+        var bad = false;
+        for (var i = 0; i < items.length && !bad; i++)
+            for (var j = i + 1; j < items.length; j++)
+                if (!pairOk(items[i].code, items[j].code)) { bad = true; break; }
+        if (!bad) return;
+        var whos = items.map(function(x){ return x.who; })
+                        .filter(function(v,i,a){ return a.indexOf(v) === i; });
         rows.push({ patient: g.patient, time: g.time, n: whos.length, whos: whos,
-                    detail: g.items.map(function(x){ return x.slip + " (" + x.who + ")"; }).join("  ·  ") });
+                    detail: items.map(function(x){ return x.slip + " (" + x.who + ")"; }).join("  ·  ") });
     });
     rows.sort(function(a,b){ return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0); });
     rows.forEach(function(r){
-        r.whos.forEach(function(wn){ pushIssue("겹침", wn, r.patient, r.time, "같은 시간에 다른 치료사와 겹침 (" + r.whos.join("·") + ")"); });
+        r.whos.forEach(function(wn){ pushIssue("겹침", wn, r.patient, r.time, r.whos.length > 1 ? "같은 시간에 다른 치료사와 겹침 (" + r.whos.join("·") + ")" : "같은 시간에 오더 두 건 이상"); });
     });
 
     var html = "<h3 class='result-header' style='font-size:17px;border-color:" +

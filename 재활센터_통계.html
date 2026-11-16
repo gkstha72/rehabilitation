@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-15 b228</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-16 b229</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -3398,6 +3398,7 @@ function staffDeptSets(wardFilter) {
     var visit = {};                             // 방문 · 재택 칸 담당 (인원현황 방문 줄)
     var elec = {};                              // 열전기 칸 담당 (인원현황 os 줄 ST/열전기 칸)
     var osName = {};                            // 근골(os) 머리글(연하늘색)로 표시된 사람
+    var redWardRows = [];                       // 주말 빨간 이름(연차) — 신경계 / 근골 고르기
     // ① 물리 · 작업 · 언어 — 열 머리글이 담당
     [["ptGridTable","PT"],["otGridTable","OT"],["stGridTable","ST"]].forEach(function(g) {
         var gid = g[0], slot = buildRowSlotMap(gid), hdrs = headerRowsOf(gid);
@@ -3408,6 +3409,7 @@ function staffDeptSets(wardFilter) {
             //   ② 아래쪽 1층 시간표("PT(토) 이예인 … OT(토) 김남준 …" 머리글)에 이름이 있으면 근골로 본다.
             //   1층 시간표 머리글은 붙여넣으면 같은 머리글 줄 오른쪽에 "PT(토)" 표시와 함께 붙는다 (11/14 머리글 주황색이어도).
             var osFrom = COL_COUNT;
+            var hasMskWard = window._wardCols && Object.keys(window._wardCols).some(function(g2){ return window._wardCols[g2].some(function(x){ return x.ward === "msk"; }); });
             for (var c1 = 1; c1 < COL_COUNT; c1++) {
                 var e1 = document.getElementById(gid + "-cell-" + hr + "-" + c1);
                 if (e1 && /^(PT|OT)\s*\(\s*(토|일)\s*\)$/.test(e1.value.trim())) { osFrom = c1; break; }
@@ -3424,6 +3426,19 @@ function staffDeptSets(wardFilter) {
                     var n = cleanTherapistName(p);
                     if (n && n.length >= 2) names[n] = 1;
                 });
+                // 평일 근골 시간표 머리글에 나온 사람은 기억해 둔다
+                if (wardOfCol(gid, c) === "msk") Object.keys(names).forEach(function(n){ mskStaffLearn(n); });
+                // ③ 주말: 연차라 이름 칸이 빨간색이면 하늘색이 안 보인다 (11/15 정철현).
+                //   기본값 = 지난 평일 근골 시간표에 2번 이상 나온 사람이면 근골. 화면에서 눌러 바꿀 수 있다 (사람마다 다름).
+                else if (isRed && !isOs && !hasMskWard) {
+                    var rn = Object.keys(names)[0];
+                    if (rn) {
+                        var auto = mskStaffKnown(rn), pk = redWardPick(rn);
+                        var toOs = pk ? pk === "os" : auto;
+                        if (!redWardRows.some(function(x){ return x.n === rn; })) redWardRows.push({ n: rn, d: g[1], auto: auto, os: toOs, pick: pk });
+                        if (toOs) isOs = true;
+                    }
+                }
                 Object.keys(names).forEach(function(n) {
                     if (!per[n]) per[n] = { red: false, rows: {}, gray: {} };
                     if (isRed) per[n].red = true;
@@ -3541,9 +3556,54 @@ function staffDeptSets(wardFilter) {
         if (c.rsV > 0) { red[c.n] = onV; if (c.rsCat) leaveCat[c.n] = c.rsCat; }
         else { delete red[c.n]; delete leaveCat[c.n]; }
     });
-    return { PT: dep.PT, OT: dep.OT, ST: dep.ST, red: red, os: osName, visit: visit, elec: elec, leaveCat: leaveCat, leave: leave, conflicts: conflicts, conflictRows: conflictRows };
+    return { PT: dep.PT, OT: dep.OT, ST: dep.ST, red: red, os: osName, visit: visit, elec: elec, leaveCat: leaveCat, leave: leave, conflicts: conflicts, conflictRows: conflictRows, redWardRows: redWardRows };
 }
 function fmtNum(x) { return String(Math.round(x * 100) / 100); }
+// 근골 치료사 — 명단을 고정해 두지 않고, 평일 근골 시간표 머리글에 나온 이름을 날짜별로 이 브라우저에 기억한다.
+//   주말에 연차(빨간 이름)라 하늘색 표시가 없는 근골 선생님을, 그 주말 직전 평일 근골 시간표에 있었으면 근골로 센다.
+//   (근골 명단은 매번 바뀌므로 가장 가까운 앞 평일 것만 본다 — 11/9 하루 근골에 들어간 윤혜미 같은 경우를 막음)
+var _mskStaff = null;
+function mskDayKey() {
+    var d = parseAnyDate(typeof schedDateText === "string" ? schedDateText : "");
+    return d ? d.y + "-" + ("0" + d.mo).slice(-2) + "-" + ("0" + d.d).slice(-2) : "";
+}
+function mskStaffLoad() {
+    if (_mskStaff) return _mskStaff;
+    try { _mskStaff = JSON.parse(localStorage.getItem("mskStaffByDay_v1") || "{}") || {}; } catch (e) { _mskStaff = {}; }
+    return _mskStaff;
+}
+function mskStaffLearn(n) {
+    var k = mskDayKey(); if (!k) return;
+    var m = mskStaffLoad();
+    m[k] = m[k] || [];
+    if (m[k].indexOf(n) !== -1) return;
+    m[k].push(n);
+    var ks = Object.keys(m).sort();
+    while (ks.length > 40) delete m[ks.shift()];
+    try { localStorage.setItem("mskStaffByDay_v1", JSON.stringify(m)); } catch (e) {}
+}
+function mskStaffKnown(n) {
+    var k = mskDayKey(); if (!k) return false;
+    var m = mskStaffLoad();
+    var prev = Object.keys(m).filter(function(x){ return x < k; }).sort().slice(-5);   // 바로 앞 평일 5일
+    var b = String(n).replace(/\d+$/, ""), hit = 0;
+    prev.forEach(function(x){ var L = m[x] || []; if (L.indexOf(n) !== -1 || L.indexOf(b) !== -1) hit++; });
+    return hit >= 2;   // 하루만 들어간 대체 인력(11/9 윤혜미)은 근골로 보지 않는다
+}
+// 주말 빨간 이름 — 신경계 / 근골 고른 것 (날짜별로 이 브라우저에 기억)
+var _redWardPick = null;
+function redWardPick(n) {
+    if (!_redWardPick) { try { _redWardPick = JSON.parse(localStorage.getItem("staffRedWardPick_v1") || "{}") || {}; } catch (e) { _redWardPick = {}; } }
+    return (_redWardPick[staffPickDay()] || {})[n] || "";
+}
+function setRedWardPick(n, v) {
+    redWardPick(n);
+    var day = staffPickDay();
+    _redWardPick[day] = _redWardPick[day] || {};
+    _redWardPick[day][n] = v;
+    try { localStorage.setItem("staffRedWardPick_v1", JSON.stringify(_redWardPick)); } catch (e) {}
+    renderStaffCount();
+}
 // 근무표 ≠ 시간표 일 때 고른 쪽 — 날짜별로 이 브라우저에 기억 ("tt" 시간표 · "rs" 근무표)
 var _staffPick = null;
 function staffPickKey() { return "staffConflictPick_v1"; }
@@ -3937,10 +3997,26 @@ function renderStaffCount(keepFocus) {
             }).join("") + "</table>" +
             (nPick ? "<div style='font-size:12px;color:#1e8449;font-weight:400;margin-top:3px;'>근무표 기준으로 고른 사람 " + nPick + "명 — 위 숫자 · 복사 · 휴무자 명단에 반영됐어요.</div>" : ""));
     }
+    if (nOn && sets.redWardRows && sets.redWardRows.length) {
+        var rth = "padding:3px 8px;border:1px solid #c9d8e8;background:#eef5fb;color:#1f4e79;font-size:12px;white-space:nowrap;";
+        var rtd = "padding:3px 8px;border:1px solid #d6e4f0;font-size:12.5px;white-space:nowrap;background:#fff;color:#2c3e50;";
+        warn.push("🔴 주말 빨간 이름(연차) " + sets.redWardRows.length + "명 — 연차자로 들어갈 구역이 맞는지 보고, 틀리면 눌러서 바꾸세요." +
+            "<table style='border-collapse:collapse;margin-top:5px;'><tr><th style='" + rth + "'>이름</th><th style='" + rth + "'>신경계</th><th style='" + rth + "'>근골</th></tr>" +
+            sets.redWardRows.map(function(r) {
+                var nm = String(r.n).replace(/'/g, "\\'");
+                function cellPick(kind, label) {
+                    var on2 = (kind === "os") === !!r.os;
+                    return "<td onclick=\"setRedWardPick('" + nm + "','" + kind + "')\" title='이쪽이 맞으면 누르세요' style='" + rtd + "cursor:pointer;" +
+                           (on2 ? "background:#d5f5e3;outline:2px solid #1e8449;outline-offset:-2px;font-weight:700;color:#145a32;" : "color:#999;") + "'>" + (on2 ? "● " : "○ ") + label + "</td>";
+                }
+                return "<tr><td style='" + rtd + "font-weight:700;'>" + r.d + " " + r.n + (r.pick ? "" : " <span style='color:#999;font-weight:400;font-size:11px;'>(" + (r.auto ? "지난주 근골 시간표에 있음" : "자동") + ")</span>") + "</td>" +
+                       cellPick("ns", "신경계 연차자") + cellPick("os", "근골 연차자") + "</tr>";
+            }).join("") + "</table>");
+    }
     var wa = document.getElementById("staffWarnArea");
     var dw = leaveDateWarning(sets);
     if (dw) warn = warn.filter(function(x){ return x.indexOf("❌ 근무표와 시간표") !== 0; }), warn.unshift(dw);   // 날짜가 다르면 이름 대조는 의미 없음
-    if (wa) wa.innerHTML = warn.map(function(x){ return /^❌/.test(x) ? "<div style='color:#c0392b;font-weight:700;'>" + x + "</div>" : "<div>⚠️ " + x + "</div>"; }).join("");
+    if (wa) wa.innerHTML = warn.map(function(x){ return /^❌/.test(x) ? "<div style='color:#c0392b;font-weight:700;'>" + x + "</div>" : /^🔴/.test(x) ? "<div style='color:#1f4e79;font-weight:700;margin-top:6px;'>" + x + "</div>" : "<div>⚠️ " + x + "</div>"; }).join("");
     var oa = document.getElementById("staffOffArea");
     if (oa) oa.innerHTML = "<div class='sp-h' style='color:#c0392b;'>🗓 휴무자" +
         "<button class='step-btn sp-btn' onclick='copyStaffOff()' style='background:#c0392b;border-color:#c0392b;color:#fff;'>📋 복사</button></div>" +

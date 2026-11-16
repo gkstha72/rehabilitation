@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-16 b231</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-16 b232</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -6559,7 +6559,7 @@ function renderDateBanner() {
 // ── 외래 환자 명단 뽑기 ────────────────────────────────────────────────
 // 일일업무보고 환자현황 칸에 그대로 붙여넣을 수 있게 다섯 명씩 줄바꿈해서 보여 준다.
 var outpatientText = "";
-var outpatientForm = { both: "" };
+var outpatientForm = { both: "", html: "" };
 // 외래 환자 ns / os (2026-11-16)
 //   · 방문재활치료(IA87x · 「방문재활」) 받는 외래 환자는 뺀다
 //   · 받는 오더로 나눈다 — 물리치료(열 · 전기 · 한냉 등 통증 처방) · 도수(KR001) · 복합(MM102)만 받으면 os, 그 밖의 치료가 하나라도 있으면 ns
@@ -6598,7 +6598,10 @@ function showOutpatientList() {
     function five(a){ var L = []; for (var i = 0; i < a.length; i += 5) L.push(a.slice(i, i + 5).join(" ")); return L.join("\n"); }
     outpatientText = ns.concat(os).join(" ");
     // 통계표 외래 칸 (ns 줄 · os 줄 오른쪽 한 칸씩) — ns 칸에 붙이면 두 줄이 들어간다
-    outpatientForm.both = ns.join(" ") + "\n" + os.join(" ");
+    // 통계표 외래 칸: 「ns (17)」 · 명단 / 「os (4)」 · 명단 — 두 줄 × 두 칸, 「ns」 칸에 붙인다 (2026-11-16)
+    outpatientForm.both = "\"ns\n(" + ns.length + ")\"\t" + ns.join(" ") + "\n\"os\n(" + os.length + ")\"\t" + os.join(" ");
+    outpatientForm.html = "<table><tr><td>ns<br>(" + ns.length + ")</td><td>" + ns.join(" ") + "</td></tr>" +
+                          "<tr><td>os<br>(" + os.length + ")</td><td>" + os.join(" ") + "</td></tr></table>";
     function block(title, color, list) {
         return "<div style='margin-top:6px;'><div style='font-weight:700;color:" + color + ";'>" + title + " " + list.length + "명</div>" +
             "<pre style='margin:2px 0 0;font-family:\"Malgun Gothic\",sans-serif;font-size:13.5px;line-height:1.7;white-space:pre-wrap;color:#222;'>" + (five(list) || "(없음)") + "</pre></div>";
@@ -6613,13 +6616,21 @@ function showOutpatientList() {
         "</div>";
 }
 function copyOutpatientForm(ward) {
-    var t = outpatientForm[ward || "both"];
+    var t = outpatientForm[ward || "both"], html = outpatientForm.html || "";
     if (!t) return alert("외래 명단을 먼저 뽑아 주세요.");
+    // 글자 + 표(HTML) 둘 다 넣는다 — 시트가 칸 안 줄바꿈("ns" ↵ "(17)")을 그대로 받는다
+    var onCopy = function(e) {
+        e.clipboardData.setData("text/plain", t);
+        if (html) e.clipboardData.setData("text/html", html);
+        e.preventDefault();
+    };
     var ta = document.createElement("textarea");
     ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); alert("✅ 외래 복사 완료\n통계표 외래 「ns」 오른쪽 칸에 붙여넣으면 아래 「os」 칸까지 들어갑니다."); }
+    document.addEventListener("copy", onCopy);
+    try { document.execCommand("copy"); alert("✅ 외래 복사 완료\n통계표 외래 「ns」 칸에 붙여넣으면 「ns (인원)」 · 명단, 아래 「os (인원)」 · 명단까지 들어갑니다."); }
     catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
+    document.removeEventListener("copy", onCopy);
     document.body.removeChild(ta);
 }
 function copyOutpatientList() {

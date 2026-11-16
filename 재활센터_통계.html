@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-16 b229</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-16 b230</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -6559,45 +6559,67 @@ function renderDateBanner() {
 // ── 외래 환자 명단 뽑기 ────────────────────────────────────────────────
 // 일일업무보고 환자현황 칸에 그대로 붙여넣을 수 있게 다섯 명씩 줄바꿈해서 보여 준다.
 var outpatientText = "";
+var outpatientForm = { ns: "", os: "" };
+// 외래 환자 ns / os (2026-11-16)
+//   · 방문재활치료(IA87x · 「방문재활」) 받는 외래 환자는 뺀다
+//   · 받는 오더로 나눈다 — 물리치료(열 · 전기 · 한냉 등 통증 처방) · 도수(KR001) · 복합(MM102)만 받으면 os, 그 밖의 치료가 하나라도 있으면 ns
+function outpatientIsOsCode(code) {
+    return isPainCode(code) || /^KR001/.test(code) || /^MM102/.test(code);
+}
 function showOutpatientList() {
     var area = document.getElementById("outpatientArea");
     if (!area) return;
     if (!globalEmrRows || globalEmrRows.length === 0) return alert("EMR 엑셀 파일을 먼저 연동해 주세요.");
     if (globalEmrVisitIdx === -1) return alert("슬립 리스트에서 '외래/입원' 열을 찾지 못했습니다.");
 
-    var seen = {}, names = [];
+    var pts = {}, order = [];
     globalEmrRows.forEach(function(row) {
         if (!row) return;
         if (String(row[globalEmrVisitIdx]||"").trim() !== "외래") return;
+        if (globalEmrDcIdx !== -1 && String(row[globalEmrDcIdx]||"").trim() !== "") return;
         var nm = String(row[globalEmrPatientIdx]||"").trim();
-        if (!nm || seen[nm]) return;
-        seen[nm] = true; names.push(nm);
+        if (!nm) return;
+        var code = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
+        var slip = globalEmrSlipNameIdx !== -1 ? String(row[globalEmrSlipNameIdx]||"").trim() : "";
+        if (!pts[nm]) { pts[nm] = { visit: false, other: false, physio: false }; order.push(nm); }
+        var p = pts[nm];
+        if (/^IA87/.test(code) || /방문재활/.test(slip)) { p.visit = true; return; }
+        if (isNonTherapySlip(code, slip)) return;
+        if (outpatientIsOsCode(code)) p.physio = true; else p.other = true;
     });
-    names.sort(function(a,b){ return a.localeCompare(b, "ko"); });
-
-    var lines = [];
-    for (var i = 0; i < names.length; i += 5) lines.push(names.slice(i, i + 5).join(" "));
-    outpatientText = lines.join("\n");
-    outpatientFormText = names.length + "\t\"" + names.join(" ") + "\"";
-
+    var ns = [], os = [], visit = [];
+    order.forEach(function(nm) {
+        var p = pts[nm];
+        if (p.visit) { visit.push(nm); return; }
+        if (p.physio && !p.other) os.push(nm); else ns.push(nm);
+    });
+    function srt(a){ return a.sort(function(x,y){ return x.localeCompare(y, "ko"); }); }
+    srt(ns); srt(os); srt(visit);
+    function five(a){ var L = []; for (var i = 0; i < a.length; i += 5) L.push(a.slice(i, i + 5).join(" ")); return L.join("\n"); }
+    outpatientText = ns.concat(os).join(" ");
+    outpatientForm.ns = ns.length + "\t\"" + ns.join(" ") + "\"";
+    outpatientForm.os = os.length + "\t\"" + os.join(" ") + "\"";
+    function block(title, color, list, ward) {
+        return "<div style='margin-top:6px;'><div style='font-weight:700;color:" + color + ";'>" + title + " " + list.length + "명" +
+            (list.length ? " <button class='btn-copy' style='margin-left:6px;padding:2px 9px;font-size:12px;background:" + color + ";' onclick='copyOutpatientForm(\"" + ward + "\")'>&#128203; 양식 복사 (인원 + 명단)</button>" : "") +
+            "</div><pre style='margin:2px 0 0;font-family:\"Malgun Gothic\",sans-serif;font-size:13.5px;line-height:1.7;white-space:pre-wrap;color:#222;'>" + (five(list) || "(없음)") + "</pre></div>";
+    }
     area.style.display = "block";
     area.innerHTML =
         "<div style='border:1px solid #2980b9;border-radius:6px;padding:9px 11px;background:#eaf2f8;'>" +
-        "<div style='font-weight:700;color:#1f618d;margin-bottom:6px;'>외래 " + names.length + "명" +
-        " <button class='btn-copy' style='margin-left:8px;padding:3px 10px;font-size:12px;' " +
-        "onclick='copyOutpatientList()'>&#128203; 명단만 복사</button>" +
-        " <button class='btn-copy' style='margin-left:4px;padding:3px 10px;font-size:12px;background:#2980b9;' " +
-        "onclick='copyOutpatientForm()'>&#128203; 양식 복사 (인원 + 명단)</button></div>" +
-        "<pre style='margin:0;font-family:\"Malgun Gothic\",sans-serif;font-size:13.5px;line-height:1.7;" +
-        "white-space:pre-wrap;color:#222;'>" + (outpatientText || "(없음)") + "</pre></div>";
+        "<div style='font-weight:700;color:#1f618d;'>외래 " + (ns.length + os.length) + "명" +
+        (visit.length ? " <span style='font-weight:400;color:#777;font-size:12px;'>· 방문재활 " + visit.length + "명 제외 (" + visit.join(", ") + ")</span>" : "") + "</div>" +
+        block("ns (신경계)", "#1f618d", ns, "ns") +
+        block("os (근골 — 물리치료 · 도수만)", "#7d3c98", os, "os") +
+        "</div>";
 }
-var outpatientFormText = "";
-function copyOutpatientForm() {
-    if (!outpatientFormText) return alert("외래 명단을 먼저 뽑아 주세요.");
+function copyOutpatientForm(ward) {
+    var t = outpatientForm[ward || "ns"];
+    if (!t) return alert("외래 명단을 먼저 뽑아 주세요.");
     var ta = document.createElement("textarea");
-    ta.value = outpatientFormText; ta.style.position = "fixed"; ta.style.opacity = "0";
+    ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); alert("✅ 외래 양식 복사 완료\n통계표 외래 인원 칸에 붙여넣으면 옆 칸에 명단이 들어갑니다."); }
+    try { document.execCommand("copy"); alert("✅ 외래 " + (ward === "os" ? "os" : "ns") + " 양식 복사 완료\n통계표 외래 인원 칸에 붙여넣으면 옆 칸에 명단이 들어갑니다."); }
     catch (e) { alert("복사 실패! 다시 눌러 주세요."); }
     document.body.removeChild(ta);
 }

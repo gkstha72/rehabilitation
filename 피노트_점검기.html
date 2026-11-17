@@ -204,7 +204,7 @@ label.cb{gap:7px}
 
   <nav class="tabs">
     <button class="tab on" data-t="notice">공지용</button>
-    <button class="tab" data-t="group">회차건수대조</button>
+    <button class="tab" data-t="group">건수대조</button>
     <button class="tab" data-t="todo">확인필요</button>
     <button class="tab" data-t="result">검사결과</button>
     <button class="tab" data-t="sum">요약</button>
@@ -232,9 +232,11 @@ label.cb{gap:7px}
 
   <section class="pane" id="p-group" hidden>
     <div class="bar">
-      <span class="n">심사과가 보는 방식(<b>4--3</b>)으로, 환자·날짜·치료·회차를 묶어 청구 건수와 기록 건수를 맞춰 봅니다.</span>
+      <span class="n">환자·날짜·치료사·치료 단위로 <b>넘긴 액팅 건수</b>와 <b>쓴 PN 기록 수</b>를 맞춰 봅니다.</span>
       <span class="sp"></span><span class="n" id="gCount"></span>
     </div>
+    <div id="cmpBody" class="scroll"></div>
+    <h3>회차건수대조 <span class="hint" style="font-weight:400">— 심사과가 보는 방식(<b>4--3</b>)</span></h3>
     <div id="groupBody" class="scroll"></div>
   </section>
 
@@ -660,6 +662,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
     // === 3-1단계 : 기본 정보 + 수량 검사 ===
     var R = new Array(n), aKey = [], aNm = [], aNm2 = [], aTh = [], aSs = [], aEe = [];
+    var dKeyRows = {};
     var aHit = [], aStat = [], aMemo = [], aSkip = [], aEval = [], dOwn = {};
     var cntQ = {};
 
@@ -673,6 +676,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       var slip = String(f(r, '슬립명칭'));
 
       aKey[i] = key; aNm[i] = sNm; aTh[i] = sTh; aSs[i] = sS; aEe[i] = sE;
+      if (!dKeyRows[key]) dKeyRows[key] = [];
+      dKeyRows[key].push(i);
       aNm2[i] = normName(slip);
       aEval[i] = kwHit(slip + ' ' + f(r, '세부명칭'), evalList);
       aHit[i] = 0; aStat[i] = ''; aMemo[i] = ''; aSkip[i] = false;
@@ -934,6 +939,75 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       cnt[aStat[i]] = (cnt[aStat[i]] || 0) + 1;
     }
 
+    // === 4-9단계 : 액팅 건수 ↔ PN 건수 대조 ===
+    //   치료사.치료 단위로 넘긴 건수와 쓴 기록 수를 세어, 남는 기록이
+    //   '액팅을 아예 안 한 것'인지 '기록을 더 쓴 것'인지 가린다.
+    var cmp = [], noteBk = {};
+    Object.keys(dKeyRows).forEach(function (key) {
+      var idxs = dKeyRows[key], es = dEnt[key] || [], bks = [], bi, b;
+      var parts = key.split('|'), inf = dInfo[key] || ['', '', ''];
+
+      idxs.forEach(function (i3) {
+        if (aSkip[i3]) return;
+        b = null;
+        for (bi = 0; bi < bks.length; bi++) {
+          if (bks[bi].ther === aTh[i3] && bks[bi].nm === aNm[i3]) { b = bks[bi]; break; }
+        }
+        if (!b) {
+          b = { ther: aTh[i3], nm: aNm[i3], nm2: aNm2[i3], item: R[i3].item,
+                ev: aEval[i3], acts: [], notes: [] };
+          bks.push(b);
+        }
+        b.acts.push(i3);
+      });
+
+      es.forEach(function (en, j) {
+        b = null;
+        for (bi = 0; bi < bks.length; bi++) {
+          if (bks[bi].ther !== en.a) continue;
+          if (bks[bi].acts.length && !nameMatchEnt(bks[bi].nm, bks[bi].nm2, en, bks[bi].ev)) continue;
+          if (!bks[bi].acts.length && bks[bi].nm !== en.n) continue;
+          b = bks[bi]; break;
+        }
+        if (!b) {
+          b = { ther: en.a, nm: en.n, nm2: '', item: cut(en.t, 24), ev: false, acts: [], notes: [] };
+          bks.push(b);
+        }
+        b.notes.push(j);
+        noteBk[key + '\u0002' + j] = b;
+      });
+
+      bks.forEach(function (bk) {
+        //  기록된 건수 = 짝이 맞은 액팅 + 짝이 없는 남은 기록
+        //  (모달리티 묶음처럼 기록 하나가 여러 액팅을 덮는 경우를 그대로 인정한다)
+        var done = 0, k3;
+        for (k3 = 0; k3 < bk.acts.length; k3++) if (aHit[bk.acts[k3]] > 0) done++;
+        var extra = 0;
+        for (k3 = 0; k3 < bk.notes.length; k3++) if (!used(key, bk.notes[k3])) extra++;
+        var pnN = done + extra;
+        if (bk.acts.length === pnN) return;
+        cmp.push({
+          date: parts[0], chart: parts[1], name: inf[0], ther: bk.ther,
+          item: cut(bk.item, 24),
+          act: bk.acts.length, pn: pnN,
+          actTime: bk.acts.map(function (x) { return R[x].st + '-' + R[x].et; }).join(', '),
+          pnTime: bk.notes.map(function (x) { return es[x].s + '-' + es[x].e; }).join(', '),
+          note: bk.acts.length === 0
+            ? '액팅이 없는데 PN 기록만 ' + pnN + '건 있습니다.'
+            : pnN === 0
+              ? '액팅 ' + bk.acts.length + '건인데 PN 기록이 없습니다.'
+              : bk.acts.length > pnN
+                ? '액팅 ' + bk.acts.length + '건 중 ' + pnN + '건만 기록되어 있습니다.'
+                : 'PN 기록이 액팅보다 ' + (pnN - bk.acts.length) + '건 많습니다.'
+        });
+      });
+    });
+    cmp.sort(function (a, b2) {
+      if (a.date !== b2.date) return a.date < b2.date ? -1 : 1;
+      if (a.ther !== b2.ther) return a.ther < b2.ther ? -1 : 1;
+      return a.name < b2.name ? -1 : a.name > b2.name ? 1 : 0;
+    });
+
     // === 5단계 : PN에만 있는 기록 ===
     var orph = [];
     Object.keys(dEnt).forEach(function (key) {
@@ -949,9 +1023,15 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
           if (j2 === j || !used(key, j2)) continue;
           if (es[j2].a === e.a && es[j2].s === e.s && es[j2].e === e.e && es[j2].n === e.n) { dup = true; break; }
         }
+        var bk = noteBk[key + '\u0002' + j];
+        var act = bk ? bk.acts.length : 0;
+        var pnN = bk ? bk.notes.length : 1;
         orph.push({
           date: parts[0], chart: parts[1], name: inf[0], ward: inf[1], room: inf[2],
-          title: oneLine(e.t), st: e.s, et: e.e, ther: e.a, dup: dup
+          title: oneLine(e.t), st: e.s, et: e.e, ther: e.a, dup: dup,
+          kind: dup ? '중복작성' : (act === 0 ? '청구없음' : '기록초과'),
+          act: act, pn: pnN,
+          actTime: bk ? bk.acts.map(function (x) { return R[x].st + '-' + R[x].et; }).join(', ') : ''
         });
       });
     });
@@ -1029,7 +1109,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       '시간불일치': '2_기록시간확인', 'PN시간미기재': '2_기록시간확인',
       '명칭확인필요': '3_기록내용확인', '치료사불일치': '3_기록내용확인',
       '회차표기누락': '3_기록내용확인', '시간·명칭불일치': '3_기록내용확인',
-      '청구없음': '4_청구누락', '중복작성': '3_기록내용확인',
+      '청구없음': '4_청구누락', '중복작성': '3_기록내용확인', '기록초과': '3_기록내용확인',
       '수량불일치': '5_수량확인', '수량없음': '5_수량확인',
       '슬립정보없음': '6_슬립확인', '회차불일치': '7_회차확인', '가산체크확인': '7_회차확인'
     };
@@ -1077,16 +1157,22 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         });
       }
     }
+    var ORPH_ACT = { '중복작성': '중복 기록 확인', '기록초과': '기록 건수 확인', '청구없음': '액팅 누락 여부 확인' };
+    var ORPH_NOTE = {
+      '중복작성': function (o) { return '같은 내용의 PN기록이 ' + o.pn + '건 있음'; },
+      '기록초과': function (o) { return '액팅 ' + o.act + '건(' + o.actTime + ') / PN기록 ' + o.pn + '건'; },
+      '청구없음': function (o) { return '이 치료사의 액팅이 없는데 PN기록만 있음'; }
+    };
     orph.forEach(function (o5) {
       todo.push({
-        type: o5.dup ? '중복작성' : '청구없음',
-        act: o5.dup ? '중복 기록 확인' : '액팅 누락 여부 확인',
-        cat: CAT[o5.dup ? '중복작성' : '청구없음'],
+        type: o5.kind, act: ORPH_ACT[o5.kind], cat: CAT[o5.kind],
         date: o5.date, chart: o5.chart, ward: o5.ward, room: o5.room,
-        name: o5.name, ther: o5.ther, billed: '', time: '',
+        name: o5.name, ther: o5.ther,
+        billed: o5.kind === '청구없음' ? '' : o5.actTime,
+        time: '',
         pnTitle: o5.title, pnBy: o5.ther + ' / ' + o5.st + '-' + o5.et,
-        note: o5.dup ? '같은 내용의 PN기록이 2건 있음' : 'PN기록만 있고 청구가 없음',
-        rank: o5.dup ? 7 : 10
+        note: ORPH_NOTE[o5.kind](o5),
+        rank: o5.kind === '청구없음' ? 10 : 7
       });
     });
     todo.sort(function (a, b) {
@@ -1150,19 +1236,24 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       }
     }
     orph.forEach(function (o7) {
-      if (o7.dup) {
-        notice.push({
-          date: o7.date, name: o7.name, ther: o7.ther,
-          billed: cut(o7.title, 30) + ' (' + o7.st + '-' + o7.et + ')',
-          type: '중복작성', msg: '같은 내용의 PN 기록이 2건 있습니다.', rank: 3
-        });
+      var msg7, bill7, rk7;
+      if (o7.kind === '중복작성') {
+        bill7 = cut(o7.title, 30) + ' (' + o7.st + '-' + o7.et + ')';
+        msg7 = '같은 내용의 PN 기록이 ' + o7.pn + '건 있습니다.';
+        rk7 = 3;
+      } else if (o7.kind === '기록초과') {
+        bill7 = cut(o7.title, 30) + ' (' + o7.st + '-' + o7.et + ')';
+        msg7 = '액팅은 ' + o7.act + '건(' + o7.actTime + ')인데 PN 기록은 ' + o7.pn + '건입니다.';
+        rk7 = 3;
       } else {
-        notice.push({
-          date: o7.date, name: o7.name, ther: o7.ther,
-          billed: '(청구 없음) ' + cut(o7.title, 30) + ' (' + o7.st + '-' + o7.et + ')',
-          type: '청구없음', msg: 'PN 기록만 있고 청구가 없습니다.', rank: 5
-        });
+        bill7 = '(액팅 없음) ' + cut(o7.title, 30) + ' (' + o7.st + '-' + o7.et + ')';
+        msg7 = '이 치료사의 액팅이 없는데 PN 기록만 있습니다.';
+        rk7 = 5;
       }
+      notice.push({
+        date: o7.date, name: o7.name, ther: o7.ther,
+        billed: bill7, type: o7.kind, msg: msg7, rank: rk7
+      });
     });
     notice.sort(function (a, b) {
       if (a.ther !== b.ther) return a.ther < b.ther ? -1 : 1;
@@ -1200,9 +1291,12 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     });
     codeTable.sort(function (a, b) { return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; });
 
-    var cDup = orph.filter(function (o) { return o.dup; }).length;
+    var cDup = orph.filter(function (o) { return o.kind === '중복작성'; }).length;
+    var cOver = orph.filter(function (o) { return o.kind === '기록초과'; }).length;
+    var cNone = orph.filter(function (o) { return o.kind === '청구없음'; }).length;
     return {
-      rows: R, n: n, cnt: cnt, cntQ: cntQ, orph: orph, todo: todo, notice: notice, cDup: cDup,
+      rows: R, n: n, cnt: cnt, cntQ: cntQ, orph: orph, todo: todo, notice: notice,
+      cmp: cmp, cDup: cDup, cOver: cOver, cNone: cNone,
       grp: grp, cover: cover, codeTable: codeTable,
       cHoeCode: cHoeCode, cNoPN: cNoPN,
       hasPNCol: C['PN'] >= 0, hasCodeCol: hasCode,
@@ -1346,8 +1440,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       { k: '확인 필요', v: S.todo.length.toLocaleString(), tone: S.todo.length ? 'warn' : 'ok' },
       { k: '기록없음', v: ((c['기록없음'] || 0) + (c['PN기록없음'] || 0)).toLocaleString(), tone: 'bad' },
       { k: '가산체크확인', v: S.cHoeCode.toLocaleString(), tone: S.cHoeCode ? 'warn' : '' },
-      { k: '청구없음', v: (S.orph.length - (S.cDup || 0)).toLocaleString(), tone: (S.orph.length - (S.cDup || 0)) ? 'warn' : '' },
-      { k: '중복작성', v: (S.cDup || 0).toLocaleString(), tone: (S.cDup || 0) ? 'warn' : '' },
+      { k: '액팅없음', v: (S.cNone || 0).toLocaleString(), tone: (S.cNone || 0) ? 'warn' : '' },
+      { k: '기록초과', v: ((S.cOver || 0) + (S.cDup || 0)).toLocaleString(), tone: ((S.cOver || 0) + (S.cDup || 0)) ? 'warn' : '' },
       { k: '빠진 날짜', v: miss.toLocaleString(), tone: miss ? 'bad' : 'ok' }
     ];
     $('#cards').innerHTML = items.map(function (i) {
@@ -1504,7 +1598,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   function tagOf(t) {
     if (t === '기록없음' || t === 'PN기록없음') return '1';
     if (t === '청구없음') return '2';
-    if (t === '가산체크확인' || t === '회차불일치' || t === '회차표기누락' || t === '중복작성') return '3';
+    if (t === '가산체크확인' || t === '회차불일치' || t === '회차표기누락' ||
+        t === '중복작성' || t === '기록초과') return '3';
     if (t === '수량불일치' || t === '수량없음') return '4';
     return '5';
   }
@@ -1706,9 +1801,28 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     }, 20);
   }
 
-  // ----- 회차건수대조 -----
+  // ----- 건수대조 -----
   function renderGroup() {
-    $('#gCount').textContent = S.grp.length.toLocaleString() + '건';
+    var cmp = S.cmp || [];
+    $('#gCount').textContent = '액팅↔PN ' + cmp.length.toLocaleString() + '건 · 회차 ' + S.grp.length.toLocaleString() + '건';
+
+    $('#cmpBody').innerHTML = !cmp.length
+      ? '<p class="empty">액팅 건수와 PN 기록 건수가 모두 맞습니다.</p>'
+      : '<table class="t"><tr>' +
+        '<th class="nw">일자</th><th class="nw">환자</th><th class="nw">치료사</th><th>치료</th>' +
+        '<th class="nw num">액팅</th><th class="nw num">PN</th>' +
+        '<th class="nw">액팅 시간</th><th class="nw">PN 시간</th><th>확인 내용</th></tr>' +
+        cmp.map(function (c) {
+          var tone = c.act > c.pn ? 't1' : c.act === 0 ? 't2' : 't3';
+          return '<tr><td class="nw">' + esc(c.date.slice(5)) + '</td>' +
+            '<td class="nw">' + esc(c.name) + '</td><td class="nw">' + esc(c.ther) + '</td>' +
+            '<td>' + esc(c.item) + '</td>' +
+            '<td class="nw num"><span class="tag ' + tone + '">' + c.act + '</span></td>' +
+            '<td class="nw num"><span class="tag ' + tone + '">' + c.pn + '</span></td>' +
+            '<td class="nw">' + esc(c.actTime) + '</td><td class="nw">' + esc(c.pnTime) + '</td>' +
+            '<td>' + esc(c.note) + '</td></tr>';
+        }).join('') + '</table>';
+
     if (!S.grp.length) {
       $('#groupBody').innerHTML = '<p class="empty">청구 건수와 기록 건수가 모두 맞습니다.</p>';
       return;
@@ -1843,8 +1957,10 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       (S.hasPNCol ? '<h3>EMR [PN] 표시</h3><table class="t"><tr><td>PN 표시 비어있음</td><td class="num">' + S.cNoPN +
         '</td><td>EMR에서도 기록이 없는 것으로 표시된 청구</td></tr></table>' : '') +
       '<h3>청구 / 기록</h3><table class="t">' +
-      '<tr><td>PN에만 있고 청구 없음</td><td class="num">' + (S.orph.length - (S.cDup || 0)) + '</td><td></td></tr>' +
-      '<tr><td>중복 작성</td><td class="num">' + (S.cDup || 0) + '</td><td>이미 청구와 짝지어진 기록과 제목·시간·작성자가 같음</td></tr>' +
+      '<tr><td>액팅 없이 PN만</td><td class="num">' + (S.cNone || 0) + '</td><td>이 치료사의 액팅이 그날 없음 — 진짜 액팅 누락 의심</td></tr>' +
+      '<tr><td>기록 초과</td><td class="num">' + (S.cOver || 0) + '</td><td>액팅보다 PN을 더 씀 (시간 다르게 두 번 작성 등)</td></tr>' +
+      '<tr><td>중복 작성</td><td class="num">' + (S.cDup || 0) + '</td><td>제목·시간·작성자가 똑같은 기록이 2건</td></tr>' +
+      '<tr><td>액팅↔PN 건수 차이</td><td class="num">' + ((S.cmp || []).length) + '</td><td>→ [건수대조] 탭</td></tr>' +
       '<tr><td>확인 필요 전체</td><td class="num">' + S.todo.length + '</td><td></td></tr>' +
       '</table></div></div>' +
       '<h3>일자별 검사 현황' + (missing.length ? ' <span class="bad">— 빠진 날짜 ' + missing.length + '일</span>' : '') + '</h3>' +
@@ -1972,6 +2088,12 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     var gt = [['처방일자', '차트번호', '수진자명', '치료', '회차', '청구건수', '기록건수', '심사과 표기', '확인 내용']];
     S.grp.forEach(function (g) { gt.push([g.date, g.chart, g.name, g.item, g.hoe, g.bill, g.rec, g.mark, g.note]); });
     XLSX.utils.book_append_sheet(wb, sheetFrom(gt), '회차건수대조');
+
+    var ct2 = [['처방일자', '차트번호', '수진자명', '치료사', '치료', '액팅건수', 'PN건수', '액팅 시간', 'PN 시간', '확인 내용']];
+    (S.cmp || []).forEach(function (c) {
+      ct2.push([c.date, c.chart, c.name, c.ther, c.item, c.act, c.pn, c.actTime, c.pnTime, c.note]);
+    });
+    XLSX.utils.book_append_sheet(wb, sheetFrom(ct2), '액팅PN건수');
 
     var tt = [['문제유형', '조치', '처방일자', '차트번호', '병동', '병실', '수진자명', '치료사',
       '청구 내용', '청구 시간', 'PN기록 제목', 'PN기록 작성자/시간', '비고']];

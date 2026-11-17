@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tDCS 처방·시간표 도우미</title>
+<style>
+
+  :root{
+    --bg:#f4f6f9; --panel:#fff; --line:#e3e7ee; --text:#1f2733; --sub:#6b7686;
+    --main:#1f6feb; --main-weak:#e8f0fe; --red:#d93838; --red-weak:#fdecec; --green:#1a8f5a; --green-weak:#e6f6ee;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo",sans-serif;background:var(--bg);color:var(--text);font-size:15px}
+  button{font-family:inherit;font-size:14px;cursor:pointer}
+  input,select,textarea{font-family:inherit;font-size:14px}
+
+  header{height:58px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:0 20px}
+  header h1{font-size:18px;margin:0;white-space:nowrap}
+  header h1 small{font-weight:400;color:var(--sub);font-size:13px;margin-left:6px}
+  .search{flex:1;max-width:420px;margin-left:auto;position:relative}
+  .search input{width:100%;padding:9px 12px 9px 34px;border:1px solid var(--line);border-radius:8px;background:#f8f9fb}
+  .search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--sub)}
+  .hbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;white-space:nowrap}
+  .hbtn:hover{background:#f3f5f8}
+  .hbtn.on{background:var(--main);color:#fff;border-color:var(--main)}
+
+  .wrap{display:grid;grid-template-columns:200px 340px 1fr;height:calc(100% - 58px)}
+  .col{overflow:auto;border-right:1px solid var(--line)}
+  /* 카테고리 */
+  .cats{background:#fbfcfd;padding:14px 10px}
+  .cat{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;background:none;text-align:left;padding:10px 12px;border-radius:8px;color:var(--text)}
+  .cat:hover{background:#eef1f5}
+  .cat.active{background:var(--main-weak);color:var(--main);font-weight:600}
+  .cat .cnt{font-size:12px;color:var(--sub)}
+  .cat .unread{background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px}
+  .cats hr{border:0;border-top:1px solid var(--line);margin:10px 4px}
+  .cat.lock span:first-child{color:#7a4b00}
+  .adminHead{font-size:12px;color:var(--sub);padding:4px 12px 6px;font-weight:600}
+  .catEdit{font-size:13px;color:var(--sub);padding:6px 12px;border:0;background:none}
+  .catEdit:hover{color:var(--main)}
+
+  /* 목록 */
+  .list{background:#fff}
+  .listHead{position:sticky;top:0;background:#fff;padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;z-index:1}
+  .listHead b{font-size:15px}
+  .listHead label{font-size:13px;color:var(--sub);display:flex;gap:4px;align-items:center}
+  .item{padding:13px 16px;border-bottom:1px solid #f0f2f5;cursor:pointer;position:relative}
+  .item:hover{background:#f8fafc}
+  .item.active{background:var(--main-weak)}
+  .item.unreadItem::before{content:"";position:absolute;left:6px;top:20px;width:6px;height:6px;border-radius:50%;background:var(--main)}
+  .item .t{font-weight:600;line-height:1.4;margin-bottom:5px}
+  .item.read .t{font-weight:500;color:#4a5462}
+  .item .m{font-size:12px;color:var(--sub);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .badge{display:inline-block;font-size:11px;padding:1px 6px;border-radius:4px;font-weight:600;vertical-align:1px}
+  .b-imp{background:var(--red-weak);color:var(--red)}
+  .b-new{background:#fff4dc;color:#b7791f}
+  .b-cat{background:#eef1f5;color:#4a5462;font-weight:500}
+  .b-done{background:var(--green-weak);color:var(--green)}
+  .empty{padding:40px 16px;text-align:center;color:var(--sub)}
+
+  /* 본문 */
+  .view{background:var(--panel)}
+  .viewInner{max-width:820px;padding:28px 36px 60px}
+  .viewEmpty{height:100%;display:flex;align-items:center;justify-content:center;color:var(--sub);flex-direction:column;gap:6px}
+  .vTitle{font-size:22px;font-weight:700;margin:8px 0 10px;line-height:1.4}
+  .vMeta{font-size:13px;color:var(--sub);display:flex;gap:14px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--line)}
+  .vBody{line-height:1.8;padding:20px 0;font-size:15.5px;word-break:keep-all}
+  .vBody h2.sec{font-size:17px;margin:26px 0 8px;padding:7px 12px;background:var(--main-weak);color:var(--main);border-radius:6px}
+  .vBody h2.sec:first-child{margin-top:4px}
+  .vBody details.fold{border:1px solid var(--line);border-radius:8px;margin:8px 0;background:#fff}
+  .vBody details.fold>summary{cursor:pointer;padding:12px 16px;font-weight:700;font-size:16px;list-style:none;display:flex;justify-content:space-between;align-items:center}
+  .vBody details.fold>summary::-webkit-details-marker{display:none}
+  .vBody details.fold>summary::after{content:"펼치기 ▾";font-size:12px;font-weight:500;color:var(--sub)}
+  .vBody details.fold[open]>summary{background:var(--main-weak);color:var(--main);border-bottom:1px solid var(--line);border-radius:8px 8px 0 0}
+  .vBody details.fold[open]>summary::after{content:"접기 ▴"}
+  .vBody details.fold:hover>summary{background:#f6f8fb}
+  .vBody details.fold[open]:hover>summary{background:var(--main-weak)}
+  .vBody .foldBody{padding:8px 18px 14px}
+  @media print{ .vBody details.fold{break-inside:avoid} }
+  .vBody .tblWrap{overflow-x:auto;margin:10px 0}
+  .vBody table.tbl{border-collapse:collapse;width:100%;font-size:14px;line-height:1.5}
+  .vBody table.tbl th{background:#eef2f7;font-weight:700;padding:8px 10px;border:1px solid #d5dbe4;white-space:nowrap}
+  .vBody table.tbl td{padding:7px 10px;border:1px solid #e0e5ec;vertical-align:top}
+  .vBody table.tbl tr:nth-child(even) td{background:#fafbfc}
+  .vBody .gallery{display:flex;flex-wrap:nowrap;gap:10px;align-items:flex-start;margin:10px 0}
+  .vBody .gallery figure{margin:0;flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .vBody .gallery img{width:100%;height:auto;margin:0}
+  .vBody .gallery figcaption{font-size:13px;color:var(--sub);text-align:center}
+  .tdBox{border:1px solid var(--line);border-radius:10px;padding:16px 18px;background:#fbfcfe;margin:6px 0 18px}
+  .tdTitle{font-weight:700;margin-bottom:8px}
+  .tdBox textarea{width:100%;min-height:70px;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;resize:vertical}
+  .tdBar{display:flex;gap:8px;margin:8px 0 12px}
+  .tdBar input{flex:1;max-width:200px;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
+  .tdRow{display:flex;gap:10px;align-items:flex-start;margin:6px 0}
+  .tdLab{width:120px;flex:none;font-size:13px;color:var(--sub);padding-top:7px}
+  .tdChips{display:flex;flex-wrap:wrap;gap:6px}
+  .tdChip{border:1px solid var(--line);background:#fff;border-radius:16px;padding:6px 12px;font-size:13px}
+  .tdChip.on{background:var(--main);border-color:var(--main);color:#fff}
+  .tdAuto{font-size:13px;color:var(--main);background:var(--main-weak);padding:6px 10px;border-radius:6px;margin-bottom:8px}
+  .tdWarn{font-size:14px;background:#fff8e6;border-left:4px solid #f0b429;padding:8px 12px;border-radius:4px;margin:8px 0}
+  .tdHint{color:var(--sub);font-size:14px;padding:8px 0}
+  .tdResult{margin-top:12px;border-top:1px dashed var(--line);padding-top:12px}
+  .tdSec{font-weight:700;margin:14px 0 6px;color:var(--main)}
+  .tdAll{background:var(--main-weak);border-radius:8px;padding:12px 14px;margin-bottom:6px}
+  .tdAll .tdPre{margin:4px 0 8px;font-weight:600;font-size:14px}
+  .tdSegHead{font-weight:700;font-size:15px;margin:16px 0 6px;padding:6px 10px;background:#eef2f7;border-radius:6px}
+  .tdCode{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:4px 0;font-weight:600}
+  .tdCode button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 10px;font-size:12px}
+  .tdPre{background:#fff;border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:13px;line-height:1.6;white-space:pre-wrap;font-family:inherit}
+  .vBody h3{font-size:16.5px;margin:20px 0 6px}
+  .vBody ul,.vBody ol{padding-left:22px;margin:6px 0}
+  .vBody p{margin:0 0 8px}
+  .vBody .box{background:#fff8e6;border-left:4px solid #f0b429;padding:10px 14px;border-radius:4px;margin:10px 0}
+  .vBody a{color:var(--main)}
+  .vBody img{max-width:100%;border:1px solid var(--line);border-radius:8px;margin:8px 0;display:block}
+  .adminActions{display:none!important}
+  body.admin .adminActions{display:flex!important}
+  .vActions{display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:16px}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 14px}
+  .btn:hover{background:#f3f5f8}
+  .btn.primary{background:var(--main);border-color:var(--main);color:#fff}
+  .btn.primary:hover{background:#185ccc}
+  .btn.ok{background:var(--green-weak);border-color:#bfe5d1;color:var(--green);font-weight:600}
+  .btn.danger{color:var(--red)}
+  .btn.danger:hover{background:var(--red-weak)}
+
+  /* 모달 */
+  .modalBg{position:fixed;inset:0;background:rgba(20,28,40,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .modalBg.show{display:flex}
+  .modal{background:#fff;border-radius:12px;width:100%;max-width:720px;max-height:92vh;overflow:auto;padding:22px 24px}
+  .modal h2{margin:0 0 14px;font-size:18px}
+  .frow{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .frow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--sub);flex:1;min-width:140px}
+  .frow input,.frow select,.frow textarea{padding:8px 10px;border:1px solid var(--line);border-radius:6px;color:var(--text)}
+  .frow textarea{min-height:260px;resize:vertical;line-height:1.6}
+  .chk{flex-direction:row!important;align-items:center;gap:6px!important;flex:0 0 auto!important;min-width:0!important;color:var(--text)!important;padding-top:20px}
+  .help{font-size:12px;color:var(--sub);background:#f7f8fa;border-radius:6px;padding:8px 10px;line-height:1.7;margin-bottom:12px}
+  .help code{background:#e9ecf1;padding:0 4px;border-radius:3px}
+  .mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+  .catRow{display:flex;gap:6px;margin-bottom:6px}
+  .catRow input{flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:6px}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1f2733;color:#fff;padding:10px 18px;border-radius:8px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:60}
+  .toast.show{opacity:1}
+  .adminOnly{display:none}
+  body.admin .adminOnly{display:inline-block}
+  body.admin .cats .adminOnly{display:block}
+
+  @media (max-width:900px){
+    .wrap{grid-template-columns:1fr;height:auto}
+    .cats{display:flex;overflow-x:auto;gap:4px;padding:8px}
+    .cat{white-space:nowrap;width:auto}
+    .cats hr{display:none}
+    .col{border-right:0;border-bottom:1px solid var(--line)}
+    .list{max-height:45vh}
+    .viewInner{padding:20px}
+    header h1 small{display:none}
+  }
+  @media print{
+    header,.cats,.list,.vActions,.toast{display:none!important}
+    .wrap{display:block;height:auto}
+    .col{border:0;overflow:visible}
+    body{background:#fff}
+  }
+
+  body{overflow:auto}
+  .page{max-width:1000px;margin:0 auto;padding:24px 24px 60px}
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:4px 0 18px}
+  .tab{border:0;background:none;padding:10px 16px;font-size:15px;color:var(--sub);border-bottom:3px solid transparent;margin-bottom:-1px}
+  .tab.on{color:var(--main);border-bottom-color:var(--main);font-weight:700}
+  .panel{display:none} .panel.on{display:block}
+  .vBody{padding:0}
+</style>
+</head>
+<body>
+<header>
+  <h1>🧠 tDCS 처방·시간표 도우미<small>광주365재활병원</small></h1>
+</header>
+<div class="page">
+  <div class="tabs">
+    <button class="tab on" data-p="p1">시간표 입력 도우미</button>
+    <button class="tab" data-p="p2">처방 기준 정리</button>
+  </div>
+  <div class="panel on" id="p1"><div class="vBody">
+    <p>원장님 챗을 붙여넣고 <b>분석</b>을 누르면 처방·시간표 기입·액팅 방법이 나옵니다. 자동 인식이 틀릴 수 있으니 아래 선택 항목을 꼭 확인하세요.</p>
+    <div id="tdcsTool"></div>
+  </div></div>
+  <div class="panel" id="p2"><div class="vBody" id="ref"></div></div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const $ = id => document.getElementById(id);
+const DATA = {images:{}}; const imgSrc = () => null;
+function esc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmt(text){
+  const inline = s => esc(s)
+    .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+    .replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');
+  let html='', list=null, fold=false;
+  const close=()=>{ if(list){ html+=`</${list}>`; list=null; } };
+  const closeFold=()=>{ close(); if(fold){ html+='</div></details>'; fold=false; } };
+  let tbl=null;
+  const flushTbl=()=>{ if(!tbl) return; close();
+    const rows=tbl.filter(r=>!/^\|?\s*:?-{2,}/.test(r)).map(r=>r.replace(/^\||\|$/g,'').split('|').map(c=>c.trim()));
+    html+='<div class="tblWrap"><table class="tbl"><thead><tr>'+rows[0].map(c=>`<th>${inline(c)}</th>`).join('')+'</tr></thead><tbody>'
+      +rows.slice(1).map(r=>'<tr>'+r.map(c=>`<td>${inline(c).replace(/&lt;br&gt;/g,'<br>')}</td>`).join('')+'</tr>').join('')+'</tbody></table></div>';
+    tbl=null; };
+  for(const raw of String(text||'').split('\n')){
+    const line = raw.trimEnd();
+    if(/^\s*\|/.test(line)){ (tbl=tbl||[]).push(line.trim()); continue; }
+    flushTbl();
+    let m;
+    if(m=line.match(/^\s*[-•·]\s+(.*)/)){ if(list!=='ul'){close();html+='<ul>';list='ul';} html+=`<li>${inline(m[1])}</li>`; }
+    else if(m=line.match(/^\s*\d+[.)]\s+(.*)/)){ if(list!=='ol'){close();html+='<ol>';list='ol';} html+=`<li>${inline(m[1])}</li>`; }
+    else { close();
+      if(/^\[\[tool:tdcs\]\]$/.test(line)) html+='<div id="tdcsTool"></div>';
+      else if(m=line.match(/^\[\[imgs:(.+)\]\]$/)) html+='<div class="gallery">'+m[1].split('|').map(x=>{ const [k,cap]=x.split('='); return imgSrc(k.trim())?`<figure><img src="${imgSrc(k.trim())}" alt="" onload="this.parentNode.style.flex=(this.naturalWidth/this.naturalHeight)+' 1 0'">${cap?`<figcaption>${inline(cap.trim())}</figcaption>`:''}</figure>`:''; }).join('')+'</div>';
+      else if(m=line.match(/^\[\[img:([\w-]+)(?:\|(\d+))?\]\]$/)) html+= imgSrc(m[1]) ? `<img src="${imgSrc(m[1])}" alt=""${m[2]?` style="width:${m[2]}px"`:''}>` : '';
+      else if(m=line.match(/^###\s+(.*)/)){ closeFold(); html+=`<details class="fold"><summary>${inline(m[1])}</summary><div class="foldBody">`; fold=true; }
+      else if(m=line.match(/^##\s+(.*)/)){ closeFold(); html+=`<h2 class="sec">${inline(m[1])}</h2>`; }
+      else if(m=line.match(/^#+\s*(.*)/)) html+=`<h3>${inline(m[1])}</h3>`;
+      else if(m=line.match(/^>\s?(.*)/)) html+=`<div class="box">${inline(m[1])}</div>`;
+      else if(line.trim()==='') html+='<p></p>';
+      else html+=`<p>${inline(line)}</p>`;
+    }
+  }
+  flushTbl(); closeFold(); return html;
+}
+// ───── tDCS 처방 도우미 ─────
+const TDCS_PN = `경두개직류자극술 (시작-종료 시간)
+
+* 자극 정보
+1. 전극 위치:
+ - 양극(+): Candidate 40 (-57.79, 1.22, 79.46)
+ - 음극(-): Candidate 82 (-5.30, 23.75, -48.31)
+2. 자극 강도: 2.0mA 직류 전류
+3. 자극 시간: 30분
+
+* 시행 과정
+1. 맞춤형 전극 위치 결정 (Neurophet tES LAB 소프트웨어 활용)
+2. 두피 세정 및 전극 준비 (식염수 적신 스펀지 패치)
+3. 전극 부착 및 헤드캡으로 고정
+4. 재활의학과 전문의 감독하에 자극 시행
+
+* comment: 특이사항 없음.`;
+const TDCS_FREE = '(Free)특수작업치료는 hand function 관련 내용 작성, 코멘트란에 부착 위치, 전류, 부착 시간(30분) 기입';
+let TD = { period:null, type:null, time:null, eq:null, pain:null, special:null, name:'', auto:[] };
+
+const TD_OPTS = {
+  period:[['p1','최초 1개월 (T1-MRI 있음)'],['p2','1개월 이후 · 영상 없음 · T1 위치 부정확']],
+  type:[['rec','회복기'],['non','비회복기']],
+  time:[['in','치료시간 내 (1:1 시간)'],['out','치료시간 외 (추가 타임)']],
+  eq:[['inmotion','인모션'],['glove','에소글러브 · 스마트글러브 · 스마트보드 (· 아이어스)'],['none','장비 없음 (상지운동)']],
+  special:[['','해당 없음'],['noorder','오더 없이 tDCS (예외)'],['notdcs','메디·tDCS 없이 1:1 시간 장비만']]
+};
+const TD_LABEL = {period:'처방 기간',type:'환자 구분',time:'시간',eq:'장비',special:'예외 상황'};
+
+function tdParse(text){
+  const t = text.replace(/\s+/g,' '), r = {}, hit=[];
+  if(/비회복기/.test(t)){ r.type='non'; hit.push('비회복기'); }
+  else if(/회복기/.test(t)){ r.type='rec'; hit.push('회복기'); }
+  if(/회복기\s*외|추가|타임|시간\s*외|치료시간\s*외|오후\s*5|17:30/.test(t)){ r.time='out'; hit.push('치료시간 외'); }
+  else if(/1\s*[:대]\s*1|일대일|치료시간\s*내|시간\s*내/.test(t)){ r.time='in'; hit.push('치료시간 내'); }
+  if(/인모션|in\s*-?\s*motion/i.test(t)){ r.eq='inmotion'; hit.push('인모션'); }
+  else if(/상지\s*운동/.test(t)){ r.eq='none'; hit.push('상지운동(장비 없음)'); }
+  else if(/에소|스마트\s*글러브|스마트\s*보드|아이어스|글러브|eso\s*-?\s*glove|smart\s*-?\s*(glove|board)/i.test(t)){ r.eq='glove'; hit.push('글러브·보드류'); }
+  else if(/장비\s*없이|장비\s*없음/.test(t)){ r.eq='none'; hit.push('장비 없음'); }
+  if(/1\s*(개월|달)\s*(이후|지나|지난|넘|후)|영상\s*(이\s*)?없|MRI\s*(가\s*)?없|T1.*(부정확|정확하지)/i.test(t)){ r.period='p2'; hit.push('1개월 이후/영상 없음'); }
+  else if(/전극\s*위치|MRI|T1|최초|첫\s*달|신규/i.test(t)){ r.period='p1'; hit.push('최초 1개월(전극 위치·MRI)'); }
+  const fe = tdFindEq(t); if(fe && fe.eq==='glove') r._dev = fe.dev;
+  r._upload = /전극\s*위치.*(업로드|올리|올려)/.test(t);
+  r._hit = hit;
+  return r;
+}
+
+function tdResult(s){
+  const N = s.name ? s.name : '○○○';
+  const out = { ok:true, rows:[], tt:[], act:[], notes:[], pn:false };
+  if(s.special==='noorder'){ out.rows.push(['구분','오더 없이 tDCS 시행 (예외)'],['비용','따로 비용 발생 X']); out.tt.push(`H${N}+tDCS(F)`); return out; }
+  if(s.special==='notdcs'){ out.rows.push(['구분','메디·tDCS 시행 안 하고 1:1 시간 내 장비만 (에소글러브·스마트글러브·스마트보드)'],['비용','따로 비용 발생 X']); out.tt.push(`H${N} (에소글러브)`); return out; }
+  const need = (s.type==='non'?['type','time','eq']:['period','type','time','eq']).filter(k=>!s[k]);
+  if(need.length) return { ok:false, need };
+  const eqName = s.eq==='inmotion'?'인모션':s.eq==='glove'?(s.dev||'에소글러브'):'';
+  const gd = d => s.dev || d;
+  const med = true, meds = x => x;
+  // 비회복기 (기간 공통)
+  if(s.type==='non'){
+    if(s.time==='in' || s.eq==='none'){ out.ok=false; out.na='비회복기는 1:1 시간 적용 X — 치료시간 외에 장비(인모션·글러브류)와 함께 시행합니다.'; return out; }
+    if(s.eq==='inmotion'){
+      out.rows.push(['처방','CR7 · 7만원'],['코드','(비급여)전산화인지재활치료(상지로봇포함) EX022A']);
+      out.tt.push(`${N}+CR7(비)+(F)+TDCS (인모션)`);
+      out.act.push('(비급여)전산화인지재활치료(상지로봇포함)으로 액팅 (7만원)','tDCS 부착 시: (비급여)전산화인지재활치료(상지로봇포함) + (Free)특수작업치료');
+    } else {
+      out.rows.push(['처방','CR6 · 6만원'],['코드','(비급여)전산화인지재활치료(주의,기억) EX022']);
+      out.tt.push(`${N}+CR6(비)+(F)+TDCS (${gd('스마트글러브')})`);
+      out.act.push('(비급여)전산화인지재활치료(주의,기억)으로 액팅 (6만원)','tDCS 부착 시: (비급여)전산화인지재활치료(주의,기억) + (Free)특수작업치료');
+    }
+    out.act.push(TDCS_FREE);
+    return out;
+  }
+  // 회복기 · 최초 1개월
+  if(s.period==='p1'){
+    out.notes.push('동의서 3개: 비급여 동의서, 혁신의료기술 대상자 동의서(10회당 1장), 포괄적 동의서');
+    if(s.time==='in'){
+      out.rows.push(['처방','DF003A 경두개직류자극술[tDCS][비급여][Dr] · 7만원'],['액팅','진료실에서 자동액팅 (슬립 X)'],['일괄처방','인모션: 월수금 / 에소글러브·스마트글러브·스마트보드: 화목']);
+      out.tt.push(`H${N}+TDCS`);
+      out.act.push('회3 특수작업치료로 액팅');
+    } else {
+      if(s.eq==='none'){ out.ok=false; out.na='표에 없는 조합입니다 (회복기 최초 1개월 · 치료시간 외 · 장비 없음). 담당 원장님께 확인해 주세요.'; return out; }
+      out.rows.push(['처방','DF003B 경두개직류자극술[tDCS][비급여][Slip] · 7만원'],['액팅','치료실 액팅 (물리슬립 - 작업치료실)']);
+      out.tt.push(`H${N} [경두개직류자극술] (${eqName})`);
+      out.act.push('치료시간 외 — tDCS 액팅만 (해당 시간에 맞춰)','P/N에 상지 중재에 관한 내용도 기입 (특수작업 내용)');
+      out.pn = true;
+    }
+    return out;
+  }
+  // 회복기 · 1개월 이후 / 영상 없음 (장비 + 메디 + tDCS 서비스 개념)
+  out.notes.push('동의서: MRI가 없으면 비급여 동의서만');
+  out.notes.push('tDCS 패드 개별구매 X. MRI가 없거나 T1 위치가 정확하지 않으면 장비 + 메디페인만 부착 (tDCS는 서비스 개념)');
+  out.notes.push('메디는 통증이 있는 경우에만 부착하고, 통증이 없으면 붙이지 않습니다. 처방·시간표·액팅은 메디 포함 그대로 나갑니다.');
+  out.pn = true;
+  if(s.time==='in'){
+    if(s.eq==='inmotion'){
+      out.rows.push(['처방','CR4 (인모션만 해당)']);
+      out.tt.push(meds(`H${N}+CR4+메디+TDCS (인모션)`));
+      out.act.push('OT: (회3)특수작업치료로 액팅'); if(med) out.act.push('PT: 비침습적 무통증 신호요법(RMS)[복잡]으로 액팅 (MZ012B)');
+    } else if(s.eq==='glove'){
+      out.rows.push(['처방','CR7 (화, 목)']);
+      if(s.days && !/화|목/.test(s.days)){
+        // 요일별 입력에서 글러브류를 월수금에 쓰는 경우 (원본 표: H○○○ (스마트보드-월수금))
+        out.rows.splice(0,1,['처방','CR7은 화, 목만 — 월수금은 장비만']);
+        out.tt.push(`H${N}+TDCS (${gd('스마트보드')}-${s.days})`);
+      } else if(s.days){
+        out.tt.push(meds(`H${N}+CR7+메디+TDCS (${gd('에소글러브')}-${s.days})`));
+      } else {
+        out.tt.push(`H${N}+TDCS (상지운동-월수금)`, meds(`H${N}+CR7+메디+TDCS (${gd('에소글러브')}-화목)`));
+      }
+      out.act.push('OT: (회3)특수작업치료로 액팅','PT: 비침습적 무통증 신호요법(RMS)[복잡][2부위 이상]으로 액팅 (MZ012A)');
+    } else {
+      out.rows.push(['원칙','1:1 시간에 적용 X'],['예외','장비 없이 시행하는 경우에도 CR7(7만원) 주 2회 (화, 목)']);
+      out.tt.push(`H${N}+TDCS (월수금)`, meds(`H${N}+CR7+메디+TDCS (화목)`));
+      out.act.push('OT: (회3)특수작업치료로 액팅','PT: 비침습적 무통증 신호요법(RMS)[복잡][2부위 이상]으로 액팅 (MZ012A)');
+    }
+  } else {
+    if(s.eq==='none'){ out.ok=false; out.na='회복기 1개월 이후 · 치료시간 외 · 장비 없음은 해당 없음(X)입니다.'; return out; }
+    if(s.eq==='inmotion'){
+      out.rows.push(['처방','CR7']);
+      out.tt.push(meds(`H${N}+CR7(F)+메디+TDCS (인모션)`));
+      out.act.push('OT: (Free)특수작업치료로 액팅'); if(med) out.act.push('PT: 비침습적 무통증 신호요법(RMS)[복잡][2부위 이상]으로 액팅 (MZ012A)');
+    } else {
+      out.rows.push(['처방','CR6']);
+      out.tt.push(meds(`H${N}+CR6(F)+메디+TDCS (${gd('에소')})`));
+      out.act.push('OT: (Free)특수작업치료로 액팅'); if(med) out.act.push('PT: 비침습적 무통증 신호요법(RMS)[복잡][기타]으로 액팅 (MZ012C)');
+    }
+    out.act.push(TDCS_FREE);
+  }
+  return out;
+}
+
+const TD_DAYS = /(월화수목금|월수금|화목|월수|수금|월목|화금|월|화|수|목|금)(?:요일)?/;
+const TD_EQ = [
+  [/인모션|in\s*-?\s*motion/i, 'inmotion', '인모션'],
+  [/상지\s*운동/, 'none', '상지운동'],
+  [/에소\s*글러브|에소|eso\s*-?\s*glove/i, 'glove', '에소글러브'],
+  [/스마트\s*글러브|smart\s*-?\s*glove/i, 'glove', '스마트글러브'],
+  [/스마트\s*보드|smart\s*-?\s*board/i, 'glove', '스마트보드'],
+  [/아이어스/, 'glove', '아이어스'],
+  [/장비\s*없이|장비\s*없음/, 'none', '장비 없음']
+];
+function tdFindEq(chunk){ for(const [re,eq,dev] of TD_EQ){ if(re.test(chunk)) return {eq,dev}; } return null; }
+function tdSegs(text){
+  const segs=[];
+  for(const chunk of text.split(/\n|,|그리고|및/)){
+    const d = chunk.match(TD_DAYS), e = tdFindEq(chunk);
+    if(d && e) segs.push({days:d[1], eq:e.eq, dev:e.dev});
+  }
+  if(segs.length>=2) return segs;
+  // '장비 (주2회)' → 화목 장비 / 월수금 상지운동, '장비 (주3회)' → 월수금 장비 / 화목 상지운동
+  const e = tdFindEq(text.replace(/상지\s*운동/g,''));
+  if(e && e.eq!=='none'){
+    if(/주\s*2\s*회/.test(text)) return [{days:'월수금', eq:'none', dev:'상지운동'},{days:'화목', eq:e.eq, dev:e.dev}];
+    if(/주\s*3\s*회/.test(text)) return [{days:'월수금', eq:e.eq, dev:e.dev},{days:'화목', eq:'none', dev:'상지운동'}];
+  }
+  return null;
+}
+function tdWithDays(str, days, dev){
+  const hasDay = s => /[월화수목금]/.test(s);
+  const last = str.match(/\(([^)]*)\)$/);
+  if(last){
+    if(hasDay(last[1])) return (/^[월화수목금,]+$/.test(last[1]) && dev) ? str.replace(/\(([^)]*)\)$/, `(${dev}-${last[1]})`) : str;
+    return str.replace(/\(([^)]*)\)$/, `(${dev||last[1]}-${days})`);
+  }
+  if(/\([^)]*[월화수목금]/.test(str)) return dev ? `${str} (${dev})` : str;
+  return `${str} (${dev?dev+'-':''}${days})`;
+}
+function tdResultHtml(r, withPn, noNotes){
+  if(r.na) return `<div class="tdWarn">${esc(r.na)}</div>`;
+  if(!r.ok) return `<div class="tdHint">${r.need.map(k=>TD_LABEL[k]).join(', ')}을(를) 선택하면 결과가 나옵니다.</div>`;
+  return `${r.rows.length?`<table class="tbl"><tbody>${r.rows.map(([a,b])=>`<tr><th style="width:110px">${esc(a)}</th><td>${esc(b)}</td></tr>`).join('')}</tbody></table>`:''}
+    <div class="tdSec">시간표 기입</div>${r.tt.map(x=>`<div class="tdCode"><span>${esc(x)}</span><button type="button" onclick="tdCopy(this,${JSON.stringify(x).replace(/"/g,'&quot;')})">복사</button></div>`).join('')}
+    ${r.act.length?`<div class="tdSec">액팅 방법</div><ul>${r.act.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+    ${!noNotes&&r.notes.length?`<div class="tdSec">참고</div><ul>${r.notes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+    ${withPn&&r.pn?tdPnHtml():''}`;
+}
+function tdPnHtml(){ return `<div class="tdSec">P/N 예시 (경두개직류자극술 액팅 시)</div><div class="tdHint" style="padding:0 0 6px">전극 위치·시간은 예시입니다. 환자별 업로드된 전극 위치와 실제 시행 시간으로 작성하세요.</div><pre class="tdPre">${esc(TDCS_PN)}</pre><button type="button" class="btn" onclick="tdCopy(this,TDCS_PN)">P/N 복사</button>`; }
+
+// 전체 틀은 한 번만 그리고, 이후에는 선택 버튼과 결과만 다시 그림 (한글 입력이 끊기지 않도록)
+function tdRender(){
+  const box = document.getElementById('tdcsTool'); if(!box) return;
+  box.innerHTML = `
+    <div class="tdBox">
+      <div class="tdTitle">💬 원장님 챗 붙여넣기</div>
+      <textarea id="tdIn" placeholder="예: 회복기외로 1타임 추가하여 인모션 + tDCS 잡아주세요&#10;예: 월수금 / 상지운동, 화목 / 스마트글러브"></textarea>
+      <div class="tdBar"><input id="tdName" placeholder="환자명 (선택)"><button type="button" class="btn primary" onclick="tdRun()">분석</button><button type="button" class="btn" onclick="tdReset()">초기화</button></div>
+      <div id="tdDyn"></div>
+    </div>`;
+  $('tdIn').value = TD.src||''; $('tdName').value = TD.name||'';
+  $('tdName').addEventListener('input', e=>{ TD.name=e.target.value.trim(); tdUpdate(); });
+  tdUpdate();
+}
+function tdSet(k,v){ TD[k] = TD[k]===v ? null : v; tdUpdate(); }
+function tdSegSet(i,v){ TD.segs[i].eq=v; TD.segs[i].dev=''; tdUpdate(); }
+function tdUpdate(){
+  const dyn = document.getElementById('tdDyn'); if(!dyn) return;
+  const chip = (k,v,l) => `<button type="button" class="tdChip ${TD[k]===v?'on':''}" onclick="tdSet('${k}','${v}')">${esc(l)}</button>`;
+  const keys = TD.segs ? ['period','type','time'] : ['period','type','time','eq'];
+  let h = '';
+  if(TD.auto.length) h += `<div class="tdAuto">자동 인식: ${TD.auto.map(esc).join(' · ')} — 아래에서 맞는지 확인하고 고쳐 주세요.</div>`;
+  if(TD.upload) h += `<div class="tdWarn">전극 위치 업로드 예정 — 업로드된 전극 위치를 확인한 뒤 P/N에 기입하세요.</div>`;
+  h += keys.map(k=>`<div class="tdRow"><div class="tdLab">${TD_LABEL[k]}</div><div class="tdChips">${TD_OPTS[k].map(([v,l])=>chip(k,v,l)).join('')}</div></div>`).join('');
+  if(TD.segs){
+    h += TD.segs.map((g,i)=>`<div class="tdRow"><div class="tdLab">장비 · ${esc(g.days)}</div><div class="tdChips">${TD_OPTS.eq.map(([v,l])=>`<button type="button" class="tdChip ${g.eq===v?'on':''}" onclick="tdSegSet(${i},'${v}')">${esc(v===g.eq&&g.dev?g.dev:l)}</button>`).join('')}</div></div>`).join('');
+    const rs = TD.segs.map(g=>({g, r:tdResult(Object.assign({},TD,{eq:g.eq, dev:g.dev, days:g.days}))}));
+    const ready = rs.every(x=>x.r.ok||x.r.na);
+    h += `<div class="tdResult">${rs.map(({g,r})=>{
+        if(r.ok){
+          const want = [...g.days].filter(c=>'월화수목금'.includes(c)).sort().join('');
+          r.tt = r.tt.filter(x=>{ const d=(x.match(/\(([^)]*)\)/g)||[]).map(p=>[...p].filter(c=>'월화수목금'.includes(c)).sort().join('')).filter(Boolean); return (!d.length || d.includes(want)) && !(g.dev && /\(([^)-]+)-[월화수목금]/.test(x) && x.match(/\(([^)-]+)-[월화수목금]/)[1]!==g.dev); })
+                     .map(x=>tdWithDays(x,g.days,g.dev));
+        }
+        return `<div class="tdSegHead">${esc(g.days)} · ${esc(g.dev||TD_OPTS.eq.find(o=>o[0]===g.eq)[1])}</div>${tdResultHtml(r,false,true)}`;
+      }).join('')}${(()=>{ const ns=[...new Set(rs.flatMap(x=>x.r.ok?x.r.notes:[]))]; return ns.length?`<div class="tdSec">참고</div><ul>${ns.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''; })()}${ready && rs.some(x=>x.r.pn)?tdPnHtml():''}</div>`;
+    TD._all = rs.flatMap(x=>x.r.ok?x.r.tt:[]);
+  } else {
+    const r = tdResult(TD); TD._all = r.ok ? r.tt : [];
+    h += `<div class="tdResult">${tdResultHtml(r,true)}</div>`;
+  }
+  if(TD._all.length>1) h = h.replace('<div class="tdResult">', `<div class="tdResult"><div class="tdAll"><div class="tdSec" style="margin-top:0">시간표 전체</div><pre class="tdPre">${esc(TD._all.join('\n'))}</pre><button type="button" class="btn primary" onclick="tdCopy(this,TD._all.join('\\n'))">시간표 전체 복사</button></div>`);
+  dyn.innerHTML = h;
+}
+function tdRun(){
+  TD.src = $('tdIn').value; TD.name = $('tdName').value.trim();
+  const p = tdParse(TD.src);
+  ['period','type','time','eq'].forEach(k=>{ TD[k] = p[k]!==undefined ? p[k] : null; });
+  TD.special = null; TD.auto = p._hit; TD.upload = p._upload; TD.dev = p._dev||null;
+  TD.segs = tdSegs(TD.src);
+  if(TD.segs){ TD.auto = TD.auto.filter(x=>!/인모션|상지운동|글러브|장비/.test(x)).concat('요일별 장비 '+TD.segs.map(g=>g.days+' '+(g.dev||'')).join(' / ')); }
+  tdUpdate();
+}
+function tdReset(){ TD = { period:null, type:null, time:null, eq:null, special:null, name:'', auto:[], src:'', segs:null }; tdRender(); }
+
+function tdCopy(btn, text){
+  const done=()=>{ const o=btn.textContent; btn.textContent='복사됨'; setTimeout(()=>btn.textContent=o,1200); };
+  try{ navigator.clipboard.writeText(text).then(done, ()=>{ fallbackCopy(text); done(); }); }catch(e){ fallbackCopy(text); done(); }
+}
+function fallbackCopy(text){ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(e){} ta.remove(); }
+const REF = "## 기본 원칙\n- 대상: **회복기 뇌병변 진단 환자 (T1-MRI)** — 최초 1개월 daily 처방\n- tDCS 패드 개별구매 X\n- MRI가 없거나 T1 위치가 정확하지 않으면 **장비 + 메디페인만 부착** (tDCS는 서비스 개념)\n- 1개월 이후 · 영상 없는 경우 메디는 **통증이 있을 때만 부착**하고, 통증이 없으면 붙이지 않음. **처방은 메디 포함으로 그대로** 나감\n- 비회복기는 1:1 시간에 적용 X, 치료시간 외에 장비와 함께 시행\n- 시간표에는 **+TDCS를 항상** 붙임 (월수금처럼 CR이 없는 요일도 동일)\n- **상지운동** = 장비 없이 하는 치료 (시간표에는 '(상지운동-월수금)'처럼 기입)\n\n## 동의서\n**MRI 있는 경우** (경두개직류자극술로 넘기는 경우) — 3개\n1. 비급여 동의서\n2. 혁신의료기술 대상자 동의서 (**10회당 1장**)\n3. 포괄적 동의서\n\n**MRI 없는 경우** — 비급여 동의서만\n\n## tDCS 코드\n| 코드 | 이름 | 액팅 |\n|---|---|---|\n| DF003A | 경두개직류자극술[tDCS] [비급여][Dr] | 자동액팅 — 진료실 창에서 직접 입력 |\n| DF003B | 경두개직류자극술[tDCS] [비급여][Slip] | 치료실 액팅 — 물리슬립 - 작업치료실 |\n\n### 최초 1개월 (T1-MRI) 전체 기준\n| 환자 | 시간 | 장비 | 처방 | 시간표 예시 | 액팅 |\n|---|---|---|---|---|---|\n| 회복기 | 치료시간 내 (1:1) | 인모션: 월수금 일괄처방 / 에소글러브·스마트글러브·스마트보드: 화목 일괄처방 | DF003A · 7만원 (슬립 X) | H○○○+TDCS<br>H○○○+TDCS (상지운동-월수금) | 회3 특수작업치료 |\n| 회복기 | 치료시간 외 | 인모션, 글러브류 | DF003B · 7만원 | H○○○ [경두개직류자극술] (에소글러브) | tDCS 액팅만 (해당 시간에 맞춰) + P/N에 상지 중재 내용 기입 |\n| 비회복기 | 치료시간 외 | 인모션 | CR7 · 7만원 | ○○○+CR7(비)+(F)+TDCS (인모션) | (비급여)전산화인지재활치료(상지로봇포함) + (Free)특수작업치료 |\n| 비회복기 | 치료시간 외 | 에소글러브·스마트글러브·스마트보드·아이어스 | CR6 · 6만원 | ○○○+CR6(비)+(F)+TDCS (스마트글러브) | (비급여)전산화인지재활치료(주의,기억) + (Free)특수작업치료 |\n\n\n### 1개월 이후 · 영상 없음 전체 기준\n| 환자 | 시간 | 장비 | 처방 | 시간표 예시 | 액팅 |\n|---|---|---|---|---|---|\n| 회복기 | 치료시간 내 (1:1) | 장비 없음 (상지운동) | 원칙적으로 적용 X. 예외적으로 장비 없이 시행하는 경우에도 CR7(7만원) 주 2회 (화, 목) | H○○○+TDCS (월수금)<br>H○○○+CR7+메디+TDCS (화목) | OT: (회3)특수작업치료<br>PT: 비침습적 무통증 신호요법(RMS)[복잡][2부위 이상] (MZ012A) |\n| 회복기 | 치료시간 내 (1:1) | 인모션 | CR4 | H○○○+CR4+메디+TDCS (인모션) | OT: (회3)특수작업치료<br>PT: 비침습적 무통증 신호요법(RMS)[복잡] (MZ012B) |\n| 회복기 | 치료시간 내 (1:1) | 에소글러브·스마트글러브·스마트보드 | CR7 (화, 목만) | H○○○+TDCS (상지운동-월수금)<br>H○○○+CR7+메디+TDCS (에소글러브-화목) | OT: (회3)특수작업치료<br>PT: 비침습적 무통증 신호요법(RMS)[복잡][2부위 이상] (MZ012A) |\n| 회복기 | 치료시간 외 | 인모션 | CR7 | H○○○+CR7(F)+메디+TDCS (인모션) | OT: (Free)특수작업치료<br>PT: 비침습적 무통증 신호요법(RMS)[복잡][2부위 이상] (MZ012A) |\n| 회복기 | 치료시간 외 | 에소글러브 등 | CR6 | H○○○+CR6(F)+메디+TDCS (에소) | OT: (Free)특수작업치료<br>PT: 비침습적 무통증 신호요법(RMS)[복잡][기타] (MZ012C) |\n| 비회복기 | 치료시간 외 | 인모션 | CR7 · 7만원 (EX022A) | ○○○+CR7(비)+(F)+TDCS (인모션) | (비급여)전산화인지재활치료(상지로봇포함) + (Free)특수작업치료 |\n| 비회복기 | 치료시간 외 | 에소글러브·스마트글러브·스마트보드·아이어스 | CR6 · 6만원 (EX022) | ○○○+CR6(비)+(F)+TDCS (스마트글러브) | (비급여)전산화인지재활치료(주의,기억) + (Free)특수작업치료 |\n\n- (Free)특수작업치료는 hand function 관련 내용 작성, 코멘트란에 부착 위치, 전류, 부착 시간(30분) 기입\n\n**메디페인 PT 액팅 코드 (CR 기준)**\n| CR | PT 액팅 |\n|---|---|\n| CR4 | 비침습적 무통증 신호요법(RMS)[복잡] (MZ012B) |\n| CR6 | 비침습적 무통증 신호요법(RMS)[복잡][기타] (MZ012C) |\n| CR7 | 비침습적 무통증 신호요법(RMS)[복잡][2부위 이상] (MZ012A) |\n\n**시간표의 (F) 표기**\n- (F) = 특수작업치료를 **Free**로 넘긴다는 표시입니다.\n- 치료시간 외: CR7(F), CR6(F) → (Free)특수작업치료 + 메디페인\n- 치료시간 내: (F) 없음 → **(회3)특수작업치료** + 메디페인\n- 비회복기: CR6(비)+(F) → CR은 비급여로, 특수작업치료는 Free로\n\n### 예외\n| 상황 | 시간표 예시 | 비용 |\n|---|---|---|\n| 메디·tDCS 시행 안 하고 1:1 시간 내 장비만 (에소글러브·스마트글러브·스마트보드) | H○○○ (에소글러브) | 따로 비용 발생 X |\n| 오더 없이 tDCS 시행 (예외) | H○○○+tDCS(F) | 따로 비용 발생 X |\n\n### P/N 작성 예시 (경두개직류자극술 액팅 시)\n> 전극 위치·시간은 예시입니다. 환자별로 업로드된 전극 위치와 실제 시행 시간으로 작성하세요.\n\n경두개직류자극술 (시작-종료 시간)\n\n**자극 정보**\n1. 전극 위치: 양극(+) Candidate 40 (-57.79, 1.22, 79.46) / 음극(-) Candidate 82 (-5.30, 23.75, -48.31)\n2. 자극 강도: 2.0mA 직류 전류\n3. 자극 시간: 30분\n\n**시행 과정**\n1. 맞춤형 전극 위치 결정 (Neurophet tES LAB 소프트웨어 활용)\n2. 두피 세정 및 전극 준비 (식염수 적신 스펀지 패치)\n3. 전극 부착 및 헤드캡으로 고정\n4. 재활의학과 전문의 감독하에 자극 시행\n\n- comment: 특이사항 없음.";
+$('ref').innerHTML = fmt(REF);
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on',p.id===b.dataset.p));
+});
+tdRender();
+</script>
+</body>
+</html>

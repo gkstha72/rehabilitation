@@ -90,6 +90,11 @@ input[type=search],input[type=number],input[type=text],select,textarea{
   border-radius:7px;background:var(--panel);color:var(--ink);
 }
 textarea{width:100%;resize:vertical;line-height:1.5}
+button.x{
+  border:0;background:none;color:var(--dim);font:inherit;font-size:15px;line-height:1;
+  padding:2px 6px;border-radius:6px;cursor:pointer;opacity:.45;
+}
+button.x:hover{background:var(--badbg);color:var(--bad);opacity:1}
 .chip{
   font:inherit;font-size:12px;padding:5px 10px;border-radius:999px;cursor:pointer;
   border:1px solid var(--line);background:var(--panel);color:var(--dim);
@@ -220,6 +225,7 @@ label.cb{gap:7px}
         <button data-m="pat">환자별</button>
       </div>
       <span class="n" id="nCount"></span>
+      <button class="mini" id="nUndo" hidden></button>
       <span class="sp"></span>
       <button class="mini" id="imgCopy">이미지 복사</button>
       <button class="mini" id="xlCopy">엑셀로 복사</button>
@@ -1370,6 +1376,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   // ---------- 파일 읽기 ----------
   function readFile(file) {
     FILE = file.name;
+    nHidden = {}; nHideN = 0;
     setStage('파일 읽는 중...');
     var fr = new FileReader();
     fr.onerror = function () { fail('파일을 읽지 못했습니다.'); };
@@ -1421,6 +1428,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     $('#app').hidden = false;
     $('#fileinfo').textContent = FILE + (PERIOD ? ' · ' + PERIOD.replace('조회기간 :', '').trim() : '');
 
+    S.notice.forEach(function (x, i) { x._id = i; });
     renderCards();
     renderNotice();
     renderGroup();
@@ -1451,11 +1459,15 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
   // ----- 공지용 -----
   var noticeMode = 'all';
+  var nHidden = {}, nHideN = 0;
   function renderNotice() {
-    var list = S.notice;
+    var list = nHideN ? S.notice.filter(function (x) { return !nHidden[x._id]; }) : S.notice;
     $('#nCount').textContent = list.length.toLocaleString() + '건';
+    $('#nUndo').hidden = !nHideN;
+    $('#nUndo').textContent = '지운 ' + nHideN + '건 되돌리기';
     if (!list.length) {
-      $('#noticeBody').innerHTML = '<p class="empty">확인할 항목이 없습니다. 이 기간은 깨끗합니다.</p>';
+      $('#noticeBody').innerHTML = '<p class="empty">' +
+        (nHideN ? '남은 항목이 없습니다.' : '확인할 항목이 없습니다. 이 기간은 깨끗합니다.') + '</p>';
       return;
     }
     if (nSortKey) {
@@ -1485,7 +1497,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       var on = nSortKey === c.k;
       return '<th class="s' + (c.nw ? ' nw' : '') + (on ? ' on' : '') + '" data-s="' + c.k + '">' +
         c.t + '<i>' + (on ? (nSortDir > 0 ? '▲' : '▼') : '↕') + '</i></th>';
-    }).join('') + '</tr>';
+    }).join('') + '<th class="nw"></th></tr>';
 
     var html = order.map(function (k, gi) {
       var rows = groups[k].map(function (x) {
@@ -1495,7 +1507,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
           }
           var v = c.k === 'date' ? x.date.slice(5) : x[c.k];
           return '<td' + (c.nw ? ' class="nw"' : '') + '>' + esc(v) + '</td>';
-        }).join('') + '</tr>';
+        }).join('') + '<td class="nw"><button class="x" data-i="' + x._id + '" title="이 줄 지우기">×</button></td></tr>';
       }).join('');
       return '<section class="grp" data-gi="' + gi + '">' +
         (k ? '<h3>' + esc(groupLabel(k)) + ' <em>' + groups[k].length + '건</em>' +
@@ -1508,6 +1520,12 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     $('#noticeBody').innerHTML = html;
     CURLIST = list;
 
+    $$('#noticeBody .x').forEach(function (b) {
+      b.addEventListener('click', function () {
+        nHidden[b.getAttribute('data-i')] = 1; nHideN++;
+        renderNotice();
+      });
+    });
     $$('#noticeBody th.s').forEach(function (th) {
       th.addEventListener('click', function () {
         var k = th.getAttribute('data-s');
@@ -2182,6 +2200,9 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     });
     $('#xlCopy').addEventListener('click', function () {
       copyTable(CURLIST, this, true, true);
+    });
+    $('#nUndo').addEventListener('click', function () {
+      nHidden = {}; nHideN = 0; renderNotice();
     });
     $('#reset').addEventListener('click', function () {
       S = null; LASTROWS = null; $('#app').hidden = true; $('#intro').hidden = false;

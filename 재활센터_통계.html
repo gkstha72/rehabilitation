@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-19 b237</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-19 b238</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -710,7 +710,16 @@ function isDosuPatientToken(base) {
 
 // C.P.M 표기 — +CPM 또는 +패시브
 var CPM_MARK = /\+\s*(CPM|패시브)/i;
+// 평가 영어 기입명(MMSE · GDS · MFT · MBI · SCIM · NCSE · GUSS · MMT · ROM …)은 치료 처방 글자가 아니다.
+//   "MMSE홍길동" 이 M→MAT, "SCIM" 이 S→특수작업, "(F)MMSE" 가 프리 로 잡히지 않게
+//   처방을 가르기 전에 이 글자(와 바로 앞 (F) · (프리))를 떼어 낸다.
+var EVAL_EN_WORD_RE = /(?:\(\s*(?:F|FREE|프리)\s*\)\s*)?(?<![A-Za-z])(?:MMSE\s*&\s*GDS|MMT\s*&\s*ROM|MMSE|GDS|MFT|MBI|SCIM|NCSE|GUSS|LOTCA|MVPT|MMT|ROM)(?![A-Za-z])/gi;
+function stripEvalWords(token) {
+    return String(token == null ? "" : token).replace(EVAL_EN_WORD_RE, "").trim();
+}
+
 function classifyPtToken(token) {
+    token = stripEvalWords(token);
     // 환자 이름이 없는 칸은 실적이 아니다.
     // 물리 시간표에 "FES" 라고만 적어 두는 건 그 시간에 FES 자리에 있다는 표시일 뿐이다.
     if (!/[가-힣]{2,}/.test(String(token||""))) return null;
@@ -2524,6 +2533,8 @@ function analyzeOtMasterLogic() {
                 debugLog[key].push(cellText);
             }
             items.forEach(function(item) {
+                item = stripEvalWords(item);          // 평가 영어 기입명(SCIM · (F)MMSE …)은 처방 글자 아님
+                if (!item) return;
                 if (_pwCtx) { var _tw = pwWardOfToken(item); _pwCtx.tok = _tw ? { w: _tw } : null; }
                 var u = item.toUpperCase();
                 var fc = item[0]; var isKorean = fc >= "가" && fc <= "힣";
@@ -2635,6 +2646,8 @@ function analyzeStMasterLogic() {
             var patients = cellText.replace(/\+/g,",").trim().split(/[\s,]+/).map(function(x){ return x.trim(); }).filter(function(x){ return x.length>0; });
             var localHCount = 0, localSCount = 0;
             patients.forEach(function(pt) {
+                pt = stripEvalWords(pt);              // 평가 영어 기입명(GDS · GUSS …)은 비회 S 가 아니다
+                if (!pt) return;
                 var u = pt.toUpperCase();
                 if (u.includes("H2")) { therapists.forEach(function(th){ timeStats[th]["H2"] += 1; }); return; }
                 if (u.endsWith("S"))  { localSCount++; }
@@ -4744,6 +4757,8 @@ function computeDetailDiff(therapist, label, room) {
 
     // 토큰 처방 분류 함수
     function getTokenLabel(token) {
+        token = stripEvalWords(token);
+        if (!token) return null;
         var base = token.split("+")[0].toUpperCase().trim();
         var u = token.toUpperCase();
         if (MINUTE_MEMO_PATTERN.test(base)) return null;
@@ -6185,7 +6200,7 @@ function isNoOrderTdcs(text) {
 
 // 작업치료 칸의 처방 접두 판정 (교차 검증 집계와 같은 규칙)
 function classifyOtTokenForDischarge(token) {
-    var u = String(token||"").trim().toUpperCase();
+    var u = stripEvalWords(token).toUpperCase();
     if (!u) return "";
     if (u.includes("(F)") || u.includes("(필")) {
         var af = u.replace(/^\(F\)|^\(필[^)]*\)/, "").replace(/\(F\)|\(필[^)]*\)/g, "").trim();

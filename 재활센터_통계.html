@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-18 b236</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-19 b237</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -534,8 +534,8 @@ var otDataCodes = {
     "COMPLEX":["MM112"],"SPECIAL":["MM113","MM1131"],"ADL":["MM114"],
     "DYSPHAGIA":["MX141","MX142"],"VITAL STIM":["MZ0081","MZ0082"],"경두개직류":["DF003B"],
     "CR6(비)":["51020","51020^","EX022"],"CR7(비)":["EX022A"],"CR6(F),CR7(F)":["EX022B","MM113A"],"RS":["DF002"],
-    "H2":["IM11301","IM11302","IM11303","IM11304","IM11305","IM11306","IM11307","IM11308","IM11309","IM11310","IM11311","IM11312","IM11313","IM11314","IM11315","IM11316"],
-    "H3":["IM141001","IM141002","IM141003","IM141004","IM141005","IM141006","IM141007","IM141008","IM141009","IM141010","IM141011","IM141012","IM141013","IM141014","IM141015","IM141016","IM114001","IM114002","IM114003","IM114004","IM114005","IM114006","IM114007","IM114008","IM114009","IM114010","IM114011","IM114012","IM114013","IM114014","IM114015","IM114016","IM009001","IM009002","IM009003","IM009004","IM009005","IM009006","IM009007","IM009008","IM009009","IM009010","IM009011","IM009012","IM009013","IM009014","IM009015","IM009016","IM113001","IM113002","IM113003","IM113004","IM113005","IM113006","IM113007","IM113008","IM113009","IM113010","IM113011","IM113012","IM113013","IM113014","IM113015","IM113016"]
+    "H2":["IM11301","IM11302","IM11303","IM11304","IM11305","IM11306","IM11307","IM11308","IM11309","IM11310","IM11311","IM11312","IM11313","IM11314","IM11315","IM11316","IM00801","IM00802","IM00803","IM00804","IM00805","IM00806","IM00807","IM00808","IM00809","IM00810","IM00811","IM00812","IM00813","IM00814","IM00815","IM00816"],   // IM008xx = [회Ⅱ]연하재활 기능적전기자극치료 (시간표 H2이름V)
+    "H3":["IM141001","IM141002","IM141003","IM141004","IM141005","IM141006","IM141007","IM141008","IM141009","IM141010","IM141011","IM141012","IM141013","IM141014","IM141015","IM141016","IM114001","IM114002","IM114003","IM114004","IM114005","IM114006","IM114007","IM114008","IM114009","IM114010","IM114011","IM114012","IM114013","IM114014","IM114015","IM114016","IM009001","IM009002","IM009003","IM009004","IM009005","IM009006","IM009007","IM009008","IM009009","IM009010","IM009011","IM009012","IM009013","IM009014","IM009015","IM009016","IM113001","IM113002","IM113003","IM113004","IM113005","IM113006","IM113007","IM113008","IM113009","IM113010","IM113011","IM113012","IM113013","IM113014","IM113015","IM113016","IM008001","IM008002","IM008003","IM008004","IM008005","IM008006","IM008007","IM008008","IM008009","IM008010","IM008011","IM008012","IM008013","IM008014","IM008015","IM008016"]
 };
 var otMap = {};
 otOrder.forEach(function(name){ (otDataCodes[name]||[]).forEach(function(code){ otMap[code.trim().toUpperCase()] = name; }); });
@@ -4601,7 +4601,7 @@ var prescriptionDesc = {
     "SPECIAL":    { emr: "슬립코드: MM113, MM1131", sched: "시간표에서 S로 시작하는 토큰" },
     "ADL":        { emr: "슬립코드: MM114", sched: "시간표에서 A로 시작하는 토큰" },
     "DYSPHAGIA":  { emr: "슬립코드: MX141, MX142", sched: "시간표에서 D로 시작하는 토큰" },
-    "VITAL STIM": { emr: "슬립코드: MZ0081, MZ0082", sched: "비회복기 V○○○ 만 집계\n예) V이다혜\n※ H○○○+V · ○○○V 는 바이탈로 세지 않음 (H○○○+V 는 회Ⅲ/회Ⅱ)" },
+    "VITAL STIM": { emr: "슬립코드: MZ0081, MZ0082", sched: "비회복기 V○○○ 만 집계\n예) V이다혜\n※ H○○○+V · ○○○V 는 바이탈로 세지 않음 (H○○○+V 는 회Ⅲ/회Ⅱ)\n※ H2○○○V 는 [회Ⅱ]연하재활 기능적전기자극치료(IM00801~) 로 H2 에 집계" },
     "경두개직류": { emr: "슬립코드: DF003B", sched: "시간표에서 경두개 포함 토큰" },
     "CR6(비)":    { emr: "슬립코드: 51020, 51020^, EX022", sched: "시간표에서 CR6(비) 또는 CR6 포함 토큰\n※ CR6(F) 보다 나중에 체크 (우선순위: CR6(F) > CR6(비))" },
     "CR7(비)":    { emr: "슬립코드: EX022A", sched: "시간표에서 CR7(비) 또는 CR7 포함 토큰\n※ CR7(F) 보다 나중에 체크\n※ H환자의 맨 CR7(예: H김순복+CR7+메디+TDCS)은 회복기 치료시간 내라 회Ⅲ로 집계\n※ H조연호+tDCS(F) 는 (Free)특수작업치료로 집계" },
@@ -6285,6 +6285,9 @@ function dischargeWantOrder(sc, lblCodes) {
         if (lb === "SPECIAL")    return fmt(pre + "특수작업치료",         hCode("IM113001~016","IM11301~316","MM113 · MM1131"));
         if (lb === "DYSPHAGIA")  return fmt("연하장애재활치료",           "MX141 · MX142");
         if (lb === "VITAL STIM") return fmt("VitalStim",                  "MZ0081 · MZ0082");
+        // H2이름V · H이름+V = 회복기 연하재활 기능적전기자극치료
+        if (isHoe && /V$/i.test(tok.replace(/\([^)]*\)/g, "").trim()))
+            return fmt(pre + "연하재활 기능적전기자극치료", hCode("IM008001~016","IM00801~816","MZ0081 · MZ0082"));
     }
     // H · H1 · H2 · H3 는 "회복기 일반" 이라는 뜻일 뿐이라 코드가 수십 개다.
     // 그대로 늘어놓으면 읽을 수 없으므로 아래 치료실 규칙으로 처방명을 정한다.

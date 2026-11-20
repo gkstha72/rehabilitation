@@ -1028,12 +1028,13 @@ function analyzeDay(parsed, day, settings){
 
     /* 개수 */
     const count = { one:0, robot:0, machine:0, mg:0, electric:0, doshu:0, special:[], robotNames:[] };
-    let hasH = false, hasMG = false;
+    let hasH = false, hasMG = false, hasF = false;
 
     merged.forEach(list=>{
       list.forEach(e=>{
         if(e.group === "H" || e.group === "GR") hasH = true;
         if(e.group === "MG") hasMG = true;
+        if(e.group === "F") hasF = true;
         switch(e.kind){
           case "one": count.one++; break;
           case "robot": count.robot++; count.robotNames.push(e.robot); break;
@@ -1048,7 +1049,9 @@ function analyzeDay(parsed, day, settings){
       });
     });
 
-    const type = hasH ? "회복기" : (hasMG ? "비회복기" : "기타");
+    /* H·GR → 회복기 / M·G 또는 F(비회복기 전기)만 → 비회복기
+       예) F차광철 하나만 있는 환자도 비회복기 루틴(M·G·전기 개수)으로 확인 */
+    const type = hasH ? "회복기" : ((hasMG || hasF) ? "비회복기" : "기타");
 
     /* 연속성 */
     const occupied = new Set();

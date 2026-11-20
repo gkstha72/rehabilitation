@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-19 b238</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-20 b239</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -8904,8 +8904,10 @@ function expandEvalLabel(label, free) {
     if (free) {
         var fl = all.filter(function(lb){ return /^\[F\]/.test(lb); });
         if (fl.length) return fl;
-    } else if (/버그/.test(label)) {
-        // 버그균형 기입 규칙 (2026-11-13): "이름 버그균형" = 일반(E6613) · "(프리) 이름 버그균형" = [F](E6613A)
+    } else {
+        // 프리 표시가 없으면 일반 오더만 — (2026-11-13) 버그균형 · (2026-11-20) MMSE 도 같은 규칙
+        //   "이름 버그균형" = 일반(E6613) · "(프리) 이름 버그균형" = [F](E6613A)
+        //   "MMSE" = 간이정신진단검사(F6216) · "(F)MMSE" = [F]간이정신진단검사(F6216C)
         var nf = all.filter(function(lb){ return !/^\[F\]/.test(lb); });
         if (nf.length) return nf;
     }

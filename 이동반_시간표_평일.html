@@ -2929,6 +2929,17 @@ function buildListColumns(ws, range){
     }
     cols.forEach((h, i)=>{
       if(h.v.length > 12 || !SKIP_BLOCK_RE.test(h.v)) return;
+      // 외진·외출 명단 줄의 '공단방문'·'외진' 같은 사유 칸은 블록 머리글이 아니다.
+      //   예) BB4 '410 윤철만' | BC4 날짜 | BD4 '공단방문' → BD열 전체를 지우면
+      //       아래 ST 칸(BD20 장길순, BD23 송순심)까지 빠졌다.
+      //   같은 줄 왼쪽 1~3칸에 '호실+이름'이 있으면 명단 줄로 보고 건너뛴다.
+      for(let k = 1; k <= 3; k++){
+        const left = ws[XLSX.utils.encode_cell({r, c: h.c - k})];
+        if(left && typeof left.v === 'string' && ABSENCE_NAME_RE.test(left.v)){
+          console.log(`[제외블록 무시] "${h.v}" ${XLSX.utils.encode_col(h.c)}${r+1} — 외진·외출 명단 줄`);
+          return;
+        }
+      }
       //   블록 폭은 넉넉히 3열까지만 — 다음 머리글이 멀리 있어도 시트 끝까지 지우지 않는다.
       const nextC = (i + 1 < cols.length) ? cols[i+1].c - 1 : range.e.c;
       const end = Math.min(nextC, h.c + 2);

@@ -3510,12 +3510,20 @@ function processSheetForDay(wb, sheetName, day, nameMap, opts){
 
       // 같은 행에서 자리 번호(1,2,3,...) 컬럼 수집 — 1부터 연속해야 함
       const seatCols = [];
+      const labelCols = [];   // 자리 번호 앞의 '담당' 같은 짧은 머리글 열 (환자 칸 아님)
       let expectSeat = 1;
       for(let cc = c+1; cc <= range.e.c; cc++){
         const sc = ws[XLSX.utils.encode_cell({r, c: cc})];
-        if(sc && typeof sc.v === 'number' && Number.isInteger(sc.v) && sc.v === expectSeat){
+        // 자리 번호: 숫자 1,2,3… 또는 글자로 저장된 '1','2','3'…
+        const seatNo = !sc ? null
+          : (typeof sc.v === 'number' && Number.isInteger(sc.v)) ? sc.v
+          : (typeof sc.v === 'string' && /^\s*\d{1,2}\s*$/.test(sc.v)) ? parseInt(sc.v, 10) : null;
+        if(seatNo === expectSeat){
           seatCols.push(cc);
           expectSeat++;
+        }else if(seatCols.length === 0 && labelCols.length < 2 && sc && typeof sc.v === 'string' && sc.v.trim().length <= 4 && !/\d/.test(sc.v)){
+          // 예) J43 '통증' | K43 '담당' | L43 1 | M43 2 … — '담당' 열은 건너뛰고 자리 번호를 계속 찾는다
+          labelCols.push(cc);
         }else if(sc && sc.v != null && sc.v !== ''){
           break;  // 자리 번호 외 다른 값이 나오면 표 폭 종료
         }else if(seatCols.length > 0){
@@ -3546,6 +3554,7 @@ function processSheetForDay(wb, sheetName, day, nameMap, opts){
         // 시간 셀 + 자리 컬럼 셀 모두 메인 루프 처리에서 제외
         subtableCellSet.add(XLSX.utils.encode_cell({r: rr, c}));
         seatCols.forEach(cc => subtableCellSet.add(XLSX.utils.encode_cell({r: rr, c: cc})));
+        labelCols.forEach(cc => subtableCellSet.add(XLSX.utils.encode_cell({r: rr, c: cc})));   // '담당' 열도 환자 칸 아님
         dataRows++;
       }
       console.log(`[${day}] ${category} 표 감지: ${XLSX.utils.encode_cell({r,c})} "${trimmed}" 자리=${seatCols.length}열 데이터=${dataRows}행`);

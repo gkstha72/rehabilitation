@@ -1268,9 +1268,11 @@ function recordRosterDate(fileName, sheetName, rows){
       if(/^4(0[1-9]|1[0-5])호?$/.test(t)) n4++;
       else if(/^5(0[1-9]|1[0-5])호?$/.test(t)) n5++;
     }));
-    const ward = n4 > n5 ? '4' : (n5 > 0 ? '5' : '?');
+    // 전체 병실현황(2·4·5병동이 한 파일)이면 4·5병동 둘 다 이 날짜로 기록
     if(!state.rosterDates) state.rosterDates = {};
-    state.rosterDates[ward] = { date: m ? `${m[1]}-${m[2]}-${m[3]}` : '', file: fileName || '' };
+    const rec = { date: m ? `${m[1]}-${m[2]}-${m[3]}` : '', file: fileName || '' };
+    if(n4 > 0) state.rosterDates['4'] = rec;
+    if(n5 > 0) state.rosterDates['5'] = rec;
   }catch(e){ console.warn('병실현황 날짜 기록 실패:', e); }
 }
 // 검증용: 병실현황 날짜 점검 → {checks:[], issues:[]}

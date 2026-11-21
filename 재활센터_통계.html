@@ -5755,7 +5755,8 @@ function analyzePainTimeLogic() {
 
 // ── ⑩ 회Ⅱ 보행치료 오더 ─────────────────────────────────────────────────
 // (2026-11-21) [회Ⅱ]보행치료(IM30201~IM30216)는 쓰지 않기로 했다 — 회Ⅱ 는 [회Ⅱ]매트및이동치료만 넘긴다.
-//   넘어간 회Ⅱ 보행 슬립은 모두 오류로 띄운다.
+//   11/22 부터 넘어간 회Ⅱ 보행 슬립을 오류로 띄운다 (그 전에 넘어간 건은 괜찮음 — 집계도 그대로 H2).
+var H2_GAIT_STOP_FROM = 20261122;   // 이 날짜(처방일자)부터 회Ⅱ 보행 금지
 //   [회Ⅲ]보행치료(IM302001~016)는 해당 없음.
 function isH2GaitOrder(code, slip) {
     return /^IM302(0[1-9]|1[0-6])$/.test(code) || /\[\s*회\s*(Ⅱ|II|2)\s*\]\s*보행/.test(String(slip||""));
@@ -5774,6 +5775,10 @@ function analyzeH2GaitLogic() {
         var code = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
         var slip = globalEmrSlipNameIdx !== -1 ? String(row[globalEmrSlipNameIdx]||"").trim() : "";
         if (!isH2GaitOrder(code, slip)) return;
+        // 처방일자가 금지 시작일 전이면 넘어가도 괜찮다
+        var dIdx = (globalEmrHeaderRow || []).findIndex(function(c){ return String(c).trim() === "처방일자"; });
+        var dd = dIdx !== -1 ? parseAnyDate(String(row[dIdx] || "")) : null;
+        if (dd && (dd.y * 10000 + dd.mo * 100 + dd.d) < H2_GAIT_STOP_FROM) return;
         rows.push({
             patient: emrPatientLabel(row) || String(row[globalEmrPatientIdx]||"").trim(),
             who:  globalEmrTherapistIdx !== -1 ? String(row[globalEmrTherapistIdx]||"").trim()

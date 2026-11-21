@@ -5754,7 +5754,8 @@ function analyzePainTimeLogic() {
 }
 
 // ── ⑩ 회Ⅱ 보행치료 오더 ─────────────────────────────────────────────────
-// (2026-11-21) [회Ⅱ]보행치료(IM30201~IM30216)는 쓰지 않기로 했다 — 넘어간 슬립은 모두 오류로 띄운다.
+// (2026-11-21) [회Ⅱ]보행치료(IM30201~IM30216)는 쓰지 않기로 했다 — 회Ⅱ 는 [회Ⅱ]매트및이동치료만 넘긴다.
+//   넘어간 회Ⅱ 보행 슬립은 모두 오류로 띄운다.
 //   [회Ⅲ]보행치료(IM302001~016)는 해당 없음.
 function isH2GaitOrder(code, slip) {
     return /^IM302(0[1-9]|1[0-6])$/.test(code) || /\[\s*회\s*(Ⅱ|II|2)\s*\]\s*보행/.test(String(slip||""));
@@ -5783,10 +5784,10 @@ function analyzeH2GaitLogic() {
     });
     rows.sort(function(a,b){ return a.who < b.who ? -1 : a.who > b.who ? 1 : (a.time < b.time ? -1 : 1); });
     rows.forEach(function(r) {
-        pushIssue("회Ⅱ 보행", r.who, r.patient, r.time, "[회Ⅱ]보행치료 오더는 쓰지 않음 — " + r.slip + " (" + r.code + ")");
+        pushIssue("회Ⅱ 보행", r.who, r.patient, r.time, "[회Ⅱ]보행치료 오더는 쓰지 않음 → [회Ⅱ]매트및이동치료로 — " + r.slip + " (" + r.code + ")");
     });
     var html = "<h3 class='result-header' style='font-size:17px;border-color:" +
-               (rows.length ? "#c0392b" : "#16a085") + ";'>⑩ 회Ⅱ 보행치료 오더 (사용 안 함) — " + rows.length + "건</h3>";
+               (rows.length ? "#c0392b" : "#16a085") + ";'>⑩ 회Ⅱ 보행치료 오더 (사용 안 함 · 회Ⅱ 는 매트만) — " + rows.length + "건</h3>";
     if (rows.length === 0) {
         html += "<p style='color:#27ae60;font-weight:bold;'>없음</p>";
     } else {
@@ -6361,6 +6362,8 @@ function dischargeWantOrder(sc, lblCodes) {
     if (!isHLabel && lblCodes[lb] && lblCodes[lb].length)
         return fmt(ORDER_NAMES[lb] || lb, compactCodeList(lblCodes[lb]));
     if (g === "물리") {
+        // (2026-11-21) 회Ⅱ 는 보행치료를 쓰지 않는다 — 보행 칸이어도 [회Ⅱ]매트및이동치료만 넘긴다
+        if (isHoe && isH2) return fmt(pre + "매트및이동치료", hCode("IM301001~016","IM30101~116","MM3012"));
         if (/보행|워킹|런닝|클라|엑소|엔젤|모닝/.test(tok))
             return fmt(pre + "보행치료", hCode("IM302001~016","IM30201~216","MM3022"));
         return fmt(pre + "매트및이동치료", hCode("IM301001~016","IM30101~116","MM3012"));

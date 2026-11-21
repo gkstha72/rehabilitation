@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-21 b240</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-21 b241</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -391,6 +391,7 @@ ICT(15) + MI(5) = <b>20분</b> · ICT(15) + HP(15) = <b>30분</b> · ICT(15) + B
 <div id="dosuConflictArea"></div>
 <div id="painTimeArea"></div>
 <div id="dupNameArea"></div>
+<div id="h2GaitArea"></div>
 </div>
 
 <div class="container">
@@ -1931,7 +1932,7 @@ function clearResultAreas() {
     resetHeaderRowCache();
     ["ptTripleArea","otTripleArea","stTripleArea","painTripleArea","evalArea",
      "orderIssueArea","crPairArea","qtyCheckArea","robotGaitArea","overlapArea",
-     "slipDetailArea","dosuConflictArea","painTimeArea","dupNameArea",
+     "slipDetailArea","dosuConflictArea","painTimeArea","dupNameArea","h2GaitArea",
      "dischargeArea","evalCheckArea","otIncArea","excludeResultArea"].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.innerHTML = "";
@@ -5752,6 +5753,56 @@ function analyzePainTimeLogic() {
     area.innerHTML = html;
 }
 
+// ── ⑩ 회Ⅱ 보행치료 오더 ─────────────────────────────────────────────────
+// (2026-11-21) [회Ⅱ]보행치료(IM30201~IM30216)는 쓰지 않기로 했다 — 넘어간 슬립은 모두 오류로 띄운다.
+//   [회Ⅲ]보행치료(IM302001~016)는 해당 없음.
+function isH2GaitOrder(code, slip) {
+    return /^IM302(0[1-9]|1[0-6])$/.test(code) || /\[\s*회\s*(Ⅱ|II|2)\s*\]\s*보행/.test(String(slip||""));
+}
+function analyzeH2GaitLogic() {
+    var area = document.getElementById("h2GaitArea");
+    if (!area) return;
+    if (!globalEmrRows || globalEmrRows.length === 0 || globalEmrCodeIdx === -1) {
+        area.innerHTML = "<p style='color:#e74c3c;font-weight:bold;'>⚠️ 먼저 EMR 엑셀을 연동해 주세요.</p>";
+        return;
+    }
+    var rows = [];
+    globalEmrRows.forEach(function(row) {
+        if (!row) return;
+        if (globalEmrDcIdx !== -1 && String(row[globalEmrDcIdx]||"").trim() !== "") return;
+        var code = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
+        var slip = globalEmrSlipNameIdx !== -1 ? String(row[globalEmrSlipNameIdx]||"").trim() : "";
+        if (!isH2GaitOrder(code, slip)) return;
+        rows.push({
+            patient: emrPatientLabel(row) || String(row[globalEmrPatientIdx]||"").trim(),
+            who:  globalEmrTherapistIdx !== -1 ? String(row[globalEmrTherapistIdx]||"").trim()
+                                               : String(row[globalEmrNameIdx]||"").trim(),
+            time: globalEmrTimeIdx !== -1 ? String(row[globalEmrTimeIdx]||"").trim() : "",
+            code: code, slip: slip
+        });
+    });
+    rows.sort(function(a,b){ return a.who < b.who ? -1 : a.who > b.who ? 1 : (a.time < b.time ? -1 : 1); });
+    rows.forEach(function(r) {
+        pushIssue("회Ⅱ 보행", r.who, r.patient, r.time, "[회Ⅱ]보행치료 오더는 쓰지 않음 — " + r.slip + " (" + r.code + ")");
+    });
+    var html = "<h3 class='result-header' style='font-size:17px;border-color:" +
+               (rows.length ? "#c0392b" : "#16a085") + ";'>⑩ 회Ⅱ 보행치료 오더 (사용 안 함) — " + rows.length + "건</h3>";
+    if (rows.length === 0) {
+        html += "<p style='color:#27ae60;font-weight:bold;'>없음</p>";
+    } else {
+        html += "<div style='max-height:300px;overflow:auto;border:1px solid #ccc;border-radius:6px;'>";
+        html += "<table class='result-table' style='table-layout:auto;margin-bottom:0;'><thead><tr>";
+        ["담당","수진자명","시간","슬립명","코드"].forEach(function(x){ html += "<th class='th-sub-label'>" + x + "</th>"; });
+        html += "</tr></thead><tbody>";
+        rows.forEach(function(r) {
+            html += "<tr class='error-cell'><td>" + r.who + "</td><td>" + r.patient + "</td><td>" + r.time +
+                    "</td><td style='text-align:left;'>" + r.slip + "</td><td>" + r.code + "</td></tr>";
+        });
+        html += "</tbody></table></div>";
+    }
+    area.innerHTML = html;
+}
+
 // ── ⑨ 동명이인 오더 점검 ────────────────────────────────────────────────
 // 시간표는 "김영재1 · 김영재2", EMR은 "김영재 · 김영재2" 로 적히는 규칙을 이용해
 // 이름이 같은 환자끼리 오더가 서로 바뀌어 넘어가지 않았는지 대조한다.
@@ -6896,7 +6947,8 @@ function analyzeOrderCheckAll() {
         ["⑥ 담당 불일치",    analyzeSlipDetailLogic,   "slipDetailArea"],
         ["⑦ 도수 충돌",      analyzeDosuConflictLogic, "dosuConflictArea"],
         ["⑧ 통증 시간",      analyzePainTimeLogic,     "painTimeArea"],
-        ["⑨ 동명이인",       analyzeDupNameLogic,      "dupNameArea"]
+        ["⑨ 동명이인",       analyzeDupNameLogic,      "dupNameArea"],
+        ["⑩ 회Ⅱ 보행",       analyzeH2GaitLogic,       "h2GaitArea"]
     ];
     var failed = [];
     steps.forEach(function(st) {

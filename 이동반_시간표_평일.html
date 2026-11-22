@@ -3912,8 +3912,27 @@ function autoFillDaily(ev, defaultCategory){
 
 // 엑셀 파일이든 붙여넣기든, 워크북 하나를 받아 시간표를 채우는 공통 처리.
 //   ev는 파일 input을 비우기 위한 것 — 붙여넣기에서는 껍데기를 넘긴다.
+// ===== 예시·양식 시트 제외 =====
+// 시트 이름에 '예시'·'양식'·'템플릿'·'샘플'이 들어간 시트는 어떤 경우에도 읽지 않는다.
+//   예) '시간표 정리 예시본'(지난 날짜 내용)이 첫 시트라 그 내용이 반영될 뻔했다(11/23).
+const SAMPLE_SHEET_RE = /예시|양식|템플릿|샘플|sample|template/i;
+function dropSampleSheets(wb){
+  const dropped = wb.SheetNames.filter(n => SAMPLE_SHEET_RE.test(n));
+  if(dropped.length){
+    wb.SheetNames = wb.SheetNames.filter(n => !SAMPLE_SHEET_RE.test(n));
+    dropped.forEach(n => { delete wb.Sheets[n]; });
+    console.log('[예시 시트 제외]', dropped);
+  }
+  return wb.SheetNames.length > 0;
+}
+
 function autoFillFromWorkbook(wb, defaultCategory, ev){
   const nameMap = buildNameMap();
+  if(!dropSampleSheets(wb)){
+    alert('예시·양식 시트만 있는 파일이라 읽지 않았습니다.\n날짜 시트가 있는 파일을 불러와 주세요.');
+    if(ev && ev.target) ev.target.value = '';
+    return;
+  }
   {
     try{
       // 사용자 날짜에 맞는 시트 자동 선택 (없으면 데이터 가장 많은 시트)

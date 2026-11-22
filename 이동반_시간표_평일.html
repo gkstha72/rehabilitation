@@ -1754,7 +1754,25 @@ function pickBestSheet(wb, targetDate){
     }
   }
 
-  // 2) 한글 셀이 가장 많은 시트 (가장 채워진 시트)
+  // 1.5) 날짜를 아직 안 정했으면: 시트 이름에 날짜(11_23 등)가 있는 시트 중 가장 늦은 날짜.
+  //   '시간표 정리 예시본'처럼 데이터가 꽉 찬 예시·양식 시트를 실제 날짜 시트보다 먼저 고르면 안 된다.
+  //   (11/23 파일: 예시본(11/20 내용)이 첫 시트라 그걸 읽어 날짜가 11/20으로 잡혔다)
+  {
+    const SAMPLE_RE = /예시|양식|템플릿|샘플|sample|template/i;
+    let bestDated = null, bestKey = -1;
+    for(const sn of wb.SheetNames){
+      if(SAMPLE_RE.test(sn)) continue;
+      const m = sn.match(/(?:^|\D)(\d{1,2})[_.](\d{1,2})(?!\d)/);
+      if(!m) continue;
+      const mo = +m[1], da = +m[2];
+      if(mo < 1 || mo > 12 || da < 1 || da > 31) continue;
+      const key = mo * 100 + da;
+      if(key > bestKey){ bestKey = key; bestDated = sn; }
+    }
+    if(bestDated) return bestDated;
+  }
+
+  // 2) 한글 셀이 가장 많은 시트 (가장 채워진 시트) — 예시·양식 시트는 마지막 수단
   let best = null, max = 0;
   for(const name of wb.SheetNames){
     const ws = wb.Sheets[name];

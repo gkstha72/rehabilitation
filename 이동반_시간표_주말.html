@@ -408,16 +408,19 @@ table.sched .col-time{min-width:56px;width:56px}
 .homonym-panel .homonym-apply:hover{background:#b8891f}
 
 /* ===== PRINT — A3 portrait, 한 병동 = 한 장 ===== */
-@page{size:A3 portrait;margin:4mm}
+/* 용지 여백 0 → 브라우저가 위·아래에 날짜·시간·제목을 찍을 자리가 없어 안 나온다.
+   대신 본문 안쪽에 8mm 여백을 둬서 프린터가 가장자리를 못 찍어도 표가 잘리지 않는다.
+   (인쇄 창에서 여백은 '기본' 또는 '없음' 아무거나 → 같은 결과) */
+@page{size:A3 portrait;margin:0}
 @media print{
-  html,body{width:289mm;padding:0;margin:0;background:#fff;font-size:8pt;color:#000;line-height:1}
+  html,body{width:297mm;box-sizing:border-box;padding:0;margin:0;background:#fff;font-size:8pt;color:#000;line-height:1}
   .header,.dash,.toolbar,.help,.status,.legend,.picker,.verify-panel,.homonym-panel{display:none !important}
   .sched-wrap{max-height:none;overflow:visible;border:none;border-radius:0;padding:0;background:#fff}
-  .ward-page{
+  .ward-page{padding:8mm 8mm 0 8mm;box-sizing:border-box;
     page-break-after:always;page-break-inside:avoid;
     break-inside:avoid;break-after:page;
     margin:0;background:#fff;
-    width:289mm;overflow:visible;
+    width:297mm;overflow:visible;
   }
   .ward-page:last-child{page-break-after:auto;break-after:auto}
   .ward-title{

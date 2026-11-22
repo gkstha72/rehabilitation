@@ -148,7 +148,7 @@ td.clickable:hover { opacity:0.75; }
 </head>
 <body>
 <div class="container">
-<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-21 b242</span></div>
+<div style="text-align:right;margin:-8px 0 6px;font-size:18px;font-weight:900;color:#c0392b;letter-spacing:.5px;">버전 <span id="buildStamp">2026-11-22 b243</span></div>
 <h1 class="main-title">&#127973; EMR 청구 &#8596; 시간표 실적 마감 교차 대조 시스템</h1>
 <div id="dateBanner" style="display:none;margin:0 0 14px;padding:12px 16px;border-radius:10px;
      background:linear-gradient(90deg,#eaf4fb,#f7fbfe);border:1px solid #cfe3f2;">
@@ -6658,6 +6658,78 @@ var outpatientForm = { both: "", ns: "", os: "" };
 function outpatientIsOsCode(code) {
     return isPainCode(code) || /^KR001/.test(code) || /^MM102/.test(code);
 }
+// ── 외래 명단 — 시간표에만 있고 아직 액팅 전인 외래 ─────────────────────────
+//   (2026-11-22) EMR 슬립은 액팅을 넘겨야 생기므로, 아직 안 넘긴 외래는 명단에서 빠졌다.
+//   ① EMR 에서 외래로 본 환자를 이 브라우저에 기억해 둔다 (ns/os 도 함께). 입원으로 나오면 지운다.
+//   ② 시간표에 그 환자가 있는데 오늘 EMR 에 아직 없으면 → 외래 명단에 넣는다.
+//   ③ 시간표에 "(외래…)" 라고 적힌 칸의 환자도 넣는다 (처음 오는 외래).
+//   부도(주황) 칸 · 취소선 줄은 안 온 것이라 넣지 않는다.
+var OUTPT_MEM_KEY = "outpatientKnown_v1";
+function outptMemLoad() { try { return JSON.parse(localStorage.getItem(OUTPT_MEM_KEY) || "{}") || {}; } catch (e) { return {}; } }
+function outptMemSave(m) { try { localStorage.setItem(OUTPT_MEM_KEY, JSON.stringify(m)); } catch (e) {} }
+function outptLearn(rows) {
+    if (!rows || globalEmrVisitIdx === -1 || globalEmrPatientIdx === -1) return;
+    var m = outptMemLoad(), seen = {};
+    rows.forEach(function(row) {
+        if (!row) return;
+        var nm = String(row[globalEmrPatientIdx]||"").trim(); if (!nm) return;
+        var vis = String(row[globalEmrVisitIdx]||"").trim();
+        var code = String(row[globalEmrCodeIdx]||"").trim().replace(/\s+/g,"").toUpperCase();
+        var slip = globalEmrSlipNameIdx !== -1 ? String(row[globalEmrSlipNameIdx]||"").trim() : "";
+        var s0 = seen[nm] || (seen[nm] = { out: false, inp: false, visit: false, physio: false, other: false });
+        if (vis !== "외래") { s0.inp = true; return; }
+        s0.out = true;
+        if (/^IA87/.test(code) || /방문재활/.test(slip)) { s0.visit = true; return; }
+        if (isNonTherapySlip(code, slip)) return;
+        if (outpatientIsOsCode(code)) s0.physio = true; else s0.other = true;
+    });
+    Object.keys(seen).forEach(function(nm) {
+        var s0 = seen[nm];
+        if (s0.inp && !s0.out) { delete m[nm]; return; }
+        if (!s0.out) return;
+        if (s0.visit) { m[nm] = { w: "visit" }; return; }
+        m[nm] = { w: (s0.physio && !s0.other) ? "os" : "ns" };
+    });
+    outptMemSave(m);
+}
+// 시간표에 있지만 오늘 EMR 에 아직 없는 외래 → [{ name, w, why }]
+function outptFromTimetable(emrNames) {
+    var mem = outptMemLoad(), found = {}, list = [];
+    var grids = ["ptGridTable","otGridTable","stGridTable","etGridTable","mtGridTable","painGridTable"];
+    grids.forEach(function(gid) {
+        for (var r = 0; r < ROW_COUNT; r++) for (var c = 0; c < COL_COUNT; c++) {
+            var el = document.getElementById(gid + "-cell-" + r + "-" + c);
+            var v = el ? el.value.trim() : "";
+            if (!v) continue;
+            if (cellFmt(gid, r, c).b) continue;                 // 부도
+            var t = liveCellText(gid, r, c, v);                 // 취소선 줄 뺌
+            if (!t) continue;
+            Object.keys(mem).forEach(function(nm) {
+                if (emrNames[nm] || mem[nm].w === "visit") return;
+                if (!textHasPatient(t, nm)) return;
+                var f = found[nm] || (found[nm] = { pain: true, dosu: false, mark: false });
+                if (gid !== "painGridTable") f.pain = false;
+                found[nm].mem = true;
+            });
+            if (/외래/.test(t)) {
+                var mm = t.replace(/^[A-Za-z0-9.()\s]*/, "").match(/^([가-힣]{2,4})(?=[\s(+\n]|외래|$)/) ||
+                         t.match(/(?:^|[\s\n])[A-Za-z]{0,3}([가-힣]{2,4})[\s\n]*\(?외래/);
+                var nm2 = mm && mm[1];
+                if (nm2 && nm2 !== "외래" && !emrNames[nm2] && !(mem[nm2] && mem[nm2].w === "visit")) {
+                    var f2 = found[nm2] || (found[nm2] = { pain: true, dosu: false, mark: false });
+                    if (gid !== "painGridTable") f2.pain = false;
+                    f2.mark = true;
+                }
+            }
+        }
+    });
+    Object.keys(found).forEach(function(nm) {
+        var f = found[nm];
+        var w = mem[nm] ? mem[nm].w : (f.pain ? "os" : "ns");
+        list.push({ name: nm, w: w, why: f.mem ? "전에 외래" : "시간표 외래 표시" });
+    });
+    return list;
+}
 function showOutpatientList() {
     var area = document.getElementById("outpatientArea");
     if (!area) return;
@@ -6685,6 +6757,13 @@ function showOutpatientList() {
         if (p.visit) { visit.push(nm); return; }
         if (p.physio && !p.other) os.push(nm); else ns.push(nm);
     });
+    // 시간표에만 있는 외래 (아직 액팅 전) — EMR 에 오늘 이름이 하나도 없는 사람만
+    outptLearn(globalEmrRows);
+    if (typeof _batch !== "undefined" && _batch.emrAll && _batch.emrAll !== globalEmrRows) outptLearn(_batch.emrAll);
+    var emrNames = {};
+    globalEmrRows.forEach(function(row){ if (row) { var n = String(row[globalEmrPatientIdx]||"").trim(); if (n) emrNames[n] = 1; } });
+    var ttOnly = outptFromTimetable(emrNames);
+    ttOnly.forEach(function(x) { if (x.w === "os") os.push(x.name); else ns.push(x.name); });
     function srt(a){ return a.sort(function(x,y){ return x.localeCompare(y, "ko"); }); }
     srt(ns); srt(os); srt(visit);
     function five(a){ var L = []; for (var i = 0; i < a.length; i += 5) L.push(a.slice(i, i + 5).join(" ")); return L.join("\n"); }
@@ -6713,6 +6792,8 @@ function showOutpatientList() {
         " · 칸이 풀리면 명단만: <a href='#' onclick='copyOutpatientForm(\"ns\");return false;'>ns 명단</a> / <a href='#' onclick='copyOutpatientForm(\"os\");return false;'>os 명단</a> (명단 칸 하나에 붙이기)</div></div>" +
         block("ns", "#1f618d", ns) +
         block("os", "#7d3c98", os) +
+        (ttOnly.length ? "<div style='margin-top:6px;font-size:12px;color:#a04000;'>⏳ 시간표에만 있고 아직 액팅 전 (명단에 포함): " +
+            ttOnly.map(function(x){ return x.name + "(" + x.w + " · " + x.why + ")"; }).join(", ") + "</div>" : "") +
         "</div>";
 }
 function copyOutpatientForm(ward) {

@@ -729,7 +729,10 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       var qv = C['수량'] >= 0 ? String(f(r, '수량')).trim() : '';
       var mi = minutesOf(f(r, '세부치료소요시간(분)'), sS, sE);
       var expQ = -1;
-      if (hoe) {
+      //  수량은 '슬립명칭에 회차가 붙은' 회복기 슬립만 시간으로 따진다.
+      //  Qd/Bid 같은 비회복기 슬립은 이름에 회차가 없으므로 수량 1이 맞다.
+      //  (세부코드로 뽑은 회차는 회차 검사용이지, 수량 규칙의 근거가 아니다)
+      if (hoeLbl) {
         if (mi > 0 && unit > 0) expQ = Math.max(1, Math.floor(mi / unit));
       } else {
         expQ = nonHoe;

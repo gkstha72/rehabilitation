@@ -9584,6 +9584,17 @@ function analyzeEvalCheck(silent) {
             hit = e; e.used = true; sc.slip = e; break;
         }
         if (!hit) {
+            // 같은 환자 · 같은 검사가 시간표에 두 번 적혔고 슬립은 이미 다른 칸과 짝이 맞았으면
+            //   안 넘긴 게 아니라 시간표 중복 기입이다 (예: "김형례 GDS" + "김형례 MFT, 치매척도") (2026-11-26)
+            var dupOf = schedList.filter(function(o) {
+                return o !== sc && o.slip && o.patient === sc.patient && sc.labels.indexOf(o.slip.label) !== -1;
+            })[0];
+            if (dupOf) {
+                rows.push({ kind:"dupSched", level:"warn", patient:sc.patient, label:dupOf.slip.label,
+                            schedWho:sc.who, emrWho:dupOf.slip.who, slot:sc.slot, code:dupOf.slip.code,
+                            note:"시간표 중복 기입", raw:sc.raw, other:dupOf.raw });
+                return;
+            }
             rows.push({ kind:"noSlip", level:"bad", patient:sc.patient, label:sc.labels.join(" 또는 "),
                         schedWho:sc.who, emrWho:"-", slot:sc.slot, code:"-",
                         note:"EMR 평가 슬립 없음", raw:sc.raw });
@@ -9647,11 +9658,13 @@ function analyzeEvalCheck(silent) {
         if (r.kind === "unread")  return "평가 메모 같은데 " + r.why + " — 대조에서 빠짐";
         if (r.kind === "ambig")   return "신경인지 — 신경인지검사 · 무시 · 유형1,2 · NCSE 중 무엇인지 확인 필요";
         if (r.kind === "noSlip")  return r.label + " — EMR 평가 슬립 없음";
+        if (r.kind === "dupSched") return r.label + " — 시간표 중복 기입 (액팅 1건은 넘어감, 한 칸 지우기)" +
+                                          (r.other ? " · 다른 칸 〈" + r.other + "〉" : "");
         if (r.kind === "noSched") return r.label + " — 시간표에 평가 표기 없음";
         if (r.kind === "who")     return r.label + " — 담당 불일치";
         return r.label + " — 시간표 성함 오타 \"" + (r.typoText||"") + "\" → \"" + r.patient + "\"";
     }
-    var KIND_ORDER = { noSlip:1, noSched:2, ambig:3, unread:4, who:5, typo:6 };
+    var KIND_ORDER = { noSlip:1, noSched:2, ambig:3, unread:4, dupSched:5, who:6, typo:7 };
     function kindRank(k) { return KIND_ORDER[k] || 9; }
 
     var wrap = document.createElement("div");

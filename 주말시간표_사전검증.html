@@ -265,6 +265,39 @@ table.board tr.has-issue td.name{color:var(--bad);}
 
 .empty-msg{padding:6px 0;color:var(--good);font-size:13px;}
 
+/* 탭 */
+.tabs{display:flex;gap:6px;max-width:1240px;margin:0 auto 14px;border-bottom:1px solid var(--line);}
+.tabs button{
+  border:none;border-bottom:3px solid transparent;border-radius:0;background:transparent;
+  padding:9px 16px;font-size:14px;font-weight:600;color:var(--muted);
+}
+.tabs button:hover{background:transparent;color:var(--ink);}
+.tabs button.on{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* 기구 칸 채우기 */
+.fill-summary{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;margin:4px 0 14px;}
+.fill-summary b{font-variant-numeric:tabular-nums;}
+.fill-slot{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+.fill-slot.bad{border-color:#e6c0bc;}
+.fill-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;padding:10px 16px;background:#f8f9f7;border-bottom:1px solid var(--line);}
+.fill-head .time{font-size:15px;font-weight:700;color:var(--ink);}
+.fill-head span{font-size:12.5px;color:var(--muted);}
+.fill-warn{margin:0;padding:7px 16px;font-size:12.5px;color:var(--bad);background:var(--bad-soft);border-bottom:1px solid #f0d6d3;}
+table.fill{width:100%;border-collapse:collapse;font-size:13px;}
+table.fill td{padding:8px 12px;border-bottom:1px solid #f0f2ef;vertical-align:top;}
+table.fill tr:last-child td{border-bottom:none;}
+table.fill td.where{width:200px;white-space:nowrap;}
+table.fill td.who{width:170px;font-size:12px;color:var(--muted);}
+table.fill td.lines{font-family:var(--mono);font-size:12px;line-height:1.7;white-space:pre-line;}
+table.fill td.copy{width:96px;text-align:right;}
+table.fill tr.done td{background:#f3f8f5;}
+table.fill tr.done td.lines{color:var(--muted);}
+.side{display:inline-block;font-size:11px;font-weight:700;border-radius:4px;padding:0 6px;line-height:18px;margin-right:4px;}
+.side.PT{background:#e2eefb;color:#2f6fb0;}
+.side.OT{background:#f6e7ef;color:#b5487a;}
+.grp{display:inline-block;font-size:10.5px;font-weight:700;border-radius:4px;padding:0 5px;margin-left:4px;background:#e4f2f2;color:var(--k-mg);}
+button.copy-btn.done{background:var(--good-soft);border-color:#bfe0cb;color:var(--good);}
+
 @media (max-width:1000px){
   .tiles{grid-template-columns:repeat(3,minmax(0,1fr));}
 }
@@ -281,7 +314,7 @@ table.board tr.has-issue td.name{color:var(--bad);}
 
 @media print{
   body{background:#fff;padding:0;}
-  .card{display:none;}
+  .card,.tabs{display:none;}
   details.issue{break-inside:avoid;}
   .board-wrap{max-height:none;overflow:visible;}
 }
@@ -311,6 +344,12 @@ table.board tr.has-issue td.name{color:var(--bad);}
   <div id="layoutBox"></div>
 </section>
 
+<nav class="tabs" role="tablist">
+  <button type="button" class="on" data-tab="check">사전 검증</button>
+  <button type="button" data-tab="fill">기구 칸 채우기</button>
+</nav>
+
+<div id="tabCheck">
 <section class="card">
   <h2 class="card-title"><span class="num">2</span>검증 기준 고르기</h2>
 
@@ -375,6 +414,22 @@ table.board tr.has-issue td.name{color:var(--bad);}
 </section>
 
 <div id="result"></div>
+</div>
+
+<div id="tabFill" hidden>
+<section class="card">
+  <h2 class="card-title"><span class="num">2</span>기구 칸 채우기</h2>
+  <p class="hint">
+    치료사 칸에 <b>기구1 · 기구2</b>처럼 적힌 칸을 찾아, 같은 시간 기구표 환자를 <b>H이름+기구</b>로 나눠 넣습니다.<br>
+    <b>한 칸 5~7명</b>(18명 → 6·6·6, 남는 칸은 그대로) · <b>가까운 기구끼리</b> 묶기 · M·G는 PT 쪽 칸에, M과 G는 다른 칸에.
+  </p>
+  <div class="actions" style="margin-top:6px">
+    <button class="primary" id="fillButton" type="button" disabled>기구 칸 만들기</button>
+    <span class="hint" style="margin:0">숫자(기구1·기구2)는 구분용으로만 보고, 위치가 바뀌어도 매번 새로 찾습니다.</span>
+  </div>
+</section>
+<div id="fillResult" style="max-width:1240px;margin:0 auto;"></div>
+</div>
 
 </main>
 
@@ -1597,6 +1652,16 @@ function cellFontColor(cell, classFonts){
   return "";
 }
 
+/* 시트에 다시 붙여넣을 때 쓰는 원래 글자 — 칸 안 줄바꿈 유지 */
+function cellRawText(cell){
+  const clone = cell.cloneNode(true);
+  clone.querySelectorAll("br").forEach(br => br.replaceWith("\u0002"));
+  return String(clone.textContent || "")
+    .replace(/[ \t\r\n\u00a0]+/g," ")
+    .split("\u0002").map(t => t.trim()).join("\n")
+    .trim();
+}
+
 function cellText(cell){
   /* 칸 안 줄바꿈(<br>)을 띄어쓰기로 살려 둡니다. */
   const clone = cell.cloneNode(true);
@@ -1619,7 +1684,7 @@ function parseHtmlTable(html){
     return m ? m[1].trim() : "";
   });
 
-  const values = [], colors = [], underlines = [], fonts = [];
+  const values = [], colors = [], underlines = [], fonts = [], raws = [];
   const occupied = {};
 
   Array.from(table.querySelectorAll("tr")).forEach((tr, r)=>{
@@ -1630,6 +1695,7 @@ function parseHtmlTable(html){
     Array.from(tr.children).forEach(cell=>{
       while(occupied[r + "," + c]) c++;
       const value = cellText(cell);
+      const raw = cellRawText(cell);
       const color = cellBackground(cell, classColors);
       const under = cellUnderline(cell, classUnderlines);
       const font = cellFontColor(cell, classFonts);
@@ -1642,6 +1708,8 @@ function parseHtmlTable(html){
           colors[tr2] = colors[tr2] || [];
           underlines[tr2] = underlines[tr2] || [];
           values[tr2][tc] = value;
+          raws[tr2] = raws[tr2] || [];
+          raws[tr2][tc] = raw;
           colors[tr2][tc] = color;
           underlines[tr2][tc] = under;
           fonts[tr2] = fonts[tr2] || [];
@@ -1653,7 +1721,7 @@ function parseHtmlTable(html){
     });
   });
 
-  return { values: fillRows(values), colors: fillRows(colors), underlines: fillRows(underlines, false), fonts: fillRows(fonts) };
+  return { values: fillRows(values), colors: fillRows(colors), underlines: fillRows(underlines, false), fonts: fillRows(fonts), raws: fillRows(raws) };
 }
 
 function fillRows(rows, empty){
@@ -1689,7 +1757,361 @@ function parseTsv(text){
     field += ch;
   }
   if(field !== "" || row.length){ row.push(field); rows.push(row); }
+  parseTsv.raws = fillRows(rows.map(r => r.map(v => String(v).trim())));
   return fillRows(rows.map(r => r.map(normalize)));
+}
+
+/* ================================================================
+   8. 기구 칸 채우기
+   치료사 칸에 "기구1" "기구 2"처럼 적힌 칸을 찾아
+   같은 시간 기구표 환자를 "H이름+기구" 형태로 나눠 넣습니다.
+   - M · G 는 PT 쪽 기구 칸에만
+   - M 과 G 는 한 칸에 같이 넣지 않음
+   - H 는 그 시간 기구 칸 전체(PT · OT)에 고르게
+   ================================================================ */
+
+const MACHINE_SHORT = {
+  "경사":"경사","슬라":"슬라","슬라이드":"슬라","기립":"기립","워킹":"워킹","런닝":"런닝","러닝":"런닝",
+  "코끼리":"코끼리","스마트":"스마트","코로":"코로","바로":"바로","동적":"동적","어댑핏":"어댑핏",
+  "전동상지":"전상","전상":"전상","등속성에르고미터":"에르","에르고미터":"에르","에르":"에르",
+  "아크트레이너":"아크","아크":"아크","클라이밋":"클라","클라":"클라","진동기":"진동기","진동":"진동기"
+};
+
+function machineShort(header){
+  const base = compact(header).replace(/\(\d*\)/g,"").replace(/\d+$/,"");
+  return MACHINE_SHORT[base] || base;
+}
+
+function isMachineSlotText(text){
+  return /^기구\d*$/.test(compact(text));
+}
+
+/* 기구표 칸 하나 → 환자 목록
+   "H박창규+PWB(토) 박창규+PWB(일)" → H박창규+PWB(토) / H박창규+PWB(일)
+   "M나경숙 (보호자상주)"           → M나경숙(보호자상주) */
+const ENTRY_HEAD = /^(GR|[HGMNSADVF])([가-힣]{2,4})/;
+
+function machineEntries(text){
+  const out = [];
+  normalize(text)
+    .replace(/\([^)]*\)?/g, m => m.replace(/\s+/g,""))      /* 괄호 안 띄어쓰기는 붙임 */
+    .split(" ").filter(Boolean).forEach(token=>{
+    const head = token.match(ENTRY_HEAD);
+    if(head){
+      out.push({ code:head[1], text:token });
+      return;
+    }
+    if(/^[가-힣]{2,4}\d*/.test(token) && out.length){
+      const code = out[out.length - 1].code;
+      out.push({ code, text:code + token });
+      return;
+    }
+    if(out.length) out[out.length - 1].text += token;
+  });
+  return out;
+}
+
+/* ---- 기구 묶기 규칙 ----
+   1) 한 칸에 5~7명. 인원 ÷ 7 을 올림한 만큼 칸을 쓰고 고르게 나눔 (18명 → 6·6·6, 남는 칸은 그대로)
+   2) 칸이 모자라 7명을 넘으면 그대로 넣고 경고 (1명은 다른 치료사 1:1로 넘겨도 됨)
+   3) M · G 는 PT 쪽 칸, M 과 G 는 다른 칸
+   4) 기구 위치가 가까운 환자끼리 묶음 — 아래 좌표(치료실 배치도) 기준,
+      자주 같이 찢는 조합(등속성+런닝, 런닝+아크+클라, 워킹+아크, 워킹+경사, 경사+코끼리,
+      기립+바로+코로+스마트, 기립+클라+아크, 동적+전상+어댑핏, 동적+어댑핏+바로+코로,
+      슬라+스마트, 슬라+바로+코로)은 더 가깝게 봄 */
+
+const MACHINE_POS = {
+  "에르":   [[35,37]],
+  "런닝":   [[130,37],[180,37],[230,37],[280,37],[330,37],[375,37]],
+  "아크":   [[470,37],[525,37]],
+  "클라":   [[620,37]],
+  "기립":   [[670,37],[720,37]],
+  "동적":   [[815,37]],
+  "워킹":   [[165,60],[420,60],[165,80],[420,80]],
+  "바로":   [[670,98]],
+  "코로":   [[670,128]],
+  "스마트": [[670,158]],
+  "경사":   [[200,127],[200,148],[200,170]],
+  "코끼리": [[325,135],[325,165]],
+  "슬라":   [[420,125],[475,125],[420,148],[475,148],[420,170],[475,170]],
+  "진동기": [[815,148]],
+  "전상":   [[815,178]],
+  "어댑핏": [[815,210]]
+};
+
+const MACHINE_COMBOS = [
+  ["에르","런닝"], ["런닝","아크","클라"],
+  ["워킹","아크"], ["워킹","경사"], ["경사","코끼리"],
+  ["기립","바로","코로","스마트"], ["기립","클라","아크"],
+  ["동적","전상","어댑핏"], ["동적","어댑핏","바로","코로"],
+  ["슬라","스마트"], ["슬라","바로","코로"]
+];
+
+const COMBO_PAIRS = new Set();
+MACHINE_COMBOS.forEach(list => list.forEach(a => list.forEach(b => { if(a !== b) COMBO_PAIRS.add(a + "|" + b); })));
+
+function machinePoint(header){
+  const base = machineShort(header);
+  const list = MACHINE_POS[base];
+  if(!list) return { base, x:450, y:120 };
+  const m = compact(header).match(/\((\d+)\)/);
+  const i = m ? Math.min(list.length, Math.max(1, Number(m[1]))) - 1 : 0;
+  return { base, x:list[i][0], y:list[i][1] };
+}
+
+function machineDistance(a, b){
+  if(a.base === b.base) return Math.hypot(a.x - b.x, a.y - b.y) * 0.3;
+  const d = Math.hypot(a.x - b.x, a.y - b.y);
+  return COMBO_PAIRS.has(a.base + "|" + b.base) ? d * 0.45 : d;
+}
+
+function groupCost(group){
+  let sum = 0;
+  for(let i = 0; i < group.length; i++)
+    for(let j = i + 1; j < group.length; j++)
+      sum += machineDistance(group[i].pt, group[j].pt);
+  return group.length ? sum / group.length : 0;
+}
+
+/* 몇 칸에 몇 명씩 — 5~7명 */
+function planSizes(n, cellCount, needTwo){
+  if(n === 0 || cellCount === 0) return [];
+  let g = Math.max(1, Math.ceil(n / 7));
+  if(needTwo) g = Math.max(g, 2);
+  g = Math.min(g, cellCount);
+  const base = Math.floor(n / g), extra = n % g;
+  return Array.from({ length:g }, (_, i) => base + (i < extra ? 1 : 0));
+}
+
+/* 가까운 기구끼리 나누기 — 크기는 고정, M·G 묶음은 그대로 두고 H만 바꿔가며 묶음 거리를 줄임 */
+function groupEntries(H, M, G, sizes){
+
+  const order = list => list.slice().sort((a,b) => (a.pt.x + a.pt.y * 2) - (b.pt.x + b.pt.y * 2));
+  const seeds = [];
+  if(M.length) seeds.push({ fixed:M.slice(), tag:"M" });
+  if(G.length) seeds.push({ fixed:G.slice(), tag:"G" });
+  while(seeds.length < sizes.length) seeds.push({ fixed:[], tag:"" });
+
+  /* 큰 칸부터 M · G 에 */
+  const sorted = sizes.slice().sort((a,b) => b - a);
+  seeds.forEach((s, i) => { s.size = Math.max(sorted[i], s.fixed.length); });
+  let over = seeds.reduce((t, s) => t + s.size, 0) - (H.length + M.length + G.length);
+  for(let i = seeds.length - 1; over > 0 && i >= 0; i--){
+    const can = seeds[i].size - seeds[i].fixed.length;
+    const cut = Math.min(can, over);
+    seeds[i].size -= cut; over -= cut;
+  }
+
+  const hs = order(H);
+  let best = null;
+
+  /* 시작점을 몇 군데 바꿔 보고 가장 잘 묶인 것을 씀 */
+  const tries = Math.min(Math.max(1, hs.length), 8);
+  for(let t = 0; t < tries; t++){
+    const rot = Math.floor(t * hs.length / tries);
+
+    const seq = hs.slice(rot).concat(hs.slice(0, rot));
+    const groups = seeds.map(s => ({ tag:s.tag, size:s.size, list:s.fixed.slice(), free:[] }));
+
+    /* M·G 칸은 그 기구에서 가까운 H부터 채움 */
+    const pool = seq.slice();
+    groups.filter(g => g.list.length).forEach(g=>{
+      while(g.list.length < g.size && pool.length){
+        let bi = 0, bd = Infinity;
+        pool.forEach((h, i) => {
+          const d = g.list.reduce((t, x) => t + machineDistance(x.pt, h.pt), 0);
+          if(d < bd){ bd = d; bi = i; }
+        });
+        const h = pool.splice(bi, 1)[0];
+        g.list.push(h); g.free.push(h);
+      }
+    });
+    groups.filter(g => !g.tag).forEach(g=>{
+      while(g.list.length < g.size && pool.length){ const h = pool.shift(); g.list.push(h); g.free.push(h); }
+    });
+
+    /* H 맞바꾸기 */
+    let improved = true, guard = 0;
+    while(improved && guard++ < 200){
+      improved = false;
+      for(let a = 0; a < groups.length; a++){
+        for(let b = a + 1; b < groups.length; b++){
+          const A = groups[a], B = groups[b];
+          for(let i = 0; i < A.free.length; i++){
+            for(let j = 0; j < B.free.length; j++){
+              const x = A.free[i], y = B.free[j];
+              const before = groupCost(A.list) + groupCost(B.list);
+              const la = A.list.map(e => e === x ? y : e), lb = B.list.map(e => e === y ? x : e);
+              if(groupCost(la) + groupCost(lb) + 1e-9 < before){
+                A.list = la; B.list = lb;
+                A.free[i] = y; B.free[j] = x;
+                improved = true;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const cost = groups.reduce((t, g) => t + groupCost(g.list), 0);
+    if(!best || cost < best.cost - 1e-9) best = { cost, groups };
+  }
+
+  return best.groups.map(g => ({ tag:g.tag, list: order(g.list) }));
+}
+
+/* "(토)" "(일)" "(토일)"처럼 요일이 붙은 환자인지 — 붙은 요일 목록, 없으면 null */
+function entryDays(text){
+  let days = null;
+  (String(text).match(/\(([^)]*)\)/g) || []).forEach(group=>{
+    const inner = group.replace(/[()]/g,"").replace(/[,·/\s]/g,"").replace(/요일/g,"");
+    if(inner && [...inner].every(ch => DAY_CHARS.includes(ch))){
+      days = days || new Set();
+      [...inner].forEach(ch => days.add(ch));
+    }
+  });
+  return days;
+}
+
+function buildMachineFill(rows, layout, day){
+
+  const warnings = [];
+  const machineBlocks = layout.filter(b => b.kind === "machine" && b.label === "기구" && b.floor !== "1층");
+  const therapistBlocks = layout.filter(b => b.kind === "therapist" && b.floor !== "1층");
+
+  if(machineBlocks.length === 0){
+    return { slots:[], warnings:["3층 기구표(머리글 \"기구\")를 찾지 못했습니다."] };
+  }
+
+  /* 시간별 기구 환자 */
+  const byTime = new Map();
+  const timeText = new Map();
+
+  machineBlocks.forEach(block=>{
+    const header = rows[block.row] || [];
+    for(let r = block.row + 1; r <= Math.min(block.endRow, rows.length - 1); r++){
+      const row = rows[r] || [];
+      const time = isTimeText(row[block.col]) ? normalize(row[block.col]) : findRowTime(row, block.cols[0].col);
+      if(!time || time.includes("12:30")) continue;
+      const min = timeOrder(time);
+      if(min === 9999) continue;
+      block.cols.forEach(col=>{
+        const text = row[col.col];
+        if(!normalize(text)) return;
+        const name = machineShort(header[col.col]);
+        machineEntries(text).forEach(entry=>{
+          const days = entryDays(entry.text);
+          if(day && days && !days.has(day)) return;   /* 다른 요일 환자는 뺌 */
+          if(!byTime.has(min)) byTime.set(min, []);
+          byTime.get(min).push({
+            code: entry.code,
+            line: entry.text + "+" + name,
+            ref: cellRef(r, col.col),
+            pt: machinePoint(header[col.col])
+          });
+        });
+      });
+    }
+  });
+
+  /* 시간별 기구 칸 */
+  const cellsByTime = new Map();
+
+  therapistBlocks.forEach(block=>{
+    const firstCol = block.cols[0].col;
+    for(let r = block.row + 1; r <= Math.min(block.endRow, rows.length - 1); r++){
+      const row = rows[r] || [];
+      const time = isTimeText(row[block.col]) ? normalize(row[block.col]) : findRowTime(row, firstCol);
+      if(!time) continue;
+      const min = timeOrder(time);
+      block.cols.forEach(col=>{
+        if(!isMachineSlotText(row[col.col])) return;
+        if(!cellsByTime.has(min)) cellsByTime.set(min, []);
+        const names = Object.entries(block.namesByDay || {})
+          .filter(([d]) => !day || !d || d === day)
+          .map(([d, map]) => (d && !day ? d + " " : "") + (map[col.col] || col.name));
+        cellsByTime.get(min).push({
+          side: block.label,                 /* PT | OT */
+          ref: cellRef(r, col.col),
+          row: r, col: col.col,
+          label: compact(row[col.col]),
+          therapists: Array.from(new Set(names)),
+          lines: [], groups: new Set()
+        });
+      });
+    }
+  });
+
+  const times = Array.from(new Set([...byTime.keys(), ...cellsByTime.keys()])).sort((a,b) => a - b);
+  const slots = [];
+
+  times.forEach(min=>{
+
+    const entries = byTime.get(min) || [];
+    const cells = (cellsByTime.get(min) || []).sort((a,b) => (a.side === b.side ? 0 : a.side === "PT" ? -1 : 1) || a.row - b.row || a.col - b.col);
+    const slotWarn = [];
+    const unplaced = [];
+
+    if(entries.length && cells.length === 0){
+      slotWarn.push("기구표에 " + entries.length + "명이 있는데 치료사 칸에 \"기구\" 칸이 없습니다.");
+    }
+    if(cells.length && entries.length === 0){
+      slotWarn.push("\"기구\" 칸이 있는데 이 시간 기구표가 비어 있습니다.");
+    }
+
+    if(cells.length){
+
+      const M = entries.filter(e => e.code === "M");
+      const G = entries.filter(e => e.code === "G");
+      const H = entries.filter(e => e.code !== "M" && e.code !== "G");
+      const pt = cells.filter(c => c.side === "PT");
+
+      let useM = M, useG = G;
+      if((M.length || G.length) && pt.length === 0){
+        slotWarn.push("M·G 환자가 있는데 PT 쪽 \"기구\" 칸이 없습니다.");
+        unplaced.push(...M, ...G); useM = []; useG = [];
+      }else if(M.length && G.length && pt.length < 2){
+        slotWarn.push("M과 G가 둘 다 있는데 PT 쪽 \"기구\" 칸이 하나뿐입니다 — G는 넣지 못했습니다.");
+        unplaced.push(...G); useG = [];
+      }
+
+      const n = H.length + useM.length + useG.length;
+      const sizes = planSizes(n, cells.length, useM.length > 0 && useG.length > 0);
+      const groups = groupEntries(H, useM, useG, sizes);
+
+      /* M·G 묶음 → PT 칸, 나머지 → 남은 칸 (PT 먼저, 남는 칸은 그대로) */
+      const freeCells = cells.slice();
+      const take = side => { const i = freeCells.findIndex(c => !side || c.side === side); return i < 0 ? null : freeCells.splice(i, 1)[0]; };
+      groups.filter(g => g.tag).forEach(g=>{
+        const cell = take("PT");
+        g.list.forEach(e => cell.lines.push(e.line));
+        cell.groups.add(g.tag);
+      });
+      groups.filter(g => !g.tag).forEach(g=>{
+        const cell = take("");
+        g.list.forEach(e => cell.lines.push(e.line));
+      });
+
+      const big = groups.filter(g => g.list.length > 7);
+      if(big.length) slotWarn.push("기구 칸이 모자라 " + big.map(g => g.list.length).join("·") + "명 들어간 칸이 있습니다 — 1명은 다른 치료사 1:1로 넘겨도 됩니다.");
+    }else{
+      unplaced.push(...entries);
+    }
+
+    const others = entries.filter(e => !/^(H|M|G|GR)$/.test(e.code));
+    if(others.length) slotWarn.push("H·M·G가 아닌 코드는 H처럼 나눴습니다: " + others.map(e => e.line).join(", "));
+
+    slots.push({
+      minutes: min,
+      total: entries.length,
+      counts: { H: entries.filter(e => e.code !== "M" && e.code !== "G").length, M: entries.filter(e => e.code === "M").length, G: entries.filter(e => e.code === "G").length },
+      cells: cells.map(c => Object.assign(c, { text: c.lines.join("\n") })),
+      unplaced: unplaced.map(e => e.line),
+      warnings: slotWarn
+    });
+  });
+
+  return { slots, warnings };
 }
 
 /* ================================================================
@@ -1697,6 +2119,7 @@ function parseTsv(text){
    ================================================================ */
 
 let parsed = null;
+let lastGrid = null;
 let lastRows = {};
 let settings = loadSettings();
 
@@ -1871,7 +2294,7 @@ function handlePaste(event){
 
   let grid = null;
   if(html && html.includes("<table")) grid = parseHtmlTable(html);
-  if(!grid && text) grid = { values: parseTsv(text), colors: [], underlines: null, fonts: null };
+  if(!grid && text) grid = { values: parseTsv(text), colors: [], underlines: null, fonts: null, raws: parseTsv.raws };
 
   const zone = document.getElementById("pasteZone");
   const status = document.getElementById("pasteStatus");
@@ -1893,6 +2316,7 @@ function handlePaste(event){
   }
 
   parsed = result;
+  lastGrid = grid;
 
   const names = new Set(result.events.map(e => e.name));
   const acting = grid.underlines ? grid.underlines.flat().filter(Boolean).length : 0;
@@ -1912,6 +2336,9 @@ function handlePaste(event){
   renderDistribution();
 
   document.getElementById("runButton").disabled = false;
+  document.getElementById("fillButton").disabled = false;
+  document.getElementById("fillResult").innerHTML = "";
+  if(!document.getElementById("tabFill").hidden) runFill();
   document.getElementById("result").innerHTML = "";
   document.getElementById("printButton").disabled = true;
   zone.blur();
@@ -2279,6 +2706,227 @@ function renderBoard(a){
   return box;
 }
 
+/* ---- 기구 칸 채우기 화면 ---- */
+
+/* 치료사 표(PT·OT) 하나를 통째로 — 기구 칸만 바꾸고 나머지는 원래 글자 그대로 */
+/* 요일을 고르면 다른 요일 표기 줄은 뺍니다 — 예) 토요일: "G부지호(토)↵H임훈성(일)" → "G부지호(토)" */
+function keepDayLines(text, day){
+  if(!day || !text) return text;
+  return String(text).split("\n").filter(line => { const d = entryDays(line); return !d || d.has(day); }).join("\n");
+}
+
+function buildPasteBlocks(layout, raws, fill, day){
+  const filled = new Map();
+  fill.slots.forEach(s => s.cells.forEach(c => { if(c.text) filled.set(c.row + "," + c.col, c.text); }));   /* 안 쓰는 기구 칸은 글자 그대로 둠 */
+  const touched = new Set(Array.from(filled.keys()));
+
+  return layout
+    .filter(b => b.kind === "therapist" && b.floor !== "1층")
+    .map(b=>{
+      const c1 = b.cols[0].col, c2 = b.cols[b.cols.length - 1].col;
+      const r1 = b.row + 1, r2 = b.endRow;
+      const grid = [];
+      let count = 0, count2 = 0, empty = 0;
+      for(let r = r1; r <= r2; r++){
+        const line = [];
+        for(let c = c1; c <= c2; c++){
+          const key = r + "," + c;
+          if(filled.has(key)){ const v = filled.get(key); line.push(v); if(v) count++; else empty++; }
+          else{
+            const raw = ((raws[r] || [])[c]) || "";
+            const kept = keepDayLines(raw, day);
+            if(kept !== raw) count2++;
+            line.push(kept);
+          }
+        }
+        grid.push(line);
+      }
+      return {
+        label: b.label, grid, count, empty, dayRemoved: count2,
+        from: cellRef(r1, c1), to: cellRef(r2, c2),
+        any: Array.from(touched).some(k => { const [r,c] = k.split(",").map(Number); return r >= r1 && r <= r2 && c >= c1 && c <= c2; })
+      };
+    })
+    .filter(b => b.any);
+}
+
+function escHtml(t){
+  return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function gridToHtml(grid){
+  return "<table>" + grid.map(row =>
+    "<tr>" + row.map(v => "<td>" + escHtml(v).split("\n").join("<br style=\"mso-data-placement:same-cell\">") + "</td>").join("") + "</tr>"
+  ).join("") + "</table>";
+}
+
+function gridToTsv(grid){
+  return grid.map(row => row.map(v => /[\t\n"]/.test(v) ? "\"" + v.replace(/"/g,"\"\"") + "\"" : v).join("\t")).join("\n");
+}
+
+/* 표 모양(text/html)과 글자(text/plain)를 함께 복사 — 시트가 알아서 골라 씀 */
+function copyGrid(grid){
+  const html = gridToHtml(grid), text = gridToTsv(grid);
+  let ok = false;
+  const handler = e => { e.clipboardData.setData("text/html", html); e.clipboardData.setData("text/plain", text); e.preventDefault(); ok = true; };
+  document.addEventListener("copy", handler);
+  try{ document.execCommand("copy"); }catch(e){}
+  document.removeEventListener("copy", handler);
+  return ok;
+}
+
+function showTab(name){
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+  document.getElementById("tabCheck").hidden = name !== "check";
+  document.getElementById("tabFill").hidden = name !== "fill";
+  if(name === "fill" && parsed && !document.getElementById("fillResult").innerHTML) runFill();
+}
+
+function copyText(text){
+  if(navigator.clipboard && window.isSecureContext){
+    return navigator.clipboard.writeText(text).then(() => true, () => fallbackCopy(text));
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+
+function fallbackCopy(text){
+  const area = el("textarea", { style:"position:fixed;left:-9999px;top:0" });
+  area.value = text;
+  document.body.append(area);
+  area.select();
+  let ok = false;
+  try{ ok = document.execCommand("copy"); }catch(e){}
+  area.remove();
+  return ok;
+}
+
+let fillDay = "";
+
+function runFill(){
+
+  const box = document.getElementById("fillResult");
+  box.innerHTML = "";
+  if(!parsed || !lastGrid) return;
+
+  /* 요일 고르기 — 토·일이 합쳐진 시트면 요일마다 따로 만듭니다 */
+  const days = parsed.days.filter(Boolean);
+  if(!days.includes(fillDay)) fillDay = days.includes("토") ? "토" : (days[0] || "");
+
+  if(days.length){
+    const pick = el("div", { class:"row-line", style:"margin-bottom:12px" });
+    pick.append(el("span", { style:"font-size:13px;font-weight:600" , text:"요일" }));
+    days.forEach(d=>{
+      const input = el("input", { type:"radio", name:"fillDay", value:d });
+      input.checked = d === fillDay;
+      input.onchange = () => { if(input.checked){ fillDay = d; runFill(); } };
+      pick.append(el("label", { class:"chip" }, [input, el("span", { text: DAY_FULL[d] || d })]));
+    });
+    if(days.length > 1){
+      pick.append(el("span", { class:"hint", style:"margin:0", text:"요일마다 따로 복사해서 그 요일 시트에 붙여넣으세요. (토)·(일)이 붙은 환자는 그 요일에만 들어갑니다." }));
+    }
+    box.append(pick);
+  }
+
+  const values = fillRows(lastGrid.values.map(r => r.map(v => v)));
+  const fill = buildMachineFill(values, parsed.layout, fillDay);
+  const dayName = fillDay ? (DAY_FULL[fillDay] || fillDay) + " " : "";
+
+  const cells = fill.slots.reduce((n, s) => n + s.cells.length, 0);
+  const people = fill.slots.reduce((n, s) => n + s.total, 0);
+  const warnCount = fill.slots.reduce((n, s) => n + s.warnings.length, 0) + fill.warnings.length;
+
+  box.append(el("div", { class:"fill-summary" }, [
+    el("span", null, ["기구 칸 ", el("b", { text:String(cells) }), "개"]),
+    el("span", null, ["기구표 환자 ", el("b", { text:String(people) }), "명"]),
+    el("span", { style: warnCount ? "color:var(--bad)" : "color:var(--good)" }, [warnCount ? "확인할 곳 " + warnCount + "건" : "확인할 곳 없음"])
+  ]));
+
+  fill.warnings.forEach(w => box.append(el("p", { class:"fill-warn", style:"border-radius:10px;margin-bottom:10px", text:w })));
+
+  /* 한 번에 넣기 */
+  const blocks = buildPasteBlocks(parsed.layout, lastGrid.raws || lastGrid.values, fill, days.length > 1 ? fillDay : "");
+  const quick = el("section", { class:"card" });
+  quick.append(el("h2", { class:"card-title" }, [el("span", { class:"num", text:"3" }), dayName + "한 번에 넣기"]));
+  quick.append(el("p", { class:"hint" }));
+  quick.lastChild.innerHTML =
+    "<b>복사</b> 누르기 → 시놀로지에서 안내된 칸(예: B5) <b>하나만 클릭</b> → <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>. " +
+    "기구 칸만 바뀌고 나머지 칸은 그대로예요.";
+  blocks.forEach(b=>{
+    const btn = el("button", { type:"button", class:"primary copy-btn", text: dayName + b.label + " 표 복사" });
+    const msg = el("span", { class:"hint", style:"margin:0" });
+    btn.onclick = () => {
+      const ok = copyGrid(b.grid);
+      btn.textContent = ok ? dayName + b.label + " 복사됨 ✓" : "복사 실패";
+      msg.innerHTML = ok ? "→ 시놀로지 <b>" + dayName + "시트</b>에서 <b>" + b.from + "</b> 칸 클릭 후 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>" : "";
+    };
+    quick.append(el("div", { class:"actions", style:"margin-top:10px" }, [
+      btn,
+      el("span", { style:"font-size:13px" }, [b.label + " 표 " + b.from + " ~ " + b.to + " · 기구 칸 " + b.count + "개" + (b.dayRemoved ? " · 다른 요일 표기 뺀 칸 " + b.dayRemoved + "개" : "")]),
+      msg
+    ]));
+  });
+  if(days.length > 1) quick.append(el("p", { class:"hint", style:"margin:12px 0 0;color:var(--warn)", text:"※ 표 전체를 덮어쓰는 방식이에요. 고른 요일과 다른 요일 표기 줄(예: 토요일에 H임훈성(일))은 빼고 복사됩니다. 나눈 시트에서 따로 고친 게 있으면 그 요일 시트를 붙여넣고 쓰세요." }));
+  quick.append(el("p", { class:"hint", style:"margin:12px 0 0", text:"복사하면 바로 붙여넣으세요. 결과가 이상하면 Ctrl+Z로 되돌리면 됩니다." }));
+  box.append(quick);
+
+  const each = el("details", { class:"layout", style:"margin:4px 0 12px" }, [el("summary", { text:"칸별로 넣기 · 나눈 결과 확인 (기구 칸 " + cells + "개)" })]);
+  box.append(each);
+  const eachBox = el("div", { style:"margin-top:10px" });
+  each.append(eachBox);
+
+  fill.slots.forEach(slot=>{
+
+    const wrap = el("div", { class:"fill-slot" + (slot.warnings.length ? " bad" : "") });
+    const c = slot.counts;
+
+    wrap.append(el("div", { class:"fill-head" }, [
+      el("span", { class:"time", text: minutesText(slot.minutes) }),
+      el("span", { text: "기구 " + slot.total + "명 (H " + c.H + " · M " + c.M + " · G " + c.G + ") → 칸 " + slot.cells.length + "개" })
+    ]));
+
+    slot.warnings.forEach(w => wrap.append(el("p", { class:"fill-warn", text:w })));
+    if(slot.unplaced.length) wrap.append(el("p", { class:"fill-warn", text:"못 넣은 환자: " + slot.unplaced.join(", ") }));
+
+    if(slot.cells.length){
+      const table = el("table", { class:"fill" });
+      slot.cells.forEach(cell=>{
+        const tr = el("tr");
+        const groups = Array.from(cell.groups);
+        const btn = cell.text
+          ? el("button", { type:"button", class:"copy-btn", text:"복사" })
+          : null;
+        if(btn){
+          btn.onclick = () => copyText(cell.text).then(ok=>{
+            btn.textContent = ok ? "복사됨 ✓" : "복사 실패";
+            btn.classList.toggle("done", !!ok);
+            if(ok) tr.classList.add("done");
+          });
+        }
+        tr.append(
+          el("td", { class:"where" }, [
+            el("span", { class:"ref", text:cell.ref }),
+            el("span", { class:"side " + cell.side, text:cell.side }),
+            cell.label,
+            ...groups.map(g => el("span", { class:"grp", text:g }))
+          ]),
+          el("td", { class:"who", text: cell.therapists.join(" · ") }),
+          el("td", { class:"lines", text: cell.text || "안 씀 — 그대로 둡니다" }),
+          el("td", { class:"copy" }, [btn])
+        );
+        table.append(tr);
+      });
+      wrap.append(table);
+    }
+
+    eachBox.append(wrap);
+  });
+  if(warnCount) each.open = true;
+
+  if(fill.slots.length === 0 && fill.warnings.length === 0){
+    box.append(el("p", { class:"hint", text:"\"기구\" 칸도, 기구표 환자도 찾지 못했습니다." }));
+  }
+}
+
 /* ---- 시작 ---- */
 
 window.addEventListener("DOMContentLoaded", ()=>{
@@ -2289,6 +2937,8 @@ window.addEventListener("DOMContentLoaded", ()=>{
   zone.addEventListener("drop", e => e.preventDefault());
 
   document.getElementById("runButton").onclick = run;
+  document.getElementById("fillButton").onclick = runFill;
+  document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
   document.getElementById("printButton").onclick = () => window.print();
   document.getElementById("resetButton").onclick = () => {
     settings = clone(DEFAULT_SETTINGS);

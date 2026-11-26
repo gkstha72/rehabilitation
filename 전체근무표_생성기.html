@@ -162,9 +162,11 @@ function parseRoster(sh, label){
   let month = null;
   for (let r=0;r<hr;r++) for (const v of (R[r]||[])){ const m=S(v).match(/(\d{1,2})\s*월/); if(m&&!month) month=+m[1]; }
   const reLab=/^(\d)\s*-\s*(\d)\s*계?$/;
-  const labOf=row=>{ for(let c=0;c<nameC;c++){ const m=S(row[c]).match(reLab); if(m) return m[1]+'-'+m[2]; } return null; };
-  let cur = label;
-  if (!cur){ for (let r=hr+1;r<R.length&&!cur;r++) cur=labOf(R[r]||[]); }   // 첫 표기 위쪽 행은 첫 계로
+  const labCols=[...Array(nameC).keys()].filter(c=>c!==typeC);
+  // A열 표기: "1-1"/"1-1계" → 교대 계, 그 밖의 글자(방문·코디·계약 등) → 기타 묶음
+  const labOf=row=>{ for(const c of labCols){ const s=S(row[c]); if(!s || /^[\d.]+$/.test(s)) continue;
+      const m=s.match(reLab); return m ? {label:m[1]+'-'+m[2], kind:'team'} : {label:s, kind:'etc'}; } return null; };
+  let cur = label ? {label, kind:'team'} : {label:'관리자', kind:'mgr'};   // 첫 계 표기 위쪽 = 차장·과장
   const map = new Map();
   for (let r=hr+1;r<R.length;r++){
     const row=R[r]||[], trow=T[r]||[];
@@ -175,12 +177,12 @@ function parseRoster(sh, label){
     for (const d in dayCol){
       const rv=row[dayCol[d]]; let t;
       if (typeof rv==='number' && rv>20000){ const pc=XLSX.SSF.parse_date_code(rv); t=pc.m+'/'+pc.d; }
-      else { t=S(trow[dayCol[d]]) || S(rv); const m=t.match(/^(?:\d{4}[-.\/])?(\d{1,2})[-.\/](\d{1,2})(?:[-.\/]\d{2,4})?$/); if(m) t=(+m[1])+'/'+(+m[2]); }
+      else { t=S(trow[dayCol[d]]) || S(rv); const m=t.match(/^(?:\d{4}[-.\/])?(\d{1,2})[-.\/](\d{1,2})(?:[-.\/]\d{2,4})?$/); if(m && +m[1]>=1 && +m[1]<=12 && +m[2]>=1) t=(+m[1])+'/'+(+m[2]); }
       vals[d]=t;
     }
-    const g=cur||'?';
-    if(!map.has(g)) map.set(g,{label:g, people:[], month, sheet:sh.name});
-    map.get(g).people.push({name, type:S(row[typeC]).toUpperCase(), div:S(row[divC]).toUpperCase(), vals});
+    const key=cur.kind+':'+cur.label+':'+sh.name;
+    if(!map.has(key)) map.set(key,{label:cur.label, kind:cur.kind, people:[], month, sheet:sh.name});
+    map.get(key).people.push({name, key:name.replace(/\s/g,''), type:S(row[typeC]).toUpperCase(), div:S(row[divC]).toUpperCase(), vals});
   }
   return [...map.values()];
 }
@@ -237,10 +239,9 @@ function parseAll(fresh){
     }
     if (/연차/.test(sh.name) && !leaveP){ leaveP=parseLeave(sh); if(!leaveP) msgs.push(['warn',`'${sh.name}' 시트에서 SUNDAY~SATURDAY 머리글을 못 찾았어요.`]); }
   }
-  groups.sort((a,b)=>a.label.localeCompare(b.label));
+  const ord={team:0,mgr:1,etc:2}; groups.sort((a,b)=>ord[a.kind]-ord[b.kind] || a.label.localeCompare(b.label));
   if (!sheets.length) return;
   if (!groups.length) msgs.push(['warn','근무안 시트를 못 찾았어요. 시트 이름이 "사전근무안1과"처럼 되어 있고, A열에 "1-1계" 표기가 있어야 해요.']);
-  if (groups.some(g=>g.label==='?')) msgs.push(['warn','A열에 "1-1계" 같은 계 표기가 없는 시트가 있어요. 해당 인원은 "?" 그룹으로 표시돼요.']);
   if (!leaveP) msgs.push(['warn','연차달력 시트(이름에 "연차" 포함)를 못 찾았어요. 연차자 줄은 비워둘게요.']);
 
   if (fresh){
@@ -256,7 +257,8 @@ function parseAll(fresh){
     const sig = groups.map(g=>JSON.stringify(g.people));
     const dup = groups.filter((g,i)=>sig.indexOf(sig[i])!==i).map(g=>g.label);
     if (dup.length) msgs.push(['warn',`${dup.join(', ')} 시트가 다른 그룹 시트와 내용이 똑같아요. 복사만 해두고 아직 안 고친 시트인지 확인해 주세요.`]);
-    msgs.push(['ok',`교대 그룹 ${groups.length}개(${groups.map(g=>g.label).join(', ')}) · 인원 ${groups.reduce((a,g)=>a+g.people.length,0)}명${leaveP?' · 연차달력: '+(leaveP.title||'').split('\n')[0]:''}`]);
+    const T=groups.filter(g=>g.kind==='team'), Mg=groups.filter(g=>g.kind==='mgr').flatMap(g=>g.people.map(p=>p.name));
+    msgs.push(['ok',`교대 계 ${T.length}개(${T.map(g=>g.label).join(', ')}) · 인원 ${groups.reduce((a,g)=>a+g.people.length,0)}명${Mg.length?' · 차장·과장(연차만 표시): '+Mg.join(', '):''}${leaveP?' · 연차달력: '+(leaveP.title||'').split('\n')[0]:''}`]);
   }
   $('#msgs').innerHTML = msgs.map(([k,t])=>`<div class="msg ${k}">${esc(t)}</div>`).join('');
   compute();
@@ -273,6 +275,11 @@ function fillHolidays(){
   $('#hols').value=list.join(', ');
 }
 const isO = v => ['O','0','ㅇ','○','◯'].includes(S(v).toUpperCase());
+// O(0.5), 0.5 → 반일 출근
+const isHalf = v => /^(?:[O0ㅇ○◯]\s*)?\(?\s*0?\.5\s*\)?$/i.test(S(v)) && !/^0$/.test(S(v));
+const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+// 연차달력(공백 제거)에 이름이 있는지 — "민 정"도 "민정"으로 찾고, 김혜민이 김혜민2에 걸리지 않게
+const inLeave = (flat, key) => new RegExp(reEsc(key)+'(?!\\d)').test(flat);
 
 // 근무안 칸의 특수 표기 → 연차자 줄에 넣을 문구
 function special(v){
@@ -292,26 +299,34 @@ function compute(){
   const nd=new Date(Y,M,0).getDate();
   const leaveOK = parsed.leaveP && (!parsed.leaveP.m || parsed.leaveP.m===M);
   const days={};
-  const ref = parsed.groups[0];
   for (let d=1; d<=nd; d++){
     const wd=new Date(Y,M-1,d).getDay();
     const hol = wd===0||wd===6||manual.has(d);
     const up=[], lo=[], chk=[];
-    const leave = leaveOK ? (parsed.leaveP.leave[d]||'') : '';
+    let leave = leaveOK ? (parsed.leaveP.leave[d]||'') : '';
     const leaveFlat = leave.replace(/\s/g,'');
+    const mgr=[];
     for (const g of parsed.groups){
       const U=[], L=[], C=[];
       for (const p of g.people){
         const v=S(p.vals[d]);
-        const pick = hol ? isO(v) : (p.type!=='D' && v==='');
-        if (pick) (p.div===upperKey?U:L).push(p.name);
-        // O·빈칸이 아닌 표기(연차·반차·공가·날짜·2h·기타 등)인데 연차달력에 이름이 없으면 확인 필요
-        if (v && !isO(v) && !leaveFlat.includes(p.name)) C.push(`${p.name}(${v})`);
+        const half=isHalf(v), work=isO(v)||half;
+        if (g.kind==='team'){
+          const pick = hol ? work : (p.type!=='D' && v==='');
+          if (pick) (p.div===upperKey?U:L).push(p.name+(half?'(0.5)':''));
+        }
+        if (!v || work || v==='휴직') continue;
+        if (inLeave(leaveFlat, p.key)) continue;
+        // 차장·과장은 연차달력에 없으니 근무안 표기로 연차자 줄에 넣음
+        if (g.kind==='mgr') mgr.push(`${p.name} ${special(v)||v}`);
+        // 나머지는 연차달력에 이름이 없으면 확인 필요
+        else C.push(`${p.name}(${v})`);
       }
       if (U.length) up.push(`${g.label}:${U.join(', ')}`);
       if (L.length) lo.push(`${g.label}:${L.join(', ')}`);
-      if (C.length) chk.push(`${g.label}:${C.join(', ')}`);
+      if (C.length) chk.push(`${g.kind==='team'?g.label+':':g.label+' '}${C.join(', ')}`);
     }
+    if (mgr.length) leave = (leave?leave+'\n':'') + mgr.join(', ');
     days[d]={d, wd, hol, leave, up:up.join('\n'), lo:lo.join('\n'), chk:chk.join('\n')};
   }
   // 주 단위

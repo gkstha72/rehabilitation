@@ -1957,7 +1957,9 @@ function groupEntries(H, M, G, sizes){
     if(!best || cost < best.cost - 1e-9) best = { cost, groups };
   }
 
-  return best.groups.map(g => ({ tag:g.tag, list: order(g.list) }));
+  /* 칸 안 순서: M·G 먼저, 그 아래 회복기(H) — 각각은 기구 위치 순 */
+  const isMG = e => e.code === "M" || e.code === "G";
+  return best.groups.map(g => ({ tag:g.tag, list: order(g.list.filter(isMG)).concat(order(g.list.filter(e => !isMG(e)))) }));
 }
 
 /* "(토)" "(일)" "(토일)"처럼 요일이 붙은 환자인지 — 붙은 요일 목록, 없으면 null */

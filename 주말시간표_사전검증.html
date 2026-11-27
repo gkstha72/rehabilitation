@@ -168,7 +168,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
 .floor-head h3{margin:0;font-size:16px;}
 .floor-head span{font-size:13px;color:var(--muted);}
 
-.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px;}
+.tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:14px;}
 .tile{
   background:var(--card);border:1px solid var(--line);border-radius:12px;
   padding:12px 14px;cursor:pointer;text-align:left;
@@ -368,6 +368,7 @@ button.copy-btn.done{background:var(--good-soft);border-color:#bfe0cb;color:var(
       <label class="check"><input type="checkbox" data-check="continuity">치료 연속성(빈 시간)</label>
       <label class="check"><input type="checkbox" data-check="routine">루틴 개수</label>
       <label class="check"><input type="checkbox" data-check="notes">특이사항 (기구X · 전기X 등)</label>
+      <label class="check"><input type="checkbox" data-check="unknown">코드 없는 칸</label>
     </div>
 
     <div class="group-head">3층 회복기 환자 (H 코드)</div>
@@ -419,16 +420,10 @@ button.copy-btn.done{background:var(--good-soft);border-color:#bfe0cb;color:var(
 <div id="tabFill" hidden>
 <section class="card">
   <h2 class="card-title"><span class="num">2</span>기구 칸 채우기</h2>
-  <p class="hint">
-    치료사 칸에 <b>기구1 · 기구2</b>처럼 적힌 칸을 찾아, 같은 시간 기구표 환자를 <b>H이름+기구</b>로 나눠 넣습니다.<br>
-    <b>한 칸 5~7명</b>(18명 → 6·6·6, 남는 칸은 그대로) · <b>가까운 기구끼리</b> 묶기 · M·G는 PT 쪽 칸에, M과 G는 다른 칸에.
-  </p>
-  <div class="actions" style="margin-top:6px">
-    <button class="primary" id="fillButton" type="button" disabled>기구 칸 만들기</button>
-    <span class="hint" style="margin:0">숫자(기구1·기구2)는 구분용으로만 보고, 위치가 바뀌어도 매번 새로 찾습니다.</span>
-  </div>
+  <div id="fillResult"><p class="hint" style="margin:0">위 1번 칸에 시간표를 붙여넣으면 바로 나옵니다.</p></div>
+  <button id="fillButton" type="button" hidden></button>
 </section>
-<div id="fillResult" style="max-width:1240px;margin:0 auto;"></div>
+<div id="fillDetail" style="max-width:1240px;margin:0 auto;"></div>
 </div>
 
 </main>
@@ -997,7 +992,7 @@ function blockTitle(block){
    ================================================================ */
 
 const DEFAULT_SETTINGS = {
-  checks: { overlap:true, columnDup:true, continuity:true, routine:true, notes:true },
+  checks: { overlap:true, columnDup:true, continuity:true, routine:true, notes:true, unknown:true },
   rec:  { one:[3], machine:[2], electric:[1] },
   non:  { mg:[2], electric:[1] },
   rec1: { one:[3], machine:[2], electric:[1] },   /* 1층(근골) 회복기 */
@@ -1059,7 +1054,7 @@ function analyzeDay(parsed, day, settings){
     bySlot.get(e.minutes).push(e);
   });
 
-  const issues = { overlap:[], columnDup:[], continuity:[], routine:[], notes:[] };
+  const issues = { overlap:[], columnDup:[], continuity:[], routine:[], notes:[], unknown:(parsed.unknownCells || []).slice() };
   const patientNotes = parsed.notes || {};
   const rows = [];
 
@@ -1192,6 +1187,7 @@ function analyzeDay(parsed, day, settings){
 
   if(!settings.checks.overlap) issues.overlap = [];
   if(!settings.checks.columnDup) issues.columnDup = [];
+  if(!settings.checks.unknown) issues.unknown = [];
 
   issues.overlap.sort((a,b) => a.minutes - b.minutes || a.name.localeCompare(b.name,"ko"));
   issues.columnDup.sort((a,b) => a.therapist.localeCompare(b.therapist,"ko"));
@@ -1299,8 +1295,35 @@ function parseSheet(rows, colors, underlines, fontColors){
   const days = [];
   layout.forEach(b => (b.dayHeaders || []).forEach(h => { if(!days.includes(h.day)) days.push(h.day); }));
   days.sort((a,b) => "월화수목금토일".indexOf(a) - "월화수목금토일".indexOf(b));
-  return { layout, events: built.events, slots: built.slots, days: days.length ? days : [""], bedPatients: findBedPatients(masked, built.events), notes: findPatientNotes(masked, layout, built.events), outpatients: findOutpatients(masked, built.events) };
+  return { layout, events: built.events, slots: built.slots, days: days.length ? days : [""], bedPatients: findBedPatients(masked, built.events), notes: findPatientNotes(masked, layout, built.events), outpatients: findOutpatients(masked, built.events), unknownCells: findUnknownCells(masked, layout) };
 }
+
+/* 코드 없는 칸 — 3층 시간표 칸에 H·M·G 등 코드 없이 적힌 글자 (예: "ㄴㅇㅁㄹ", "홍길동") */
+const NON_PATIENT_TEXT = /^(기구\d*|전기\d*|X+|\\|`|대기|-)$/i;
+
+function findUnknownCells(rows, layout){
+  const out = [];
+  layout.filter(b => b.floor !== "1층").forEach(block=>{
+    const header = rows[block.row] || [];
+    const firstCol = block.cols[0].col;
+    for(let r = block.row + 1; r <= Math.min(block.endRow, rows.length - 1); r++){
+      const row = rows[r] || [];
+      const time = isTimeText(row[block.col]) ? normalize(row[block.col]) : findRowTime(row, firstCol);
+      if(!time || time.includes("12:30")) continue;
+      block.cols.forEach(col=>{
+        const text = compact(row[col.col]);
+        if(!text || NON_PATIENT_TEXT.test(text)) return;
+        if(text === compact(header[col.col])) return;
+        if(splitPersonChunks(text).map(parseChunk).filter(Boolean).length) return;
+        out.push({ ref: cellRef(r, col.col), text: normalize(row[col.col]), floor: block.floor === "1층" ? "1층" : "3층",
+          where: block.label + " " + (block.kind === "therapist" ? "" : (block.fixedName || machineShortSafe(header[col.col]))), minutes: timeOrder(time) });
+      });
+    }
+  });
+  return out;
+}
+
+function machineShortSafe(h){ return normalize(h).replace(/\s+/g,""); }
 
 /* 침상재활 환자 — 시트 어디든 "오은자 침상재활"처럼 적혀 있거나
    환자 칸에 "(침상)" "침상재활"이 붙어 있으면 연속성 검사에서 뺍니다. */
@@ -2025,12 +2048,16 @@ function buildMachineFill(rows, layout, day, blanks){
         Object.entries(countCols).forEach(([k, c]) => got[k] = num(c));
         if(Object.values(got).some(v => v !== null)) sheetCount.set(min, got);
       }
-      if(!tableCount.has(min)) tableCount.set(min, { total:0, M:0, G:0, blanks:[] });
+      if(!tableCount.has(min)) tableCount.set(min, { total:0, M:0, G:0, blanks:[], unknown:[] });
       const tc = tableCount.get(min);
       block.cols.forEach(col=>{
         if(!normalize(row[col.col]) && ((blanks || [])[r] || [])[col.col]) tc.blanks.push(cellRef(r, col.col) + "(" + compact(header[col.col]) + ")");
         const all = machineEntries(row[col.col] || "");
-        if(normalize(row[col.col])){
+        const txt = compact(row[col.col]);
+        if(txt && !all.length && !NON_PATIENT_TEXT.test(txt) && txt !== compact(header[col.col])){
+          tc.unknown.push(cellRef(r, col.col) + "(" + compact(header[col.col]) + ") \"" + normalize(row[col.col]) + "\"");
+        }
+        if(all.length){
           tc.total++;
           if(all.some(e => e.code === "M")) tc.M++;
           if(all.some(e => e.code === "G")) tc.G++;
@@ -2144,7 +2171,8 @@ function buildMachineFill(rows, layout, day, blanks){
     if(others.length) slotWarn.push("H·M·G가 아닌 코드는 H처럼 나눴습니다: " + others.map(e => e.line).join(", "));
 
     /* 시트 갯수 칸과 맞춰 보기 */
-    const sc = sheetCount.get(min), tc = tableCount.get(min) || { total:0, M:0, G:0, blanks:[] };
+    const sc = sheetCount.get(min), tc = tableCount.get(min) || { total:0, M:0, G:0, blanks:[], unknown:[] };
+    if(tc.unknown.length) slotWarn.push("H·M·G 코드가 없어 기구 칸에 못 넣은 칸: " + tc.unknown.join(", "));
     let count = null;
     if(sc){
       const diffs = [];
@@ -2154,9 +2182,9 @@ function buildMachineFill(rows, layout, day, blanks){
       if(sc.total !== null && sc.total !== undefined && sc.total !== tc.total) diffs.push("기구 " + sc.total + " → 실제 " + tc.total);
       const why = [];
       if(diffs.length){
-        if(tc.blanks.length && sc.total === tc.total + tc.blanks.length) why.push("빈 줄바꿈만 있는 칸이 갯수에 들어감: " + tc.blanks.join(", "));
-        else if(tc.blanks.length) why.push("빈 줄바꿈만 있는 칸: " + tc.blanks.join(", "));
-        if(!why.length || sc.total !== tc.total + tc.blanks.length) why.push("갯수 칸 수식 범위가 기구 열 일부를 빼고 있지 않은지 확인 (경사~진동기 전체여야 함)");
+        if(tc.unknown.length) why.push("코드 없는 칸이 갯수에 들어감: " + tc.unknown.join(", "));
+        if(tc.blanks.length) why.push("빈 줄바꿈만 있는 칸이 갯수에 들어감: " + tc.blanks.join(", "));
+        if(sc.total !== tc.total + tc.blanks.length + tc.unknown.length) why.push("갯수 칸 수식 범위가 기구 열 일부를 빼고 있지 않은지 확인 (경사~진동기 전체여야 함)");
       }
       count = { sheet:sc, table:tc, ok: diffs.length === 0, diffs, why };
       if(diffs.length) slotWarn.push("시트 갯수 칸과 다름 — " + diffs.join(", ") + ". " + why.join(" / "));
@@ -2205,6 +2233,7 @@ function loadSettings(){
         if(!Array.isArray(v) || v.length !== 1) merged[g][k] = clone(DEFAULT_SETTINGS[g][k]);
       }));
       if(merged.checks.notes === undefined) merged.checks.notes = true;
+      if(merged.checks.unknown === undefined) merged.checks.unknown = true;
       merged.fesCounts = true;
       return merged;
     }
@@ -2449,6 +2478,7 @@ const ISSUE_INFO = {
   columnDup:  { title:"한 치료사 칸에 같은 환자 2번 이상", note:"같은 날 같은 치료사 칸에 두 번 이상 들어간 환자입니다. 1층(근골)은 2번까지 허용하고 3번부터 표시합니다." },
   continuity: { title:"치료 연속성 (빈 시간)", note:"치료 사이에 빈 시간이 있는 환자입니다. 오전 · 오후는 따로 보고, 점심시간은 빈 시간이 아닙니다. 침상재활 환자는 뺍니다." },
   routine:    { title:"루틴 개수", note:"" },
+  unknown:    { title:"코드 없는 칸", note:"H·M·G·GR·F·N·S·A·D·V 같은 코드 없이 적힌 칸입니다. 환자가 아니면 지우고, 환자면 코드를 붙여주세요. (기구1·전기·X 칸은 제외)" },
   notes:      { title:"특이사항", note:"환자 이름 왼쪽 칸 메모, 침상재활 메모, 시간표 칸의 (격리)를 읽어서 확인합니다. 기구X · 기구 HOLD · 격리 · 전기X · 로봇X · 아크X · 런닝,아크 고정 · 오토사이클만 · 워킹,슬라 · +PWB필수 · 기구 경사1개 · 기구3개 · 일9시만 · 14:40 이후 를 알아봅니다." }
 };
 
@@ -2509,6 +2539,7 @@ function renderFloor(a, floor){
   if(settings.checks.continuity) panel.append(sections.continuity = issueBox("continuity", issues.continuity, renderContinuity, floor));
   if(settings.checks.routine)    panel.append(sections.routine = issueBox("routine", issues.routine, renderRoutine, floor));
   if(settings.checks.notes)      panel.append(sections.notes = issueBox("notes", issues.notes, renderNotes, floor));
+  if(settings.checks.unknown)    panel.append(sections.unknown = issueBox("unknown", issues.unknown, renderUnknown, floor));
 
   panel.append(renderBoard(view));
 
@@ -2616,6 +2647,19 @@ function renderRoutine(list){
       el("td", null, [typeTag(item.type)]),
       el("td", { style:"white-space:nowrap", text: countText(item.type, item.count) }),
       el("td", null, [lines])
+    ]));
+  });
+  return table;
+}
+
+function renderUnknown(list){
+  const table = el("table", { class:"list" });
+  table.append(el("tr", null, [el("th",{text:"시간"}), el("th",{text:"칸"}), el("th",{text:"적힌 글자"})]));
+  list.slice().sort((a,b) => a.minutes - b.minutes).forEach(item=>{
+    table.append(el("tr", null, [
+      el("td", { class:"time", text: minutesText(item.minutes) }),
+      el("td", null, [el("span", { class:"ref", text:item.ref }), item.where]),
+      el("td", { class:"nm", text:item.text })
     ]));
   });
   return table;
@@ -2842,7 +2886,7 @@ function showTab(name){
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
   document.getElementById("tabCheck").hidden = name !== "check";
   document.getElementById("tabFill").hidden = name !== "fill";
-  if(name === "fill" && parsed && !document.getElementById("fillResult").innerHTML) runFill();
+  if(name === "fill" && parsed) runFill();
 }
 
 function copyText(text){
@@ -2868,86 +2912,65 @@ let fillDay = "";
 function runFill(){
 
   const box = document.getElementById("fillResult");
-  box.innerHTML = "";
+  const detail = document.getElementById("fillDetail");
+  box.innerHTML = ""; detail.innerHTML = "";
   if(!parsed || !lastGrid) return;
 
-  /* 요일 고르기 — 토·일이 합쳐진 시트면 요일마다 따로 만듭니다 */
   const days = parsed.days.filter(Boolean);
   if(!days.includes(fillDay)) fillDay = days.includes("토") ? "토" : (days[0] || "");
-
-  if(days.length){
-    const pick = el("div", { class:"row-line", style:"margin-bottom:12px" });
-    pick.append(el("span", { style:"font-size:13px;font-weight:600" , text:"요일" }));
-    days.forEach(d=>{
-      const input = el("input", { type:"radio", name:"fillDay", value:d });
-      input.checked = d === fillDay;
-      input.onchange = () => { if(input.checked){ fillDay = d; runFill(); } };
-      pick.append(el("label", { class:"chip" }, [input, el("span", { text: DAY_FULL[d] || d })]));
-    });
-    if(days.length > 1){
-      pick.append(el("span", { class:"hint", style:"margin:0", text:"요일마다 따로 복사해서 그 요일 시트에 붙여넣으세요. (토)·(일)이 붙은 환자는 그 요일에만 들어갑니다." }));
-    }
-    box.append(pick);
-  }
 
   const values = fillRows(lastGrid.values.map(r => r.map(v => v)));
   const fill = buildMachineFill(values, parsed.layout, fillDay, lastGrid.blanks);
   const dayName = fillDay ? (DAY_FULL[fillDay] || fillDay) + " " : "";
-
   const cells = fill.slots.reduce((n, s) => n + s.cells.length, 0);
-  const people = fill.slots.reduce((n, s) => n + s.total, 0);
   const warnCount = fill.slots.reduce((n, s) => n + s.warnings.length, 0) + fill.warnings.length;
-
   const countSlots = fill.slots.filter(s => s.count);
-  const countBad = countSlots.filter(s => !s.count.ok).length;
-  const dayDiff = fill.slots.filter(s => s.count && s.placed !== s.count.table.total);
-  box.append(el("div", { class:"fill-summary" }, [
-    el("span", null, ["기구 칸 ", el("b", { text:String(cells) }), "개"]),
-    el("span", null, ["기구표 환자 ", el("b", { text:String(people) }), "명"]),
-    el("span", { style: warnCount ? "color:var(--bad)" : "color:var(--good)" }, [warnCount ? "확인할 곳 " + warnCount + "건" : "확인할 곳 없음"]),
-    countSlots.length
-      ? el("span", { style: countBad ? "color:var(--bad);font-weight:600" : "color:var(--good);font-weight:600", text: countBad ? "시트 갯수 칸과 다른 시간 " + countBad + "개" : "시트 갯수 칸(M·G·기구) " + countSlots.length + "개 시간 모두 일치" })
-      : el("span", { text:"시트 갯수 칸을 못 찾음" })
-  ]));
-  countSlots.filter(s => !s.count.ok).forEach(s=>{
-    box.append(el("p", { class:"fill-warn", style:"border-radius:10px;margin-bottom:8px",
-      text: minutesText(s.minutes) + " 시트 갯수 칸과 다름 — " + s.count.diffs.join(", ") + ". " + s.count.why.join(" / ") }));
-  });
-  if(fillDay && dayDiff.length){
-    box.append(el("p", { class:"hint", text: "참고: 시트 갯수는 토·일 합친 기준이라, (토)·(일)이 붙은 환자가 있는 시간은 " + (DAY_FULL[fillDay] || fillDay) + " 넣은 인원과 다를 수 있어요 — " +
-      dayDiff.map(s => minutesText(s.minutes) + " 기구표 " + s.count.table.total + "칸 / " + fillDay + " " + s.placed + "명").join(", ") }));
+  const countBad = countSlots.filter(s => !s.count.ok);
+
+  /* 요일 + 상태 한 줄 */
+  const top = el("div", { class:"row-line", style:"margin-bottom:14px" });
+  if(days.length > 1){
+    days.forEach(d=>{
+      const input = el("input", { type:"radio", name:"fillDay", value:d });
+      input.checked = d === fillDay;
+      input.onchange = () => { if(input.checked){ fillDay = d; runFill(); } };
+      top.append(el("label", { class:"chip" }, [input, el("span", { text: DAY_FULL[d] || d })]));
+    });
   }
+  top.append(el("span", {
+    style: "font-size:13px;font-weight:600;color:" + (warnCount ? "var(--bad)" : "var(--good)"),
+    text: warnCount ? "확인할 곳 " + warnCount + "건" : (countSlots.length ? "✓ 시트 기구 갯수와 일치" : "✓ 문제 없음")
+  }));
+  box.append(top);
 
-  fill.warnings.forEach(w => box.append(el("p", { class:"fill-warn", style:"border-radius:10px;margin-bottom:10px", text:w })));
+  countBad.forEach(s=>{
+    box.append(el("p", { class:"fill-warn", style:"border-radius:8px;margin:0 0 6px",
+      text: minutesText(s.minutes) + " — " + s.count.diffs.join(", ") + ". " + s.count.why.join(" / ") }));
+  });
+  fill.slots.filter(s => !s.count || s.count.ok).forEach(s => s.warnings.forEach(w=>{
+    box.append(el("p", { class:"fill-warn", style:"border-radius:8px;margin:0 0 6px", text: minutesText(s.minutes) + " — " + w }));
+  }));
+  fill.warnings.forEach(w => box.append(el("p", { class:"fill-warn", style:"border-radius:8px;margin:0 0 6px", text:w })));
 
-  /* 한 번에 넣기 */
+  /* 복사 버튼 */
   const blocks = buildPasteBlocks(parsed.layout, lastGrid.raws || lastGrid.values, fill, days.length > 1 ? fillDay : "");
-  const quick = el("section", { class:"card" });
-  quick.append(el("h2", { class:"card-title" }, [el("span", { class:"num", text:"3" }), dayName + "한 번에 넣기"]));
-  quick.append(el("p", { class:"hint" }));
-  quick.lastChild.innerHTML =
-    "<b>복사</b> 누르기 → 시놀로지에서 안내된 칸(예: B5) <b>하나만 클릭</b> → <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>. " +
-    "기구 칸만 바뀌고 나머지 칸은 그대로예요.";
   blocks.forEach(b=>{
     const btn = el("button", { type:"button", class:"primary copy-btn", text: dayName + b.label + " 표 복사" });
-    const msg = el("span", { class:"hint", style:"margin:0" });
     btn.onclick = () => {
       const ok = copyGrid(b.grid);
       btn.textContent = ok ? dayName + b.label + " 복사됨 ✓" : "복사 실패";
-      msg.innerHTML = ok ? "→ 시놀로지 <b>" + dayName + "시트</b>에서 <b>" + b.from + "</b> 칸 클릭 후 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>" : "";
     };
-    quick.append(el("div", { class:"actions", style:"margin-top:10px" }, [
+    box.append(el("div", { class:"actions", style:"margin-top:8px" }, [
       btn,
-      el("span", { style:"font-size:13px" }, [b.label + " 표 " + b.from + " ~ " + b.to + " · 기구 칸 " + b.count + "개" + (b.dayRemoved ? " · 다른 요일 표기 뺀 칸 " + b.dayRemoved + "개" : "")]),
-      msg
+      el("span", { style:"font-size:16px;font-weight:800;color:#a3000b", text: b.from })
     ]));
   });
-  if(days.length > 1) quick.append(el("p", { class:"hint", style:"margin:12px 0 0;color:var(--warn)", text:"※ 표 전체를 덮어쓰는 방식이에요. 고른 요일과 다른 요일 표기 줄(예: 토요일에 H임훈성(일))은 빼고 복사됩니다. 나눈 시트에서 따로 고친 게 있으면 그 요일 시트를 붙여넣고 쓰세요." }));
-  quick.append(el("p", { class:"hint", style:"margin:12px 0 0", text:"복사하면 바로 붙여넣으세요. 결과가 이상하면 Ctrl+Z로 되돌리면 됩니다." }));
-  box.append(quick);
+  const tip = el("p", { class:"hint", style:"margin:12px 0 0" });
+  tip.innerHTML = "복사 → 시놀로지에서 빨간 칸 클릭 → <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>";
+  box.append(tip);
 
-  const each = el("details", { class:"layout", style:"margin:4px 0 12px" }, [el("summary", { text:"칸별로 넣기 · 나눈 결과 확인 (기구 칸 " + cells + "개)" })]);
-  box.append(each);
+  const each = el("details", { class:"layout", style:"margin:4px 0 12px" }, [el("summary", { text:"나눈 결과 보기" })]);
+  detail.append(each);
   const eachBox = el("div", { style:"margin-top:10px" });
   each.append(eachBox);
 
@@ -3001,7 +3024,6 @@ function runFill(){
 
     eachBox.append(wrap);
   });
-  if(warnCount) each.open = true;
 
   if(fill.slots.length === 0 && fill.warnings.length === 0){
     box.append(el("p", { class:"hint", text:"\"기구\" 칸도, 기구표 환자도 찾지 못했습니다." }));

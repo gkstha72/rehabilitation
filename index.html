@@ -695,6 +695,7 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
       <button class="nav-item" data-tool="work3"><span class="icon">3</span><span class="label">3과 근무안</span></button>
       <button class="nav-item" data-tool="leave"><span class="icon">🗓</span><span class="label">연차달력</span></button>
       <button class="nav-item" data-tool="leaveprint"><span class="icon">📄</span><span class="label">연차알림</span></button>
+      <button class="nav-item" data-tool="equip"><span class="icon">🔧</span><span class="label">기구점검</span></button>
     </div>
 
     <div class="sidebar-section section-schedule">
@@ -706,11 +707,6 @@ body{background:var(--bg); color:var(--ink); display:flex; flex-direction:column
       <div class="sidebar-title"><span class="dot"></span>평가</div>
       <button class="nav-item" data-tool="spasticity"><span class="icon">🔬</span><span class="label">경직진자검사</span></button>
       <button class="nav-item" data-tool="mbi"><span class="icon">📋</span><span class="label">MBI/SCIM</span></button>
-    </div>
-
-    <div class="sidebar-section section-check">
-      <div class="sidebar-title"><span class="dot"></span>확인 · 점검</div>
-      <button class="nav-item" data-tool="equip"><span class="icon">🔧</span><span class="label">기구점검</span></button>
     </div>
 
     <hr class="sidebar-divider">
@@ -1002,7 +998,7 @@ function renderUrlEditList() {
     gen: {label: '시간표', color: 'var(--cat-schedule)'},
     spasticity: {label: '평가', color: 'var(--cat-eval)'},
     mbi: {label: '평가', color: 'var(--cat-eval)'},
-    equip: {label: '확인·점검', color: 'var(--cat-check)'},
+    equip: {label: '근무안', color: 'var(--cat-work)'},
     mwd: {label: '간부용', color: 'var(--cat-mgmt)'},
     mwe: {label: '간부용', color: 'var(--cat-mgmt)'},
     verify: {label: '간부용', color: 'var(--cat-mgmt)'},

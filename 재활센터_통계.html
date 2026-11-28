@@ -401,6 +401,8 @@ ICT(15) + MI(5) = <b>20분</b> · ICT(15) + HP(15) = <b>30분</b> · ICT(15) + B
 <div class="s3-box" style="border-color:#c8b0dd;background:#faf7fd;">
   <div class="s12-head">
     <span class="s12-title" style="color:#7d3c98;">🏥 퇴원 환자</span>
+    <input type="date" id="dischargeDate" onchange="renderDischargeNotice()" title="이 날짜의 퇴원 환자 피노트 작성 문구에 모읍니다"
+           style="padding:4px 6px;font-size:12.5px;border:1px solid #ccc;border-radius:6px;" />
     <input type="text" id="dischargeNameInput" placeholder="환자 성함 (여러 명은 쉼표로)"
            style="flex:1;min-width:140px;padding:5px 9px;font-size:12.5px;border:1px solid #ccc;border-radius:6px;"
            onkeydown="if(event.key==='Enter'){analyzeDischargeLogic();}" />
@@ -474,6 +476,7 @@ var globalEmrTherapistIdx = -1; // 세부치료사 열
 var globalEmrChartIdx = -1;     // 차트번호 열 (동명이인 구분의 기준)
 var globalEmrRoomIdx  = -1;     // 병실 열
 var globalEmrHeaderRow  = null; // EMR 헤더 행 (열 추가 탐색용)
+var globalEmrRawRows    = null; // EMR 원본 행 전체 (피노트 점검기 엔진용)
 var globalEmrPatientNames = null; // EMR 수진자명 집합 (도수 등 환자명 검증용)
 // 엑셀에서 복사하면 한글이 자모 분리형(NFD)으로 넘어오기도 한다.
 // 보기엔 같아도 글자 코드가 달라 이름을 못 찾으므로 항상 조합형(NFC)으로 맞춘다.
@@ -645,7 +648,9 @@ function normalize15Text(t) {
         .replace(/[（]/g, "(").replace(/[）]/g, ")")
         .replace(/[［]/g, "[").replace(/[］]/g, "]")
         .replace(/[０-９]/g, function(d){ return String.fromCharCode(d.charCodeAt(0) - 0xFEE0); })
-        .replace(/(\d)\s+분/g, "$1분");
+        .replace(/(\d)\s+분/g, "$1분")
+        // "체외 15분" 처럼 띄어 써도 체외충격파 시행시간 메모다 — 붙여서 15분 액팅으로 안 잡히게 (2026-11-26)
+        .replace(/(체외|채외|ESWT)\s+(?=15분)/gi, "$1");
 }
 function count15Min(cellText) {
     if (!cellText) return 0;
@@ -1892,7 +1897,7 @@ function loadEmrRows(rows) {
             globalEmrVisitIdx = row.findIndex(function(c){ return String(c).includes("외래/입원"); });
             globalEmrDoctorIdx = row.findIndex(function(c){ return String(c).trim() === "담당의"; });
             globalEmrTherapistIdx = row.findIndex(function(c){ return String(c).includes("세부치료사"); });
-            globalEmrHeaderRow = row;
+            globalEmrHeaderRow = row; globalEmrRawRows = rows;
             if (globalEmrDurIdx === -1) globalEmrDurIdx = row.findIndex(function(c){ return String(c).includes("슬립소요시간"); });
             globalEmrRows = rows.slice(i+1); resetEmrTherapistAlias(); break;
         }
@@ -6404,8 +6409,13 @@ function analyzeDischargeLogic() {
     if (names.length === 0) { area.innerHTML = "<p style='color:#c0392b;font-weight:bold;'>환자 성함을 입력해 주세요.</p>"; return; }
     // EMR 미연동이어도 시간표 스케줄은 보여준다 (액팅 대조만 생략)
     var hasEmr = !!(globalEmrRows && globalEmrRows.length > 0 && globalEmrCodeIdx !== -1);
+    // 피노트 — 피노트 점검기 규칙(PNEngine)으로 판정한다 (2026-11-28)
+    //   EMR 한 줄마다 엔진 결과(R[k])를 붙인다. 엔진이 못 읽는 파일이면 피노트 칸은 비운다.
+    var pnRes = dischargePnRun(hasEmr);
+    var hasPn = !!pnRes;
     var lblCodes = labelCodeMapAll();
     var html = "";
+    var noticeParts = [];   // 퇴원 환자 피노트 작성 문구 (환자별 파트 · 시간 · 담당)
 
     names.forEach(function(nm) {
         // ① 시간표에서 그 환자가 나오는 칸 → 처방 라벨
@@ -6478,6 +6488,7 @@ function analyzeDischargeLogic() {
                 who:  globalEmrTherapistIdx !== -1 ? String(row[globalEmrTherapistIdx]||"").trim()
                                                    : String(row[globalEmrNameIdx]||"").trim(),
                 time: globalEmrTimeIdx !== -1 ? String(row[globalEmrTimeIdx]||"").trim() : "",
+                pn:   hasPn ? dischargePnOf(pnRes, row) : null,
                 used: false
             });
         });
@@ -6546,6 +6557,7 @@ function analyzeDischargeLogic() {
             rows.push({ grid: sc.grid, time: sc.time, token: sc.token, who: sc.who, label: sc.label,
                         want: (hit || etOnly) ? "" : dischargeWantOrder(sc, lblCodes),
                         act: hit ? (hit.code + " " + hit.slip + " (" + hit.who + " " + hit.time + ")") : "",
+                        pn: hit ? hit.pn : null,
                         ok: !!hit, warn: !!hit && note !== "액팅됨", note: note });
         });
         var extra = acts.filter(function(a){ return !a.used; }).sort(function(a, b) {
@@ -6555,6 +6567,27 @@ function analyzeDischargeLogic() {
             if (tb === null) return -1;
             return ta - tb;
         });
+
+        // 퇴원 환자 피노트 작성 문구 — 아직 액팅이나 피노트가 남은 칸만 파트 · 시간 · 담당으로 (같은 칸 중복은 한 줄)
+        //   PN 열이 없는 파일이면 시간표에 배정된 칸을 모두 적는다
+        (function() {
+            var seen = {}, lines = [];
+            rows.forEach(function(r) {
+                if (hasPn && r.ok && r.pn && r.pn.ok) return;   // 액팅 · 피노트 모두 끝난 칸
+                var who = r.who || "담당 미상";
+                var k = r.grid + "|" + r.time + "|" + who;
+                if (seen[k]) return; seen[k] = true;
+                lines.push(r.grid + "   " + r.time + "   " + who);
+            });
+            noticeParts.push({ nm: nm, done: hasPn && rows.length > 0 && lines.length === 0,
+                               text: nm + "님\n" + (lines.length ? lines.join("\n") : "(시간표 배정 없음)") });
+        })();
+        // 피노트 점검기에서 "PN에만 있는 기록"(청구없음 · 기록초과 · 중복작성) 중 이 환자 것
+        var pnOrph = hasPn ? pnRes.orph.filter(function(o) {
+            return o.name === nm || o.name === resolveEmrPatientName(nm);
+        }) : [];
+        var pnMiss = hasPn ? rows.filter(function(r){ return r.ok && r.pn && !r.pn.ok; }).length +
+                             extra.filter(function(a){ return a.pn && !a.pn.ok; }).length + pnOrph.length : 0;
 
         var bad = rows.filter(function(r){ return !r.ok; }).length;
         var warn = rows.filter(function(r){ return r.ok && r.warn; }).length;
@@ -6568,12 +6601,19 @@ function analyzeDischargeLogic() {
                 (bad ? " · <span style='color:#c0392b;'>넘겨야 할 건 " + bad + "</span>" : "") +
                 (extra.length ? " · <span style='color:#c0392b;'>취소·확인할 건 " + extra.length + "</span>" : "") +
                 (warn ? " · <span style='color:#c0392b;'>담당·시간 확인 " + warn + "</span>" : "") +
-                (!bad && !extra.length && !warn ? " · <span style='color:#27ae60;'>모두 일치</span>" : "") + "</h3>";
+                (pnMiss ? " · <span style='color:#c0392b;'>피노트 확인 " + pnMiss + "</span>" : "") +
+                (!bad && !extra.length && !warn ? " · <span style='color:#27ae60;'>모두 일치</span>" : "") +
+                (hasPn && !bad && !pnMiss ? " · <span style='color:#27ae60;'>피노트 완료</span>" : "") + "</h3>";
         html += "<div style='max-height:340px;overflow:auto;border:1px solid #ccc;border-radius:6px;'>";
         html += "<table class='result-table' id='dischargeTable_" + nm + "' style='table-layout:auto;margin-bottom:0;font-size:12.5px;'><thead><tr>";
-        ["시간표","시간","기입","담당","처방","넘길 오더","EMR 액팅","판정"].forEach(function(x){ html += "<th class='th-sub-label'>" + x + "</th>"; });
+        ["시간표","시간","기입","담당","처방","넘길 오더","EMR 액팅","피노트","판정"].forEach(function(x){ html += "<th class='th-sub-label'>" + x + "</th>"; });
         html += "</tr></thead><tbody>";
-        if (rows.length === 0 && extra.length === 0) html += "<tr><td colspan='8'>해당 환자의 시간표 배정이 없습니다.</td></tr>";
+        if (rows.length === 0 && extra.length === 0) html += "<tr><td colspan='9'>해당 환자의 시간표 배정이 없습니다.</td></tr>";
+        function pnCell(v) {
+            if (!hasPn || !v) return "<td>-</td>";
+            if (v.ok) return "<td" + (v.stat === "대조제외" ? " style='color:#888;'>대상 아님" : ">✅") + "</td>";
+            return "<td style='text-align:left;color:#c0392b;'><b>⚠️ " + v.stat + "</b><br>" + v.msg + "</td>";
+        }
         if (!hasEmr) rows.forEach(function(rr){ rr.ok = false; });
         rows.forEach(function(r) {
             var cls = (!r.ok || r.warn) ? " class='error-cell'" : "";
@@ -6583,19 +6623,198 @@ function analyzeDischargeLogic() {
                     "</td><td>" + (r.label||"-") +
                     "</td><td style='text-align:left;font-weight:" + (r.want ? "700;color:#c0392b;" : "400;") + "'>" +
                     (r.want || "-") +
-                    "</td><td style='text-align:left;'>" + (r.act||"-") +
-                    "</td><td style='text-align:left;'>" + mark + r.note + "</td></tr>";
+                    "</td><td style='text-align:left;'>" + (r.act||"-") + "</td>" + pnCell(r.ok ? r.pn : null) +
+                    "<td style='text-align:left;'>" + mark + r.note + "</td></tr>";
         });
         extra.forEach(function(a) {
             html += "<tr class='error-cell'><td>-</td><td>" + (a.time||"-") + "</td><td style='text-align:left;'>-</td><td>" +
                     a.who + "</td><td>-</td><td>-</td><td style='text-align:left;'>" + a.code + " " + a.slip +
-                    "</td><td style='text-align:left;'>⚠️ 시간표에 없는 액팅 — " + a.who + " 선생님 " +
+                    "</td>" + pnCell(a.pn) + "<td style='text-align:left;'>⚠️ 시간표에 없는 액팅 — " + a.who + " 선생님 " +
                     (a.time||"") + " " + a.slip + " 건입니다. 시간표에 없으면 <b>취소</b>하거나, 실제 시행했다면 시간표에 추가하세요</td></tr>";
+        });
+        pnOrph.forEach(function(o) {
+            html += "<tr class='error-cell'><td>-</td><td>" + (o.st||"-") + "</td><td style='text-align:left;'>-</td><td>" +
+                    (o.ther||"-") + "</td><td>-</td><td>-</td><td style='text-align:left;'>PN: " + String(o.title||"").replace(/&/g,"&amp;").replace(/</g,"&lt;") + "</td>" +
+                    "<td style='text-align:left;color:#c0392b;'><b>⚠️ " + o.kind + "</b><br>" + dischargePnOrphMsg(o).replace(/</g,"&lt;") + "</td>" +
+                    "<td style='text-align:left;'>⚠️ 액팅과 짝이 없는 PN 기록</td></tr>";
         });
         html += "</tbody></table></div>";
         html += "<button class='btn-copy' style='margin:8px 0 18px;' onclick='copyResultTable(\"dischargeTable_" + nm + "\")'>📄 이 표 복사하기</button>";
     });
-    area.innerHTML = html;
+    // 퇴원 환자 피노트 작성 문구 — 날짜별로 퇴원 환자를 쌓아 두고 한 번에 모은다 (2026-11-28)
+    //   같은 날 같은 환자를 다시 점검하면 그 환자 내용만 새것으로 바뀐다
+    var dk = dischargeDateKey();
+    var store = dischargeStoreLoad();
+    if (!store[dk]) store[dk] = [];
+    noticeParts.forEach(function(p) {
+        var i = store[dk].findIndex(function(x){ return x.nm === p.nm; });
+        // 액팅 · 피노트가 모두 끝난 환자는 문구에서 뺀다
+        if (p.done) { if (i !== -1) store[dk].splice(i, 1); return; }
+        var item = { nm: p.nm, text: p.text };
+        if (i === -1) store[dk].push(item); else store[dk][i] = item;
+    });
+    dischargeStoreSave(store);
+    area.innerHTML = "<div id='dischargeNoticeBox'></div>" + html;
+    renderDischargeNotice();
+}
+
+// ── 퇴원 점검 피노트 — 피노트 점검기 엔진(PNEngine) 결과를 EMR 줄에 붙인다 (2026-11-28) ──
+//   설정(이름 대응표 · 제외 항목 · 회차 표기 규칙)은 피노트 점검기에서 저장한 것을 그대로 쓴다.
+function dischargePnCfg() {
+    var E = window.PNEngine, base = {
+        alias: E.DEFAULTS.alias.map(function(a){ return a.slice(); }), skip: E.DEFAULTS.skip.slice(),
+        evalKw: E.DEFAULTS.evalKw.slice(), unit: E.DEFAULTS.unit, nonHoe: E.DEFAULTS.nonHoe,
+        hoeReq: { 1: true, 2: true, 3: false, 4: false }, codeFix: {}
+    };
+    try {
+        var o = JSON.parse(localStorage.getItem("pn-checker-cfg-v1") || "null");
+        if (o && typeof o === "object") {
+            if (Array.isArray(o.alias)) base.alias = o.alias;
+            if (Array.isArray(o.skip)) base.skip = o.skip;
+            if (Array.isArray(o.evalKw)) base.evalKw = o.evalKw;
+            if (typeof o.unit === "number") base.unit = o.unit;
+            if (typeof o.nonHoe === "number") base.nonHoe = o.nonHoe;
+            if (o.hoeReq) base.hoeReq = o.hoeReq;
+            if (o.codeFix) base.codeFix = o.codeFix;
+        }
+    } catch (e) {}
+    return base;
+}
+function dischargePnRun(hasEmr) {
+    if (!hasEmr || !window.PNEngine || !globalEmrRawRows) return null;
+    var res;
+    try { res = window.PNEngine.run(globalEmrRawRows, dischargePnCfg()); } catch (e) { return null; }
+    if (!res || res.error) return null;
+    // 엔진이 읽은 데이터 줄 순서대로 EMR 원본 줄에 결과를 매단다 (엔진과 같은 규칙으로 빈 줄을 건너뜀)
+    var hdr = globalEmrHeaderRow || [];
+    var nmI = hdr.findIndex(function(c){ return String(c).trim() === "수진자명"; });
+    var dtI = hdr.findIndex(function(c){ return String(c).trim() === "처방일자"; });
+    var k = 0;
+    res.byRow = new Map();
+    (globalEmrRows || []).forEach(function(row) {
+        var r = row || [];
+        var nmv = nmI >= 0 ? r[nmI] : null, dtv = dtI >= 0 ? r[dtI] : null;
+        var emptyNm = (nmv === null || nmv === undefined || String(nmv).trim() === "");
+        var emptyDt = (dtv === null || dtv === undefined || String(dtv).trim() === "");
+        if (emptyNm && emptyDt) return;
+        if (row) res.byRow.set(row, res.rows[k]);
+        k++;
+    });
+    return res;
+}
+// 피노트 점검기 공지용과 같은 문구
+function dischargePnMsg(o, hasPNCol) {
+    var tp = function(s){ var p = String(s).indexOf("/"); return p >= 0 ? String(s).slice(p + 1).trim() : String(s).trim(); };
+    var np = function(s){ var p = String(s).indexOf("/"); return p >= 0 ? String(s).slice(0, p).trim() : String(s).trim(); };
+    var ct = function(s, n){ var t = String(s||"").replace(/[\r\n]+/g, " ").trim(); return t.length > n ? t.slice(0, n) + "..." : t; };
+    var H = window.PNEngine.hoeOf;
+    switch (o.stat) {
+        case "기록없음":       return (o.pnFlag || !hasPNCol) ? "PN 기록이 없습니다." : "PN 기록이 없습니다. (EMR [PN] 표시도 비어 있습니다)";
+        case "PN기록없음":     return "이 날짜 PN이 비어 있습니다.";
+        case "시간불일치":     return "PN 기록 시간이 " + tp(o.pnBy) + " 입니다.";
+        case "PN시간미기재":   return "PN 기록에 치료시간 표기가 없습니다.";
+        case "시간·명칭불일치": return "PN 기록이 [" + ct(o.pnTitle, 30) + "] " + tp(o.pnBy) + " 로 되어 있습니다.";
+        case "치료사불일치":   return "같은 시간 PN 기록 작성자가 " + np(o.pnBy) + " 입니다.";
+        case "명칭확인필요":   return "PN 기록 제목이 [" + ct(o.pnTitle, 30) + "] 입니다.";
+        case "회차표기누락":   return "PN 제목 앞에 " + o.hoe + " 표기가 빠졌습니다.";
+        case "회차불일치":
+            var m = "PN 제목은 " + H(o.pnTitle) + " 표기인데 실제 청구는 " + o.hoe + " 입니다.";
+            if (o.hoeCode && o.hoeLbl !== o.hoeCode) m += " (슬립명칭에는 " + o.hoeLbl + " 로 떠 있으나 청구 코드는 " + o.hoeCode + " 입니다)";
+            return m;
+        case "슬립정보없음":   return "슬립에 치료사 또는 치료시간이 비어 있습니다.";
+    }
+    return o.memo || "";
+}
+function dischargePnOrphMsg(o) {
+    if (o.kind === "중복작성") return "같은 내용의 PN 기록이 " + o.pn + "건 있습니다.";
+    if (o.kind === "기록초과") return "액팅은 " + o.act + "건(" + o.actTime + ")인데 PN 기록은 " + o.pn + "건입니다.";
+    return "이 치료사의 액팅이 없는데 PN 기록만 있습니다.";
+}
+// EMR 한 줄의 피노트 판정 → { ok, stat, msg }
+//   점검기 공지용에 오르는 것(PN 문제 · 수량불일치/수량없음 · 가산체크확인)이 하나라도 있으면 확인 필요
+function dischargePnOf(res, row) {
+    var o = res && res.byRow ? res.byRow.get(row) : null;
+    if (!o) return null;
+    var probs = [], stat = o.stat;
+    var okStat = (stat === "일치" || stat === "대조제외");
+    if (!okStat) probs.push(dischargePnMsg(o, res.hasPNCol));
+    if (o.qStat === "수량불일치" || o.qStat === "수량없음")
+        probs.push(o.min + "분 치료인데 청구 수량이 " + o.qty + "입니다. (" + o.expQ + " 이어야 함)");
+    if (o.hoeJudge === "가산체크확인" && stat !== "회차불일치")
+        probs.push("슬립은 " + o.hoeLbl + " 인데 " + o.hoeCode + " 로 청구되어 있습니다.");
+    if (!probs.length) return { ok: true, stat: stat, msg: "" };
+    probs = probs.map(function(t){ return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;"); });
+    if (okStat) stat = (o.qStat === "수량불일치" || o.qStat === "수량없음") ? o.qStat : "가산체크확인";
+    return { ok: false, stat: stat, msg: probs.join("<br>") };
+}
+
+// ── 퇴원 환자 피노트 작성 문구 — 날짜별 누적 (브라우저에 저장) ─────────────────
+var DISCHARGE_STORE_KEY = "dischargeNoticeByDay_v1";
+var dischargeNoticeText = "";
+function dischargeStoreLoad() {
+    try { return JSON.parse(localStorage.getItem(DISCHARGE_STORE_KEY) || "{}") || {}; } catch (e) { return {}; }
+}
+function dischargeStoreSave(st) {
+    // 30일 지난 날짜는 지운다
+    var cut = new Date(); cut.setDate(cut.getDate() - 30);
+    var cutKey = cut.toISOString().slice(0, 10);
+    Object.keys(st).forEach(function(k){ if (k < cutKey || !st[k] || !st[k].length) delete st[k]; });
+    try { localStorage.setItem(DISCHARGE_STORE_KEY, JSON.stringify(st)); } catch (e) {}
+}
+// 날짜 칸이 비어 있으면 시간표 날짜 → EMR 날짜 → 오늘 순으로 채운다
+function dischargeDateKey() {
+    var el = document.getElementById("dischargeDate");
+    if (el && el.value) return el.value;
+    var d = parseAnyDate(schedDateText) || parseAnyDate(emrDateText), k;
+    if (d) k = d.y + "-" + ("0"+d.mo).slice(-2) + "-" + ("0"+d.d).slice(-2);
+    else { var t = new Date(); k = t.getFullYear() + "-" + ("0"+(t.getMonth()+1)).slice(-2) + "-" + ("0"+t.getDate()).slice(-2); }
+    if (el) el.value = k;
+    return k;
+}
+function renderDischargeNotice() {
+    var area = document.getElementById("dischargeArea");
+    if (!area) return;
+    var box = document.getElementById("dischargeNoticeBox");
+    if (!box) { box = document.createElement("div"); box.id = "dischargeNoticeBox"; area.insertBefore(box, area.firstChild); }
+    var dk = dischargeDateKey();
+    var list = dischargeStoreLoad()[dk] || [];
+    var WAVE = "〰️〰️〰️〰️〰️〰️〰️〰️〰️〰️〰️〰️";
+    dischargeNoticeText = list.length
+        ? WAVE + "\n수납을 위해 액팅 처리 및 피노트 작성 부탁드립니다.\n\n" +
+          list.map(function(p){ return p.text; }).join("\n\n") + "\n\n" + WAVE
+        : "";
+    var esc = function(t){ return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;"); };
+    var chips = list.map(function(p) {
+        return "<span style='display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border:1px solid #c8b0dd;border-radius:10px;font-size:12px;'>" +
+               esc(p.nm) + " <a href='javascript:void(0)' onclick='removeDischargeNotice(" + JSON.stringify(p.nm).replace(/'/g,"&#39;") + ")' " +
+               "style='color:#c0392b;text-decoration:none;font-weight:700;'>✕</a></span>";
+    }).join("");
+    box.innerHTML = "<div class='s3-box' style='border-color:#c8b0dd;background:#fff;margin-bottom:14px;'>" +
+        "<div class='s12-head'><span class='s12-title' style='color:#7d3c98;'>📨 퇴원 환자 피노트 작성 문구 · " + esc(dk) + " · " + list.length + "명</span>" +
+        "<button class='step-btn' onclick='copyDischargeNotice()' style='background:#8e44ad;border-color:#8e44ad;color:#fff;'>📋 문구 복사</button>" +
+        (list.length ? "<button class='step-btn' onclick='clearDischargeNotice()'>이 날짜 비우기</button>" : "") + "</div>" +
+        (list.length
+            ? "<div style='margin:6px 0;'>" + chips + "</div>" +
+              "<pre style='white-space:pre-wrap;font-size:12.5px;margin:6px 0 0;font-family:inherit;max-height:260px;overflow:auto;'>" +
+              esc(dischargeNoticeText) + "</pre>"
+            : "<p style='margin:6px 0 0;color:#888;font-size:12.5px;'>이 날짜에 모인 퇴원 환자가 없습니다. 성함을 넣고 🔍 오더 점검을 누르면 여기에 쌓입니다.</p>") +
+        "</div>";
+}
+function removeDischargeNotice(nm) {
+    var st = dischargeStoreLoad(), dk = dischargeDateKey();
+    st[dk] = (st[dk] || []).filter(function(p){ return p.nm !== nm; });
+    dischargeStoreSave(st);
+    renderDischargeNotice();
+}
+function clearDischargeNotice() {
+    var dk = dischargeDateKey();
+    if (!confirm(dk + " 에 모인 퇴원 환자 문구를 모두 지울까요?")) return;
+    var st = dischargeStoreLoad(); delete st[dk]; dischargeStoreSave(st);
+    renderDischargeNotice();
+}
+function copyDischargeNotice() {
+    if (!dischargeNoticeText) return alert("이 날짜에 모인 퇴원 환자가 없습니다.");
+    copyText(dischargeNoticeText, "✅ 퇴원 환자 피노트 작성 문구를 복사했습니다.\n카톡 등에 Ctrl+V 로 붙여넣으세요.");
 }
 
 // 오더 점검 전체 실행
@@ -7581,7 +7800,9 @@ function collect15Cells() {
     return out;
 }
 // "H홍거상(15분)+런닝" → "홍거상" (공백으로 떨어진 "(15분)"은 앞 토큰에서 이름을 가져옴)
-function extract15Patients(cellText) {
+//   nonH 를 넘기면 H(회복기) 가 아닌 오더에 붙은 (15분)의 환자명을 거기 담는다 — 예) S홍길동(15분)
+var NON_H_15_NOTE = "비회복기 오더에 (15분) — 15분은 H(회복기) 오더만 가능";
+function extract15Patients(cellText, nonH) {
     var toks = normalize15Text(cellText).replace(/\r?\n|\r/g," ").split(/[\s,]+/).filter(function(t){ return t.length>0; });
     var out = [];
     toks.forEach(function(t, i) {
@@ -7596,12 +7817,17 @@ function extract15Patients(cellText) {
         var src = t;
         var n = src.split("(")[0].split("[")[0].split("+")[0].replace(/^[^가-힣]+/, "").trim();
         if (!/^[가-힣]/.test(n)) n = "";   // 한글로 시작하지 않으면 이름이 아님
+        var owner = t;
         if (!n && i > 0) {
             var prev = toks[i-1];
             if (/체외|채외|ESWT/i.test(prev)) return;
             n = prev.split("(")[0].split("[")[0].split("+")[0].replace(/^[A-Za-z]+/, "").trim();
+            owner = prev;
         }
-        if (n) out.push(n);
+        if (n) {
+            out.push(n);
+            if (nonH && !/^H/i.test(owner.replace(/^[^A-Za-z가-힣]+/, ""))) nonH.push(n);
+        }
     });
     return out;
 }
@@ -7826,12 +8052,14 @@ function analyzeQtyCheckLogic() {
         if (!slotCache15[cell.grid]) slotCache15[cell.grid] = buildRowSlotMap(cell.grid);
         var who15  = dischargeWhoOf(cell.grid, cell.row, cell.col, colsCache15[cell.grid]) || "";
         var slot15 = slotCache15[cell.grid][cell.row] || "";
-        extract15Patients(cell.text).forEach(function(n0) {
+        var nonH15 = [];
+        extract15Patients(cell.text, nonH15).forEach(function(n0) {
             var n = resolveEmrPatientName(n0);
             if (!sched15[n]) sched15[n] = {
                 text: (GRID_LABELS[cell.grid]||"") + " · " + cell.text.replace(/\r?\n|\r/g," "),
                 who: who15, slot: slot15
             };
+            if (nonH15.indexOf(n0) !== -1) sched15[n].nonH = true;
         });
     });
     var matched15 = {};
@@ -7869,12 +8097,15 @@ function analyzeQtyCheckLogic() {
             var cell = sched15[patient] ? sched15[patient].text : "";
             var b15 = [];
             // 시간표가 안 들어온 파트(근골만 넣고 신경계를 안 넣은 경우 등)는 대조 근거가 없다
+            // 15분은 회복기(H) 오더만 가능 — 시간표에서 H 가 아닌 오더에 (15분)이 붙었으면 오류 (2026-11-26)
+            var non15 = (sched15[patient] && sched15[patient].nonH) ? NON_H_15_NOTE : "";
             if (!cell && !loadedTh15[who]) {
                 list15.push({ patient: patient, time: st, slip: slip, who: who, qty: rec.qty,
-                              dur: rec.dur, cell: "", ok: true,
-                              note: "시간표 미입력 파트 — 대조 제외" });
-                skipped15[who || "담당 미상"] = true;
+                              dur: rec.dur, cell: "", ok: !non15,
+                              note: non15 || "시간표 미입력 파트 — 대조 제외" });
+                if (!non15) skipped15[who || "담당 미상"] = true;
             } else {
+            if (non15) b15.push(non15);
             if (!cell) b15.push("시간표에 (15분) 표기 없음");
             if (qty !== 1) b15.push("수량이 " + rec.qty + " (15분 액팅은 1)");
             list15.push({ patient: patient, time: st, slip: slip, who: who, qty: rec.qty,
@@ -8003,7 +8234,8 @@ function analyzeQtyCheckLogic() {
     Object.keys(sched15).forEach(function(n) {
         if (matched15[n]) return;
         list15.push({ patient: n, time: sched15[n].slot, slip: "", who: sched15[n].who, qty: "", dur: "",
-                      cell: sched15[n].text, ok: false, note: "EMR에 15분 액팅 없음" });
+                      cell: sched15[n].text, ok: false,
+                      note: (sched15[n].nonH ? NON_H_15_NOTE + " / " : "") + "EMR에 15분 액팅 없음" });
     });
 
     function tbl(id, heads, rows, render) {
@@ -9758,6 +9990,1037 @@ function analyzeEvalCheck(silent) {
     area.appendChild(wrap);
     notify("평가 점검이 완료되었습니다!");
 }
+
+</script>
+<!-- 피노트 점검기(피노트_점검기.html) 판정 엔진 그대로 — 퇴원 점검의 피노트 판정에 쓴다 (2026-11-28) -->
+<script>
+
+/* ============================================================
+   PN 대조 엔진 — VBA [PN대조검사] 모듈을 그대로 옮긴 것
+   ============================================================ */
+(function (root) {
+  'use strict';
+
+  // ---------- 기본 설정값 ----------
+  var DEFAULTS = {
+    alias: [
+      ['간섭파전류치료', 'ICT'],
+      ['표층열치료', 'HP;BH;핫팩;HOTPACK'],
+      ['INFRARED', 'IR;BI;적외선'],
+      ['심층열치료', '심층열;US;SONOR;초음파;MW;MWD;MI;마이크로'],
+      ['ULTRASOUND', 'US;U;SONOR;초음파'],
+      ['MICROWAVE', 'MW;MWD;MI;마이크로'],
+      ['한냉치료', 'CP;콜드팩;COLDPACK'],
+      ['기능적전기자극치료', 'FES;전기자극'],
+      ['중추신경계발달재활치료', '중추신경계발달치료;NDT;보바스'],
+      ['복합운동치료', 'CPM;복합운동'],
+      ['경두개직류자극술', 'TDCS;경두개'],
+      ['비침습적무통증신호요법', 'RMS;비침습적무통증신호요법'],
+      ['전산화인지재활치료', '전산화인지;COTRAS;COMCOG'],
+      ['연하장애재활치료', '연하장애;연하재활'],
+      ['검사', '평가;검사;TEST'],
+      ['일상생활동작훈련치료', 'ADL;일상생활동작'],
+      ['도수치료', 'MANUAL;도수']
+    ],
+    skip: ['방문재활치료료', '방문관리료', '재활사회사업', '지역사회연계료'],
+    evalKw: ['검사', '평가'],
+    unit: 15,
+    nonHoe: 1,
+    hoeReq: { 1: true, 2: true, 3: false, 4: false },
+    codeFix: {}
+  };
+
+  // ---------- 정규식 ----------
+  var reTime = /\(\s*(\d{1,2})\s*[:;]\s*(\d{2})\s*[-~]\s*(\d{1,2})\s*[:;]\s*(\d{2})\s*\)/g;
+  var reLoose = /(\d{1,2})\s*[:;]\s*(\d{2})\s*[-~\s:]+\s*(\d{1,2})\s*[:;]\s*(\d{2})/;
+  var reLoose2 = /\(\s*(\d{2})(\d{2})\s*[-~\s]+\s*(\d{2})(\d{2})\s*\)/;
+  var reSig = /([^\s()|]{2,12})\s*\([^()\r\n]{1,20}\)\s*\|\s*\d{1,2}\s*:\s*\d{2}/g;
+  var reLead = /^\s*(\[[^\]]{1,6}\]|\((?:F|비|회\s*[1-4])\)|회\s*[1-4]\s*[)\].]?)\s*/;
+  var reHoe = /회\s*([1-4])/;
+  var reJunk = /[\s[\](){}·ㆍ.,\-~_/\\|:;*+#!?"'`]/g;
+
+  function execAll(re, s) {
+    var out = [], m;
+    re.lastIndex = 0;
+    while ((m = re.exec(s)) !== null) {
+      out.push({ index: m.index, len: m[0].length, g: m.slice(1) });
+      if (m[0].length === 0) re.lastIndex++;
+    }
+    return out;
+  }
+  function execOne(re, s) {
+    var m = re.exec(s);
+    return m ? [{ index: m.index, len: m[0].length, g: m.slice(1) }] : [];
+  }
+  function findTimes(c) {
+    var t = execAll(reTime, c);
+    if (t.length) return t;
+    t = execOne(reLoose, c);
+    if (t.length) return t;
+    return execOne(reLoose2, c);
+  }
+
+  // ---------- 문자열 보조 ----------
+  function pad2(s) { return ('0' + String(s).trim()).slice(-2); }
+
+  function normName(s) {
+    if (s === null || s === undefined) return '';
+    var t = String(s).trim().toUpperCase();
+    t = t.replace(/Ⅰ/g, '1').replace(/Ⅱ/g, '2').replace(/Ⅲ/g, '3').replace(/Ⅳ/g, '4');
+    var prev;
+    do { prev = t; t = t.replace(reLead, '').trim(); } while (t !== prev && t.length);
+    t = t.replace(reJunk, '');
+    t = t.split('1일당').join('').split('비급여').join('')
+         .split('관리급여').join('').split('급여').join('');
+    return t;
+  }
+
+  function oneLine(s) {
+    var t = String(s === null || s === undefined ? '' : s).replace(/[\r\n]+/g, ' ');
+    while (t.indexOf('  ') >= 0) t = t.split('  ').join(' ');
+    return t.trim();
+  }
+  function cut(s, n) { var t = oneLine(s); return t.length > n ? t.slice(0, n) + '...' : t; }
+
+  function hoeOf(s) {
+    if (!s) return '';
+    var t = String(s).replace(/Ⅰ/g, '1').replace(/Ⅱ/g, '2').replace(/Ⅲ/g, '3').replace(/Ⅳ/g, '4');
+    var m = reHoe.exec(t);
+    return m ? '회' + m[1] : '';
+  }
+  function hoeNum(s) {
+    s = String(s || '');
+    for (var i = 0; i < s.length; i++) { var c = s[i]; if (c >= '1' && c <= '4') return +c; }
+    return 0;
+  }
+
+  function normTime(v) {
+    if (v === null || v === undefined) return '';
+    if (v instanceof Date) return pad2(v.getHours()) + ':' + pad2(v.getMinutes());
+    if (typeof v === 'number') {
+      if (v > 0 && v < 1) {
+        var mins = Math.round(v * 24 * 60);
+        return pad2(Math.floor(mins / 60)) + ':' + pad2(mins % 60);
+      }
+      return String(v);
+    }
+    var s = String(v).trim();
+    if (!s) return '';
+    if (s.indexOf(':') >= 0) { var p = s.split(':'); return pad2(p[0]) + ':' + pad2(p[1]); }
+    return s;
+  }
+
+  function normDate(v) {
+    if (v === null || v === undefined) return '';
+    if (v instanceof Date) {
+      return v.getFullYear() + '-' + pad2(v.getMonth() + 1) + '-' + pad2(v.getDate());
+    }
+    if (typeof v === 'number' && v > 20000) {
+      var d = new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 86400000);
+      return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+    }
+    return String(v).trim();
+  }
+
+  function toMin(t) {
+    t = String(t || '');
+    if (t.length < 4 || t.indexOf(':') < 0) return -1;
+    var p = t.split(':');
+    if (isNaN(+p[0]) || isNaN(+p[1])) return -1;
+    return (+p[0]) * 60 + (+p[1]);
+  }
+  function overlap(s1, e1, s2, e2) {
+    var a1 = toMin(s1), b1 = toMin(e1), a2 = toMin(s2), b2 = toMin(e2);
+    if (a1 < 0 || b1 < 0 || a2 < 0 || b2 < 0) return 0;
+    if (a1 > b1) b1 = a1;
+    if (a2 > b2) b2 = a2;
+    var lo = Math.max(a1, a2), hi = Math.min(b1, b2);
+    return Math.max(0, hi - lo);
+  }
+  function matchScore(s1, e1, s2, e2) {
+    var a1 = toMin(s1), a2 = toMin(s2), gap = Math.abs(a1 - a2);
+    if (a1 < 0 || a2 < 0) gap = 1440;
+    return overlap(s1, e1, s2, e2) * 1000 - gap;
+  }
+  function minutesOf(v, ss, ee) {
+    var s = String(v === null || v === undefined ? '' : v).trim();
+    if (s && !isNaN(+s) && +s > 0) return Math.round(+s);
+    var a = toMin(ss), b = toMin(ee);
+    if (a < 0 || b < 0) return 0;
+    return Math.max(0, b - a);
+  }
+
+  // ---------- PN 원문 파싱 ----------
+  function parsePN(txt) {
+    txt = String(txt || '');
+    var sm = execAll(reSig, txt), ents = [], prev = 0, i, k, chunk, nm, ts, title, body;
+
+    for (i = 0; i < sm.length; i++) {
+      chunk = txt.slice(prev, sm[i].index);
+      nm = String(sm[i].g[0]).trim();
+      prev = sm[i].index + sm[i].len;
+      ts = findTimes(chunk);
+      if (ts.length === 0) {
+        title = chunk.trim();
+        if (title.length) ents.push({ t: title, n: normName(title), s: '', e: '', a: nm, b: '' });
+      } else {
+        for (k = 0; k < ts.length; k++) {
+          if (k === 0) title = chunk.slice(0, ts[0].index);
+          else title = chunk.slice(ts[k - 1].index + ts[k - 1].len, ts[k].index);
+          title = title.trim();
+          var endK = ts[k].index + ts[k].len;
+          if (k === ts.length - 1) body = chunk.slice(endK);
+          else body = chunk.slice(endK, ts[k + 1].index);
+          ents.push({
+            t: title, n: normName(title),
+            s: pad2(ts[k].g[0]) + ':' + ts[k].g[1],
+            e: pad2(ts[k].g[2]) + ':' + ts[k].g[3],
+            a: nm, b: normName(body)
+          });
+        }
+      }
+    }
+    if (prev < txt.length) {
+      chunk = txt.slice(prev);
+      ts = findTimes(chunk);
+      for (k = 0; k < ts.length; k++) {
+        ents.push({
+          t: '(작성자 미상)', n: '',
+          s: pad2(ts[k].g[0]) + ':' + ts[k].g[1],
+          e: pad2(ts[k].g[2]) + ':' + ts[k].g[3],
+          a: '', b: ''
+        });
+      }
+    }
+    return ents;
+  }
+
+  // ---------- 명칭 비교 ----------
+  function makeMatcher(aliasRows) {
+    var list = [];
+    (aliasRows || []).forEach(function (r) {
+      var kw = normName(r[0]);
+      var av = String(r[1] || '');
+      if (!kw || !av.trim()) return;
+      var parts = av.split(',').join(';').split(';').map(normName).filter(Boolean);
+      if (parts.length) list.push({ k: kw, v: parts });
+    });
+
+    function nameMatch(slipNorm, pnNorm) {
+      if (!slipNorm || !pnNorm) return false;
+      if (slipNorm.indexOf(pnNorm) >= 0) return true;
+      if (pnNorm.indexOf(slipNorm) >= 0) return true;
+      for (var i = 0; i < list.length; i++) {
+        if (slipNorm.indexOf(list[i].k) >= 0) {
+          for (var j = 0; j < list[i].v.length; j++) {
+            if (pnNorm.indexOf(list[i].v[j]) >= 0) return true;
+          }
+        }
+      }
+      return false;
+    }
+    function nameMatch2(n1, n2, pn) {
+      if (nameMatch(n1, pn)) return true;
+      return n2 ? nameMatch(n2, pn) : false;
+    }
+    function isGenericTitle(t) {
+      if (!t || t.length > 12) return false;
+      return t.indexOf('평가') >= 0 || t.indexOf('검사') >= 0;
+    }
+    function nameMatchEnt(n1, n2, ent, isEval) {
+      if (nameMatch2(n1, n2, ent.n)) return true;
+      if (isEval && isGenericTitle(ent.n)) return true;
+      if (isGenericTitle(ent.n) && ent.b) return nameMatch2(n1, n2, ent.b);
+      return false;
+    }
+    return nameMatchEnt;
+  }
+
+  function kwHit(s, list) {
+    if (!list || !list.length) return false;
+    var t = String(s || '').split(' ').join('').toUpperCase();
+    for (var i = 0; i < list.length; i++) {
+      var k = String(list[i] || '').split(' ').join('').toUpperCase();
+      if (k && t.indexOf(k) >= 0) return true;
+    }
+    return false;
+  }
+
+  // ---------- 열 찾기 ----------
+  var COLS = ['순서', '처방일자', '차트번호', '수진자명', '병동', '병실', '슬립명칭',
+    '세부명칭', '세부치료사', '세부치료시작', '세부치료종료', '일자별PN기록',
+    '수량', '세부치료소요시간(분)', 'PN', '세부코드'];
+
+  function findHeader(rows) {
+    for (var r = 0; r < Math.min(rows.length, 30); r++) {
+      var row = rows[r] || [];
+      for (var c = 0; c < row.length; c++) {
+        if (String(row[c] === null || row[c] === undefined ? '' : row[c]).trim() === '세부명칭') {
+          return r;
+        }
+      }
+    }
+    return -1;
+  }
+
+  function mapCols(headerRow) {
+    var idx = {};
+    (headerRow || []).forEach(function (h, i) {
+      var k = String(h === null || h === undefined ? '' : h).trim();
+      if (k && !(k in idx)) idx[k] = i;
+    });
+    var out = {};
+    COLS.forEach(function (c) { out[c] = (c in idx) ? idx[c] : -1; });
+    return out;
+  }
+
+  // ---------- 본체 ----------
+  function run(rowsRaw, cfg) {
+    cfg = cfg || {};
+    var unit = cfg.unit === undefined ? DEFAULTS.unit : cfg.unit;
+    var nonHoe = cfg.nonHoe === undefined ? DEFAULTS.nonHoe : cfg.nonHoe;
+    var hoeReq = cfg.hoeReq || DEFAULTS.hoeReq;
+    var codeFix = cfg.codeFix || {};
+    var nameMatchEnt = makeMatcher(cfg.alias || DEFAULTS.alias);
+    var skipList = cfg.skip || DEFAULTS.skip;
+    var evalList = cfg.evalKw || DEFAULTS.evalKw;
+
+    var hRow = findHeader(rowsRaw);
+    if (hRow < 0) return { error: "'세부명칭' 머리글을 찾지 못했습니다. 슬립 리스트 파일이 맞는지 확인해 주세요." };
+    var C = mapCols(rowsRaw[hRow]);
+    var need = ['처방일자', '차트번호', '세부명칭', '세부치료사', '세부치료시작', '세부치료종료', '일자별PN기록'];
+    var missing = need.filter(function (k) { return C[k] < 0; });
+    if (missing.length) return { error: '필수 열을 찾지 못했습니다: ' + missing.join(', ') };
+
+    var data = [];
+    for (var ri = hRow + 1; ri < rowsRaw.length; ri++) {
+      var rw = rowsRaw[ri] || [];
+      var nm = C['수진자명'] >= 0 ? rw[C['수진자명']] : null;
+      var dt = rw[C['처방일자']];
+      if ((nm === null || nm === undefined || String(nm).trim() === '') &&
+          (dt === null || dt === undefined || String(dt).trim() === '')) continue;
+      data.push(rw);
+    }
+    var n = data.length;
+    if (!n) return { error: '데이터 행이 없습니다.' };
+
+    function f(r, key, dflt) {
+      var c = C[key];
+      if (c < 0) return dflt === undefined ? '' : dflt;
+      var v = r[c];
+      return (v === null || v === undefined) ? (dflt === undefined ? '' : dflt) : v;
+    }
+
+    // === 1단계 : 환자·일자별 PN 원문 수집 ===
+    var dPN = {}, dInfo = {};
+    for (var i = 0; i < n; i++) {
+      var k = normDate(data[i][C['처방일자']]) + '|' + String(f(data[i], '차트번호')).trim();
+      var txt = String(f(data[i], '일자별PN기록'));
+      if (txt.trim().length && !(k in dPN)) dPN[k] = txt;
+      if (!(k in dInfo)) {
+        dInfo[k] = [String(f(data[i], '수진자명')), String(f(data[i], '병동')), String(f(data[i], '병실'))];
+      }
+    }
+
+    // === 2단계 : PN 파싱 ===
+    var dEnt = {}, dUsed = {};
+    Object.keys(dPN).forEach(function (key) { dEnt[key] = parsePN(dPN[key]); });
+
+    // === 3-0단계 : 세부코드별 실제 청구 회차 ===
+    var dCH = {}, dCHn = {}, dTop = {}, codeHoeMap = {}, dCodeName = {};
+    var hasCode = C['세부코드'] >= 0;
+    if (hasCode) {
+      for (i = 0; i < n; i++) {
+        var ck = String(f(data[i], '세부코드')).trim();
+        if (!ck) continue;
+        if (!(ck in dCodeName)) dCodeName[ck] = String(f(data[i], '세부명칭'));
+        var hl = hoeOf(f(data[i], '슬립명칭'));
+        if (!hl) continue;
+        dCH[ck + '\u0002' + hl] = (dCH[ck + '\u0002' + hl] || 0) + 1;
+        dCHn[ck] = (dCHn[ck] || 0) + 1;
+      }
+      Object.keys(dCH).forEach(function (vk) {
+        var p = vk.split('\u0002'), c = p[0];
+        var cur = dTop[c] ? (dCH[c + '\u0002' + dTop[c]] || 0) : 0;
+        if (dCH[vk] > cur) dTop[c] = p[1];
+      });
+      // 같은 코드가 3건 이상 & 8할 이상이 한 회차일 때만 기준으로 삼는다
+      Object.keys(dTop).forEach(function (c) {
+        var best = dTop[c], bc = dCH[c + '\u0002' + best] || 0;
+        if (bc >= 3 && bc * 10 >= (dCHn[c] || 0) * 8) codeHoeMap[c] = best;
+      });
+      // 건수가 적어 판정이 안 된 코드는 코드 규칙으로 메운다 (기본=회2, +001=회3)
+      Object.keys(dTop).forEach(function (c) {
+        if (codeHoeMap[c]) return;
+        if (c.length > 3 && c.slice(-3) === '001') {
+          var base = c.slice(0, -3);
+          if (codeHoeMap[base] === '회2') codeHoeMap[c] = '회3';
+        } else if (codeHoeMap[c + '001'] === '회3') {
+          codeHoeMap[c] = '회2';
+        }
+      });
+      // 수동지정 우선
+      Object.keys(codeFix).forEach(function (c) {
+        var h = hoeNum(codeFix[c]);
+        if (h >= 1 && h <= 4) codeHoeMap[c] = '회' + h;
+      });
+    }
+
+    // === 3-1단계 : 기본 정보 + 수량 검사 ===
+    var R = new Array(n), aKey = [], aNm = [], aNm2 = [], aTh = [], aSs = [], aEe = [];
+    var dKeyRows = {};
+    var aHit = [], aStat = [], aMemo = [], aSkip = [], aEval = [], dOwn = {};
+    var cntQ = {};
+
+    for (i = 0; i < n; i++) {
+      var r = data[i];
+      var key = normDate(r[C['처방일자']]) + '|' + String(f(r, '차트번호')).trim();
+      var sNm = normName(f(r, '세부명칭'));
+      var sTh = String(f(r, '세부치료사')).trim();
+      var sS = normTime(r[C['세부치료시작']]);
+      var sE = normTime(r[C['세부치료종료']]);
+      var slip = String(f(r, '슬립명칭'));
+
+      aKey[i] = key; aNm[i] = sNm; aTh[i] = sTh; aSs[i] = sS; aEe[i] = sE;
+      if (!dKeyRows[key]) dKeyRows[key] = [];
+      dKeyRows[key].push(i);
+      aNm2[i] = normName(slip);
+      aEval[i] = kwHit(slip + ' ' + f(r, '세부명칭'), evalList);
+      aHit[i] = 0; aStat[i] = ''; aMemo[i] = ''; aSkip[i] = false;
+      if (sTh) dOwn[key + '\u0002' + sTh] = 1;
+
+      var o = {
+        seq: f(r, '순서', i + 1),
+        date: normDate(r[C['처방일자']]),
+        chart: String(f(r, '차트번호')).trim(),
+        name: String(f(r, '수진자명')),
+        ward: String(f(r, '병동')),
+        room: String(f(r, '병실')),
+        slip: slip,
+        item: String(f(r, '세부명칭')),
+        ther: sTh,
+        st: sS, et: sE,
+        stat: '', pnTitle: '', pnBy: '', memo: '',
+        hoe: '', min: '', qty: '', expQ: '', qStat: '',
+        hoeLbl: '', hoeCode: '', hoeJudge: '', pnFlag: ''
+      };
+      R[i] = o;
+
+      if (kwHit(slip + ' ' + o.item, skipList)) {
+        aSkip[i] = true; aStat[i] = '대조제외'; aMemo[i] = 'PN 작성 대상이 아닌 항목';
+      } else if (!sTh || !sS || !sE) {
+        aSkip[i] = true; aStat[i] = '슬립정보없음'; aMemo[i] = '세부치료사 또는 치료시간이 비어 있음';
+      }
+
+      // 회차 판정 : 실제 청구 회차는 세부코드가 결정한다
+      var hoeLbl = hoeOf(slip) || hoeOf(o.item);
+      var hoeCode = '';
+      if (hasCode) {
+        var cc = String(f(r, '세부코드')).trim();
+        if (cc && codeHoeMap[cc]) hoeCode = codeHoeMap[cc];
+      }
+      var hoe = hoeCode || hoeLbl;
+      o.hoeLbl = hoeLbl; o.hoeCode = hoeCode;
+      o.hoeJudge = (hoeLbl && hoeCode && hoeLbl !== hoeCode) ? '가산체크확인' : '';
+      o.hoe = hoe;
+      o.pnFlag = C['PN'] >= 0 ? String(f(r, 'PN')).trim() : '';
+
+      // 수량 검사
+      var qv = C['수량'] >= 0 ? String(f(r, '수량')).trim() : '';
+      var mi = minutesOf(f(r, '세부치료소요시간(분)'), sS, sE);
+      var expQ = -1;
+      //  수량은 '슬립명칭에 회차가 붙은' 회복기 슬립만 시간으로 따진다.
+      //  Qd/Bid 같은 비회복기 슬립은 이름에 회차가 없으므로 수량 1이 맞다.
+      //  (세부코드로 뽑은 회차는 회차 검사용이지, 수량 규칙의 근거가 아니다)
+      if (hoeLbl) {
+        if (mi > 0 && unit > 0) expQ = Math.max(1, Math.floor(mi / unit));
+      } else {
+        expQ = nonHoe;
+      }
+      o.min = mi > 0 ? mi : '';
+      o.qty = qv;
+      o.expQ = expQ >= 0 ? expQ : '';
+      var qStat;
+      if (C['수량'] < 0 || expQ < 0) qStat = '검사제외';
+      else if (!qv) qStat = '수량없음';
+      else if (qv === String(expQ)) qStat = '수량일치';
+      else qStat = '수량불일치';
+      o.qStat = qStat;
+      cntQ[qStat] = (cntQ[qStat] || 0) + 1;
+    }
+
+    function entsOf(key) { return dEnt[key] || null; }
+    function used(key, j) { return dUsed[key + '\u0002' + j] === 1; }
+    function markUsed(key, j) { dUsed[key + '\u0002' + j] = 1; }
+
+    // === 3-2단계 : 1차 — 시간 + 치료사 + 명칭 완전 일치 ===
+    for (i = 0; i < n; i++) {
+      if (aSkip[i]) continue;
+      var ents = entsOf(aKey[i]);
+      if (!ents || !ents.length) continue;
+      var best = -1, j;
+
+      if (aEval[i]) {
+        for (j = 0; j < ents.length; j++) {
+          if (!used(aKey[i], j) && ents[j].a === aTh[i] && nameMatchEnt(aNm[i], aNm2[i], ents[j], true)) { best = j; break; }
+        }
+        if (best < 0) for (j = 0; j < ents.length; j++) {
+          if (ents[j].a === aTh[i] && nameMatchEnt(aNm[i], aNm2[i], ents[j], true)) { best = j; break; }
+        }
+        if (best < 0) for (j = 0; j < ents.length; j++) {
+          if (!used(aKey[i], j) && ents[j].a === aTh[i]) { best = j; break; }
+        }
+        if (best < 0) for (j = 0; j < ents.length; j++) {
+          if (ents[j].a === aTh[i]) { best = j; break; }
+        }
+      } else {
+        for (j = 0; j < ents.length; j++) {
+          if (!used(aKey[i], j) && ents[j].s === aSs[i] && ents[j].e === aEe[i] && ents[j].a === aTh[i]
+              && nameMatchEnt(aNm[i], aNm2[i], ents[j], aEval[i])) { best = j; break; }
+        }
+        if (best < 0) for (j = 0; j < ents.length; j++) {
+          if (ents[j].s === aSs[i] && ents[j].e === aEe[i] && ents[j].a === aTh[i]
+              && nameMatchEnt(aNm[i], aNm2[i], ents[j], aEval[i])) { best = j; break; }
+        }
+      }
+      if (best >= 0) {
+        aHit[i] = best + 1; aStat[i] = '일치';
+        if (aEval[i]) aMemo[i] = '평가 항목은 시간·제목 비교를 생략함';
+        markUsed(aKey[i], best);
+        R[i].pnTitle = oneLine(ents[best].t);
+        R[i].pnBy = ents[best].a + ' / ' + ents[best].s + '-' + ents[best].e;
+      }
+    }
+
+    // === 3-3단계 : 2차 — 원인 가리기 ===
+    for (i = 0; i < n; i++) {
+      if (aSkip[i] || aHit[i]) continue;
+      var ents2 = entsOf(aKey[i]);
+      if (!ents2 || !ents2.length) {
+        aStat[i] = 'PN기록없음';
+        aMemo[i] = '해당 일자·환자의 일자별PN기록이 없거나 항목을 인식하지 못함';
+        continue;
+      }
+      if (aEval[i]) {
+        aStat[i] = '기록없음';
+        aMemo[i] = '이 치료사가 쓴 PN기록을 찾지 못함';
+        continue;
+      }
+      var b = -1, jj, sc, bestScore;
+
+      // ② 시간 + 치료사 일치, 명칭만 다름
+      for (jj = 0; jj < ents2.length; jj++) {
+        if (!used(aKey[i], jj) && ents2[jj].s === aSs[i] && ents2[jj].e === aEe[i] && ents2[jj].a === aTh[i]) { b = jj; break; }
+      }
+      if (b < 0) for (jj = 0; jj < ents2.length; jj++) {
+        if (ents2[jj].s === aSs[i] && ents2[jj].e === aEe[i] && ents2[jj].a === aTh[i]) { b = jj; break; }
+      }
+      if (b >= 0) {
+        aStat[i] = '명칭확인필요';
+        aMemo[i] = 'PN기록 제목이 세부명칭과 다름';
+      } else {
+        // ③ 치료사 + 명칭 일치, 시간만 다름
+        bestScore = -999999;
+        for (jj = 0; jj < ents2.length; jj++) {
+          if (used(aKey[i], jj)) continue;
+          if (ents2[jj].a !== aTh[i]) continue;
+          if (!nameMatchEnt(aNm[i], aNm2[i], ents2[jj], aEval[i])) continue;
+          sc = matchScore(aSs[i], aEe[i], ents2[jj].s, ents2[jj].e);
+          if (sc > bestScore) { bestScore = sc; b = jj; }
+        }
+        if (b >= 0) {
+          if (!ents2[b].s) {
+            aStat[i] = 'PN시간미기재'; aMemo[i] = 'PN기록에 치료시간이 적혀 있지 않음';
+          } else {
+            aStat[i] = '시간불일치';
+            aMemo[i] = 'PN기록 시간은 ' + ents2[b].s + '-' + ents2[b].e +
+              ' (' + minutesOf('', ents2[b].s, ents2[b].e) + '분)';
+          }
+        } else {
+          // ④ 시간만 일치, 작성자 다름
+          for (jj = 0; jj < ents2.length; jj++) {
+            if (!used(aKey[i], jj) && ents2[jj].s === aSs[i] && ents2[jj].e === aEe[i]
+                && !dOwn[aKey[i] + '\u0002' + ents2[jj].a]) { b = jj; break; }
+          }
+          if (b < 0) for (jj = 0; jj < ents2.length; jj++) {
+            if (ents2[jj].s === aSs[i] && ents2[jj].e === aEe[i]
+                && !dOwn[aKey[i] + '\u0002' + ents2[jj].a]) { b = jj; break; }
+          }
+          if (b >= 0) {
+            aStat[i] = '치료사불일치';
+            aMemo[i] = "같은 시간 기록의 작성자가 '" + ents2[b].a + "'";
+          } else {
+            // ⑤ 치료사만 일치
+            bestScore = -999999;
+            for (jj = 0; jj < ents2.length; jj++) {
+              if (used(aKey[i], jj)) continue;
+              if (ents2[jj].a !== aTh[i]) continue;
+              sc = matchScore(aSs[i], aEe[i], ents2[jj].s, ents2[jj].e);
+              if (sc > bestScore) { bestScore = sc; b = jj; }
+            }
+            if (b >= 0) {
+              if (!ents2[b].s) {
+                aStat[i] = 'PN시간미기재'; aMemo[i] = 'PN기록에 치료시간이 적혀 있지 않음';
+              } else {
+                aStat[i] = '시간·명칭불일치';
+                aMemo[i] = '같은 치료사 기록이 ' + ents2[b].s + '-' + ents2[b].e + '에 다른 제목으로 있음';
+              }
+            } else {
+              aStat[i] = '기록없음';
+              aMemo[i] = '대응하는 PN기록을 찾지 못함';
+            }
+          }
+        }
+      }
+      if (b >= 0) {
+        aHit[i] = b + 1;
+        markUsed(aKey[i], b);
+        R[i].pnTitle = oneLine(ents2[b].t);
+        R[i].pnBy = ents2[b].a + ' / ' + ents2[b].s + '-' + ents2[b].e;
+      }
+    }
+
+    // === 3-3b단계 : 슬립정보없음 행도 짝을 찾아 표시만 ===
+    for (i = 0; i < n; i++) {
+      if (aStat[i] !== '슬립정보없음') continue;
+      var e3 = entsOf(aKey[i]);
+      if (!e3 || !e3.length) continue;
+      var b3 = -1, j3;
+      if (aSs[i] && aEe[i]) {
+        for (j3 = 0; j3 < e3.length; j3++) {
+          if (!used(aKey[i], j3) && e3[j3].s === aSs[i] && e3[j3].e === aEe[i]
+              && nameMatchEnt(aNm[i], aNm2[i], e3[j3], aEval[i])) { b3 = j3; break; }
+        }
+        if (b3 < 0) for (j3 = 0; j3 < e3.length; j3++) {
+          if (!used(aKey[i], j3) && e3[j3].s === aSs[i] && e3[j3].e === aEe[i]) { b3 = j3; break; }
+        }
+      }
+      if (b3 < 0 && aTh[i]) {
+        for (j3 = 0; j3 < e3.length; j3++) {
+          if (!used(aKey[i], j3) && e3[j3].a === aTh[i]
+              && nameMatchEnt(aNm[i], aNm2[i], e3[j3], aEval[i])) { b3 = j3; break; }
+        }
+      }
+      if (b3 >= 0) {
+        aHit[i] = b3 + 1;
+        markUsed(aKey[i], b3);
+        R[i].pnTitle = oneLine(e3[b3].t);
+        R[i].pnBy = e3[b3].a + ' / ' + e3[b3].s + '-' + e3[b3].e;
+        aMemo[i] = (aMemo[i] + ' (같은 시간 PN 작성자: ' + e3[b3].a + ')').trim();
+      }
+    }
+
+    // === 3-4단계 : 회차 검사 + 집계 ===
+    var cnt = {}, cHoeCode = 0, cNoPN = 0, dDay = {};
+    for (i = 0; i < n; i++) {
+      var o2 = R[i];
+      if (aStat[i] === '일치') {
+        var hn = hoeNum(o2.hoe);
+        var pnHn = hoeNum(hoeOf(o2.pnTitle));
+        var lblHn = hoeNum(o2.hoeLbl);
+        if (o2.hoeJudge === '가산체크확인') {
+          // 슬립 회차와 청구 코드 회차가 어긋난 행은 회차를 단정하지 않는다.
+          // PN 표기가 양쪽 어느 것과도 다를 때만 불일치로 본다.
+          if (pnHn >= 1 && pnHn !== hn && pnHn !== lblHn) {
+            aStat[i] = '회차불일치';
+            aMemo[i] = 'PN은 회' + pnHn + ' 표기인데 청구는 회' + hn + ' / 슬립명칭은 회' + lblHn;
+          }
+        } else if (hn >= 1 && hn <= 4 && pnHn >= 1 && pnHn !== hn) {
+          aStat[i] = '회차불일치';
+          aMemo[i] = 'PN은 회' + pnHn + ' 표기인데 청구는 회' + hn;
+        } else if (hn >= 1 && hn <= 4 && hoeReq[hn] && pnHn !== hn) {
+          aStat[i] = '회차표기누락';
+          aMemo[i] = 'PN 제목 앞에 회' + hn + ' 표기가 없음';
+        }
+      }
+      if (C['PN'] >= 0 && !o2.pnFlag && !aSkip[i]) {
+        cNoPN++;
+        if (aStat[i] === '일치') {
+          aMemo[i] = (aMemo[i] + ' / [PN] 표시가 비어 있음 - 다른 기록에 함께 적혔는지 확인').trim();
+        } else {
+          aMemo[i] = '[PN] 표시가 비어 있음 - EMR에도 기록이 없는 청구. ' + aMemo[i];
+        }
+      }
+      if (o2.hoeJudge === '가산체크확인') cHoeCode++;
+      dDay[o2.date] = (dDay[o2.date] || 0) + 1;
+      o2.stat = aStat[i];
+      o2.memo = aMemo[i];
+      cnt[aStat[i]] = (cnt[aStat[i]] || 0) + 1;
+    }
+
+    // === 4-9단계 : 액팅 건수 ↔ PN 건수 대조 ===
+    //   치료사.치료 단위로 넘긴 건수와 쓴 기록 수를 세어, 남는 기록이
+    //   '액팅을 아예 안 한 것'인지 '기록을 더 쓴 것'인지 가린다.
+    var cmp = [], noteBk = {};
+    Object.keys(dKeyRows).forEach(function (key) {
+      var idxs = dKeyRows[key], es = dEnt[key] || [], bks = [], bi, b;
+      var parts = key.split('|'), inf = dInfo[key] || ['', '', ''];
+
+      idxs.forEach(function (i3) {
+        if (aSkip[i3]) return;
+        b = null;
+        for (bi = 0; bi < bks.length; bi++) {
+          if (bks[bi].ther === aTh[i3] && bks[bi].nm === aNm[i3]) { b = bks[bi]; break; }
+        }
+        if (!b) {
+          b = { ther: aTh[i3], nm: aNm[i3], nm2: aNm2[i3], item: R[i3].item,
+                ev: aEval[i3], acts: [], notes: [] };
+          bks.push(b);
+        }
+        b.acts.push(i3);
+      });
+
+      es.forEach(function (en, j) {
+        b = null;
+        for (bi = 0; bi < bks.length; bi++) {
+          if (bks[bi].ther !== en.a) continue;
+          if (bks[bi].acts.length && !nameMatchEnt(bks[bi].nm, bks[bi].nm2, en, bks[bi].ev)) continue;
+          if (!bks[bi].acts.length && bks[bi].nm !== en.n) continue;
+          b = bks[bi]; break;
+        }
+        if (!b) {
+          b = { ther: en.a, nm: en.n, nm2: '', item: cut(en.t, 24), ev: false, acts: [], notes: [] };
+          bks.push(b);
+        }
+        b.notes.push(j);
+        noteBk[key + '\u0002' + j] = b;
+      });
+
+      bks.forEach(function (bk) {
+        //  기록된 건수 = 짝이 맞은 액팅 + 짝이 없는 남은 기록
+        //  (모달리티 묶음처럼 기록 하나가 여러 액팅을 덮는 경우를 그대로 인정한다)
+        var done = 0, k3;
+        for (k3 = 0; k3 < bk.acts.length; k3++) if (aHit[bk.acts[k3]] > 0) done++;
+        var extra = 0;
+        for (k3 = 0; k3 < bk.notes.length; k3++) if (!used(key, bk.notes[k3])) extra++;
+        var pnN = done + extra;
+        if (bk.acts.length === pnN) return;
+        cmp.push({
+          date: parts[0], chart: parts[1], name: inf[0], ther: bk.ther,
+          item: cut(bk.item, 24),
+          act: bk.acts.length, pn: pnN,
+          actTime: bk.acts.map(function (x) { return R[x].st + '-' + R[x].et; }).join(', '),
+          pnTime: bk.notes.map(function (x) { return es[x].s + '-' + es[x].e; }).join(', '),
+          note: bk.acts.length === 0
+            ? '액팅이 없는데 PN 기록만 ' + pnN + '건 있습니다.'
+            : pnN === 0
+              ? '액팅 ' + bk.acts.length + '건인데 PN 기록이 없습니다.'
+              : bk.acts.length > pnN
+                ? '액팅 ' + bk.acts.length + '건 중 ' + pnN + '건만 기록되어 있습니다.'
+                : 'PN 기록이 액팅보다 ' + (pnN - bk.acts.length) + '건 많습니다.'
+        });
+      });
+    });
+    cmp.sort(function (a, b2) {
+      if (a.date !== b2.date) return a.date < b2.date ? -1 : 1;
+      if (a.ther !== b2.ther) return a.ther < b2.ther ? -1 : 1;
+      return a.name < b2.name ? -1 : a.name > b2.name ? 1 : 0;
+    });
+
+    // === 5단계 : PN에만 있는 기록 ===
+    var orph = [];
+    Object.keys(dEnt).forEach(function (key) {
+      var es = dEnt[key];
+      if (!es || !es.length) return;
+      var parts = key.split('|');
+      var inf = dInfo[key] || ['', '', ''];
+      es.forEach(function (e, j) {
+        if (used(key, j)) return;
+        // 이미 청구와 짝지어진 기록과 제목.시간.작성자가 같으면 '청구없음'이 아니라 중복 작성이다
+        var dup = false;
+        for (var j2 = 0; j2 < es.length; j2++) {
+          if (j2 === j || !used(key, j2)) continue;
+          if (es[j2].a === e.a && es[j2].s === e.s && es[j2].e === e.e && es[j2].n === e.n) { dup = true; break; }
+        }
+        var bk = noteBk[key + '\u0002' + j];
+        var act = bk ? bk.acts.length : 0;
+        var pnN = bk ? bk.notes.length : 1;
+        orph.push({
+          date: parts[0], chart: parts[1], name: inf[0], ward: inf[1], room: inf[2],
+          title: oneLine(e.t), st: e.s, et: e.e, ther: e.a, dup: dup,
+          kind: dup ? '중복작성' : (act === 0 ? '청구없음' : '기록초과'),
+          act: act, pn: pnN,
+          actTime: bk ? bk.acts.map(function (x) { return R[x].st + '-' + R[x].et; }).join(', ') : ''
+        });
+      });
+    });
+
+    // === 5-4단계 : 회차별 건수 대조 (심사과 방식) ===
+    var dBill = {}, dRec = {}, dGI = {};
+    function gkey(d, c, nm, h) { return d + '\u0002' + c + '\u0002' + nm + '\u0002' + h; }
+    for (i = 0; i < n; i++) {
+      if (aSkip[i]) continue;
+      var gnm = aNm[i], ghoe = R[i].hoe;
+      if (!gnm || !ghoe) continue;   // 회차가 붙는 청구만 대상
+      var gk = gkey(R[i].date, R[i].chart, gnm, ghoe);
+      dBill[gk] = (dBill[gk] || 0) + 1;
+      if (aStat[i] === '일치') dRec[gk] = (dRec[gk] || 0) + 1;
+      if (!(gk in dGI)) dGI[gk] = { date: R[i].date, chart: R[i].chart, name: R[i].name, item: R[i].item, hoe: ghoe };
+      if (aStat[i] === '회차불일치') {
+        var gh2 = hoeOf(R[i].pnTitle);
+        if (gh2) {
+          var gk2 = gkey(R[i].date, R[i].chart, gnm, gh2);
+          dRec[gk2] = (dRec[gk2] || 0) + 1;
+          if (!(gk2 in dGI)) dGI[gk2] = { date: R[i].date, chart: R[i].chart, name: R[i].name, item: R[i].item, hoe: gh2 };
+        }
+      }
+    }
+    orph.forEach(function (o3) {
+      if (o3.dup) return;
+      var gnm2 = normName(o3.title), gh3 = hoeOf(o3.title);
+      if (!gnm2 || !gh3) return;
+      var gk3 = gkey(o3.date, o3.chart, gnm2, gh3);
+      dRec[gk3] = (dRec[gk3] || 0) + 1;
+      if (!(gk3 in dGI)) dGI[gk3] = { date: o3.date, chart: o3.chart, name: o3.name, item: cut(o3.title, 24), hoe: gh3 };
+    });
+
+    var grp = [];
+    Object.keys(dGI).forEach(function (gk4) {
+      var bq = dBill[gk4] || 0, rq = dRec[gk4] || 0;
+      if (bq === rq) return;
+      var gi = dGI[gk4];
+      var lbl = cut(gi.item, 16) + '[' + gi.hoe + ']';
+      var mark, note;
+      if (bq === 0) {
+        mark = lbl + ' 오더없음--' + rq;
+        note = '청구에 없는 회차로 기록이 쓰여 있습니다. 회차 표기를 확인해 주세요.';
+      } else if (rq < bq) {
+        mark = lbl + ' ' + bq + '--' + rq;
+        note = '청구 ' + bq + '건 중 ' + rq + '건만 기록되어 있습니다. (' + (bq - rq) + '건 부족)';
+      } else {
+        mark = lbl + ' ' + bq + '--' + rq;
+        note = '기록이 청구보다 많습니다. 확인해 주세요.';
+      }
+      grp.push({
+        date: gi.date, chart: gi.chart, name: gi.name, item: gi.item, hoe: gi.hoe,
+        bill: bq === 0 ? '오더없음' : bq, rec: rq, mark: mark, note: note
+      });
+    });
+    grp.sort(function (a, b) {
+      return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    });
+
+    // === 확인필요 목록 ===
+    var RANK = {
+      '기록없음': 1, 'PN기록없음': 2, '시간불일치': 3, '시간·명칭불일치': 4,
+      'PN시간미기재': 5, '치료사불일치': 6, '명칭확인필요': 7, '회차표기누락': 7, '회차불일치': 7,
+      '슬립정보없음': 8
+    };
+    var ACT = {
+      '기록없음': 'PN 미작성 - 기록 추가', 'PN기록없음': '해당일 PN 없음 - 기록 추가',
+      '시간불일치': 'PN 시간 수정', '시간·명칭불일치': 'PN 시간/제목 확인',
+      'PN시간미기재': 'PN에 치료시간 기재', '치료사불일치': '작성자 확인',
+      '명칭확인필요': 'PN 제목 확인', '회차표기누락': 'PN 제목에 회차 표기 추가',
+      '회차불일치': 'PN 회차 표기 수정', '슬립정보없음': '슬립 치료사/시간 확인'
+    };
+    var CAT = {
+      '기록없음': '1_기록누락', 'PN기록없음': '1_기록누락',
+      '시간불일치': '2_기록시간확인', 'PN시간미기재': '2_기록시간확인',
+      '명칭확인필요': '3_기록내용확인', '치료사불일치': '3_기록내용확인',
+      '회차표기누락': '3_기록내용확인', '시간·명칭불일치': '3_기록내용확인',
+      '청구없음': '4_청구누락', '중복작성': '3_기록내용확인', '기록초과': '3_기록내용확인',
+      '수량불일치': '5_수량확인', '수량없음': '5_수량확인',
+      '슬립정보없음': '6_슬립확인', '회차불일치': '7_회차확인', '가산체크확인': '7_회차확인'
+    };
+
+    var todo = [];
+    function pushTodo(o, type, act, note, rank) {
+      todo.push({
+        type: type, act: act, cat: CAT[type] || '', date: o.date, chart: o.chart,
+        ward: o.ward, room: o.room, name: o.name, ther: o.ther,
+        billed: o.slipForTodo || o.item, time: o.st + '-' + o.et,
+        pnTitle: o.pnTitle, pnBy: o.pnBy, note: note, rank: rank
+      });
+    }
+
+    for (i = 0; i < n; i++) {
+      var o4 = R[i];
+      var rk = RANK[o4.stat] || 0;
+      if (rk > 0) {
+        todo.push({
+          type: o4.stat, act: ACT[o4.stat] || '', cat: CAT[o4.stat] || '',
+          date: o4.date, chart: o4.chart, ward: o4.ward, room: o4.room,
+          name: o4.name, ther: o4.ther, billed: o4.item, time: o4.st + '-' + o4.et,
+          pnTitle: o4.pnTitle, pnBy: o4.pnBy, note: o4.memo, rank: rk
+        });
+      }
+      if (o4.qStat === '수량불일치' || o4.qStat === '수량없음') {
+        todo.push({
+          type: o4.qStat, act: '청구 수량 확인', cat: CAT[o4.qStat],
+          date: o4.date, chart: o4.chart, ward: o4.ward, room: o4.room,
+          name: o4.name, ther: o4.ther, billed: o4.slip, time: o4.st + '-' + o4.et,
+          pnTitle: '', pnBy: '',
+          note: '수량 ' + o4.qty + ' / ' + o4.min + '분이면 ' + o4.expQ + '이어야 함', rank: 9
+        });
+      }
+      // 회차불일치로 이미 올라간 행은 같은 내용이므로 중복으로 올리지 않는다
+      if (o4.hoeJudge === '가산체크확인' && o4.stat !== '회차불일치') {
+        todo.push({
+          type: '가산체크확인', act: '액팅 가산 체크 확인', cat: CAT['가산체크확인'],
+          date: o4.date, chart: o4.chart, ward: o4.ward, room: o4.room,
+          name: o4.name, ther: o4.ther, billed: o4.slip, time: o4.st + '-' + o4.et,
+          pnTitle: o4.pnTitle, pnBy: o4.pnBy,
+          note: '슬립은 ' + o4.hoeLbl + ' 인데 ' + o4.hoeCode + ' 로 청구됨 - ' +
+            (hoeNum(o4.hoeLbl) > hoeNum(o4.hoeCode) ? '액팅할 때 가산 체크가 빠졌을 가능성' : '액팅의 가산 체크 확인 필요'),
+          rank: 8
+        });
+      }
+    }
+    var ORPH_ACT = { '중복작성': '중복 기록 확인', '기록초과': '기록 건수 확인', '청구없음': '액팅 누락 여부 확인' };
+    var ORPH_NOTE = {
+      '중복작성': function (o) { return '같은 내용의 PN기록이 ' + o.pn + '건 있음'; },
+      '기록초과': function (o) { return '액팅 ' + o.act + '건(' + o.actTime + ') / PN기록 ' + o.pn + '건'; },
+      '청구없음': function (o) { return '이 치료사의 액팅이 없는데 PN기록만 있음'; }
+    };
+    orph.forEach(function (o5) {
+      todo.push({
+        type: o5.kind, act: ORPH_ACT[o5.kind], cat: CAT[o5.kind],
+        date: o5.date, chart: o5.chart, ward: o5.ward, room: o5.room,
+        name: o5.name, ther: o5.ther,
+        billed: o5.kind === '청구없음' ? '' : o5.actTime,
+        time: '',
+        pnTitle: o5.title, pnBy: o5.ther + ' / ' + o5.st + '-' + o5.et,
+        note: ORPH_NOTE[o5.kind](o5),
+        rank: o5.kind === '청구없음' ? 10 : 7
+      });
+    });
+    todo.sort(function (a, b) {
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      if (a.ther !== b.ther) return a.ther < b.ther ? -1 : 1;
+      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    });
+
+    // === 공지용 ===
+    function timePart(s) { var p = String(s).indexOf('/'); return p >= 0 ? String(s).slice(p + 1).trim() : String(s).trim(); }
+    function namePart(s) { var p = String(s).indexOf('/'); return p >= 0 ? String(s).slice(0, p).trim() : String(s).trim(); }
+
+    var notice = [];
+    for (i = 0; i < n; i++) {
+      var o6 = R[i], rk2 = 0, msg = '';
+      switch (o6.stat) {
+        case '기록없음':
+          rk2 = 1; msg = 'PN 기록이 없습니다.';
+          if (C['PN'] >= 0 && !o6.pnFlag) msg = 'PN 기록이 없습니다. (EMR [PN] 표시도 비어 있습니다)';
+          break;
+        case 'PN기록없음': rk2 = 1; msg = '이 날짜 PN이 비어 있습니다.'; break;
+        case '시간불일치': rk2 = 2; msg = 'PN 기록 시간이 ' + timePart(o6.pnBy) + ' 입니다.'; break;
+        case 'PN시간미기재': rk2 = 2; msg = 'PN 기록에 치료시간 표기가 없습니다.'; break;
+        case '시간·명칭불일치': rk2 = 3; msg = 'PN 기록이 [' + cut(o6.pnTitle, 30) + '] ' + timePart(o6.pnBy) + ' 로 되어 있습니다.'; break;
+        case '치료사불일치': rk2 = 3; msg = '같은 시간 PN 기록 작성자가 ' + namePart(o6.pnBy) + ' 입니다.'; break;
+        case '명칭확인필요': rk2 = 3; msg = 'PN 기록 제목이 [' + cut(o6.pnTitle, 30) + '] 입니다.'; break;
+        case '회차표기누락': rk2 = 3; msg = 'PN 제목 앞에 ' + o6.hoe + ' 표기가 빠졌습니다.'; break;
+        case '회차불일치':
+          rk2 = 3;
+          msg = 'PN 제목은 ' + hoeOf(o6.pnTitle) + ' 표기인데 실제 청구는 ' + o6.hoe + ' 입니다.';
+          if (o6.hoeCode && o6.hoeLbl !== o6.hoeCode) {
+            msg += ' (슬립명칭에는 ' + o6.hoeLbl + ' 로 떠 있으나 청구 코드는 ' + o6.hoeCode + ' 입니다)';
+          }
+          break;
+        case '슬립정보없음': rk2 = 6; msg = '슬립에 치료사 또는 치료시간이 비어 있습니다.'; break;
+      }
+      if (rk2 > 0) {
+        notice.push({
+          date: o6.date, name: o6.name, ther: o6.ther,
+          billed: o6.item + ' (' + o6.st + '-' + o6.et + ')',
+          type: o6.stat, msg: msg, rank: rk2
+        });
+      }
+      if (o6.qStat === '수량불일치' || o6.qStat === '수량없음') {
+        notice.push({
+          date: o6.date, name: o6.name, ther: o6.ther,
+          billed: o6.slip + ' (' + o6.st + '-' + o6.et + ')',
+          type: o6.qStat,
+          msg: o6.min + '분 치료인데 청구 수량이 ' + o6.qty + '입니다. (' + o6.expQ + ' 이어야 함)',
+          rank: 4
+        });
+      }
+      if (o6.hoeJudge === '가산체크확인' && o6.stat !== '회차불일치') {
+        notice.push({
+          date: o6.date, name: o6.name, ther: o6.ther,
+          billed: o6.slip + ' (' + o6.st + '-' + o6.et + ')',
+          type: '가산체크확인',
+          msg: '슬립은 ' + o6.hoeLbl + ' 인데 ' + o6.hoeCode + ' 로 청구되어 있습니다.',
+          rank: 4
+        });
+      }
+    }
+    orph.forEach(function (o7) {
+      var msg7, bill7, rk7;
+      if (o7.kind === '중복작성') {
+        bill7 = cut(o7.title, 30) + ' (' + o7.st + '-' + o7.et + ')';
+        msg7 = '같은 내용의 PN 기록이 ' + o7.pn + '건 있습니다.';
+        rk7 = 3;
+      } else if (o7.kind === '기록초과') {
+        bill7 = cut(o7.title, 30) + ' (' + o7.st + '-' + o7.et + ')';
+        msg7 = '액팅은 ' + o7.act + '건(' + o7.actTime + ')인데 PN 기록은 ' + o7.pn + '건입니다.';
+        rk7 = 3;
+      } else {
+        bill7 = '(액팅 없음) ' + cut(o7.title, 30) + ' (' + o7.st + '-' + o7.et + ')';
+        msg7 = '이 치료사의 액팅이 없는데 PN 기록만 있습니다.';
+        rk7 = 5;
+      }
+      notice.push({
+        date: o7.date, name: o7.name, ther: o7.ther,
+        billed: bill7, type: o7.kind, msg: msg7, rank: rk7
+      });
+    });
+    notice.sort(function (a, b) {
+      if (a.ther !== b.ther) return a.ther < b.ther ? -1 : 1;
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      return a.rank - b.rank;
+    });
+
+    // === 일자별 검사 현황 ===
+    var days = Object.keys(dDay).filter(function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
+    var cover = [];
+    if (days.length) {
+      var DW = '일월화수목금토';
+      var cur = new Date(days[0] + 'T00:00:00Z');
+      var last = new Date(days[days.length - 1] + 'T00:00:00Z');
+      while (cur <= last) {
+        var ds = cur.getUTCFullYear() + '-' + pad2(cur.getUTCMonth() + 1) + '-' + pad2(cur.getUTCDate());
+        cover.push({ date: ds, dow: DW[cur.getUTCDay()], cnt: dDay[ds] || 0, missing: !(ds in dDay) });
+        cur = new Date(cur.getTime() + 86400000);
+      }
+    }
+
+    // === 세부코드 회차 판정표 ===
+    var codeTable = [];
+    Object.keys(dCodeName).forEach(function (c) {
+      var dist = [];
+      for (var h = 1; h <= 4; h++) {
+        var v = dCH[c + '\u0002회' + h] || 0;
+        if (v) dist.push('회' + h + ' ' + v + '건');
+      }
+      if (!dist.length) return;
+      codeTable.push({
+        code: c, item: dCodeName[c], hoe: codeHoeMap[c] || '(판정불가)',
+        dist: dist.join(' / '), fixed: codeFix[c] || ''
+      });
+    });
+    codeTable.sort(function (a, b) { return a.code < b.code ? -1 : a.code > b.code ? 1 : 0; });
+
+    var cDup = orph.filter(function (o) { return o.kind === '중복작성'; }).length;
+    var cOver = orph.filter(function (o) { return o.kind === '기록초과'; }).length;
+    var cNone = orph.filter(function (o) { return o.kind === '청구없음'; }).length;
+    return {
+      rows: R, n: n, cnt: cnt, cntQ: cntQ, orph: orph, todo: todo, notice: notice,
+      cmp: cmp, cDup: cDup, cOver: cOver, cNone: cNone,
+      grp: grp, cover: cover, codeTable: codeTable,
+      cHoeCode: cHoeCode, cNoPN: cNoPN,
+      hasPNCol: C['PN'] >= 0, hasCodeCol: hasCode,
+      headerRow: hRow
+    };
+  }
+
+  var API = {
+    run: run, DEFAULTS: DEFAULTS,
+    normName: normName, hoeOf: hoeOf, parsePN: parsePN, normDate: normDate, normTime: normTime
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+  root.PNEngine = API;
+})(typeof window !== 'undefined' ? window : globalThis);
+
 
 </script>
 </body>
